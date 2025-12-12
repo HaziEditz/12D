@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getSubscriptionStatus } from "@/lib/subscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Crown, GraduationCap, User, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, Crown, GraduationCap, User, Sparkles, Tag, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import SubscriptionPayPalButton from "@/components/SubscriptionPayPalButton";
 
 const plans = [
@@ -32,6 +36,7 @@ const plans = [
     description: "For individual learners ready to master trading",
     icon: User,
     popular: true,
+    hasPromoCode: true,
     features: [
       "Full simulator access",
       "$10,000 virtual balance",
@@ -60,9 +65,55 @@ const plans = [
 ];
 
 export default function Pricing() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const status = getSubscriptionStatus(user);
+  const [promoCode, setPromoCode] = useState("");
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [showPromoInput, setShowPromoInput] = useState(false);
+
+  const handleRedeemPromo = async () => {
+    if (!promoCode.trim()) {
+      toast({
+        title: "Enter a code",
+        description: "Please enter a promo code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRedeeming(true);
+    try {
+      const response = await apiRequest("POST", "/api/payments/redeem-promo", {
+        promoCode: promoCode.trim(),
+      });
+      
+      if (response.ok) {
+        await refreshUser();
+        toast({
+          title: "Success!",
+          description: "Promo code redeemed! You now have free Casual access.",
+        });
+        navigate("/dashboard");
+      } else {
+        const data = await response.json();
+        toast({
+          title: "Invalid Code",
+          description: data.error || "This promo code is not valid",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to redeem promo code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRedeeming(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
@@ -126,7 +177,7 @@ export default function Pricing() {
                   </ul>
                 </CardContent>
                 
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-3">
                   {isCurrentPlan ? (
                     <Button
                       className="w-full"
@@ -153,6 +204,49 @@ export default function Pricing() {
                       amount={plan.price.toString()}
                       planName={plan.name}
                     />
+                  )}
+                  
+                  {plan.hasPromoCode && user && !isCurrentPlan && (
+                    <>
+                      {!showPromoInput ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-muted-foreground"
+                          onClick={() => setShowPromoInput(true)}
+                          data-testid="button-show-promo"
+                        >
+                          <Tag className="w-4 h-4 mr-2" />
+                          Have a promo code?
+                        </Button>
+                      ) : (
+                        <div className="w-full space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter promo code"
+                              value={promoCode}
+                              onChange={(e) => setPromoCode(e.target.value)}
+                              className="flex-1"
+                              data-testid="input-promo-code"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRedeemPromo();
+                              }}
+                            />
+                            <Button
+                              onClick={handleRedeemPromo}
+                              disabled={isRedeeming}
+                              data-testid="button-redeem-promo"
+                            >
+                              {isRedeeming ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                "Apply"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardFooter>
               </Card>

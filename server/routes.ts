@@ -547,6 +547,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Promo code redemption route
+  app.post("/api/payments/redeem-promo", requireAuth, async (req, res) => {
+    try {
+      const { promoCode } = req.body;
+      const user = req.user as User;
+
+      // Validate promo code
+      if (promoCode !== "12DIGITS!") {
+        return res.status(400).json({ error: "Invalid promo code" });
+      }
+
+      // Check if user already has an active subscription
+      if (user.membershipStatus === "active" && user.subscriptionId) {
+        return res.status(400).json({ error: "You already have an active subscription" });
+      }
+
+      // Activate free casual subscription
+      await storage.updateUser(user.id, {
+        membershipTier: "casual",
+        membershipStatus: "active",
+        subscriptionId: `PROMO-12DIGITS-${Date.now()}`,
+      });
+
+      res.json({ success: true, message: "Promo code redeemed! You now have free Casual access." });
+    } catch (error) {
+      console.error("Promo redemption error:", error);
+      res.status(500).json({ error: "Failed to redeem promo code" });
+    }
+  });
+
   // Subscription payment routes
   app.post("/api/payments/activate-subscription", requireAuth, async (req, res) => {
     try {
