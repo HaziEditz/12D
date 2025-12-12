@@ -22,7 +22,16 @@ import {
 import { createChart, ColorType, CandlestickData, Time, CandlestickSeries } from "lightweight-charts";
 import type { Trade } from "@shared/schema";
 
-const SYMBOLS = ["BTC/USD", "ETH/USD", "AAPL", "TSLA", "SPY"];
+const SYMBOLS = [
+  // Popular Stocks
+  "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX",
+  // Crypto
+  "BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD",
+  // ETFs & Indices  
+  "SPY", "QQQ", "DIA",
+  // Other Popular Stocks
+  "AMD", "DIS", "PYPL", "UBER", "COIN", "BA", "JPM", "V"
+];
 
 function generateCandlestickData(count: number): CandlestickData[] {
   const data: CandlestickData[] = [];
