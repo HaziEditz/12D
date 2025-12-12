@@ -215,7 +215,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Check if user has enough balance
       const cost = data.quantity * data.entryPrice;
-      if (user.simulatorBalance < cost) {
+      if ((user.simulatorBalance ?? 10000) < cost) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
 
