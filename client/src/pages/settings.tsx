@@ -59,7 +59,12 @@ export default function SettingsPage() {
 
   const profileMutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
-      const response = await apiRequest("PATCH", "/api/user/profile", data);
+      const payload = {
+        displayName: data.displayName,
+        bio: data.bio || null,
+        avatarUrl: data.avatarUrl || null,
+      };
+      const response = await apiRequest("PATCH", "/api/user/profile", payload);
       return response.json();
     },
     onSuccess: () => {
