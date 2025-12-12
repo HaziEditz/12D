@@ -17,6 +17,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("student"),
   membershipTier: text("membership_tier"),
   membershipStatus: text("membership_status").default("inactive"),
+  trialStartDate: timestamp("trial_start_date").defaultNow(),
+  subscriptionId: text("subscription_id"),
   simulatorBalance: real("simulator_balance").default(10000),
   totalProfit: real("total_profit").default(0),
   lessonsCompleted: integer("lessons_completed").default(0),

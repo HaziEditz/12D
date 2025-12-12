@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { Navbar } from "@/components/navbar";
+import { TrialBanner } from "@/components/paywall";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
@@ -17,6 +18,7 @@ import SimulatorPage from "@/pages/simulator";
 import LeaderboardPage from "@/pages/leaderboard";
 import AdminPage from "@/pages/admin";
 import TeacherPage from "@/pages/teacher";
+import PricingPage from "@/pages/pricing";
 
 function Router() {
   return (
@@ -24,6 +26,7 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/lessons" component={LessonsPage} />
       <Route path="/dashboard" component={DashboardPage} />
@@ -39,6 +42,7 @@ function Router() {
 function AppContent() {
   return (
     <div className="min-h-screen bg-background">
+      <TrialBanner />
       <Navbar />
       <Router />
     </div>

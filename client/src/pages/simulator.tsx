@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
+import { Paywall } from "@/components/paywall";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -216,7 +217,8 @@ export default function SimulatorPage() {
   }, 0) ?? 0;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4">
+    <Paywall featureName="the Trading Simulator">
+      <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4">
       <div className="flex-1 flex flex-col gap-4">
         <Card className="flex-shrink-0">
           <CardContent className="py-3">
@@ -416,6 +418,7 @@ export default function SimulatorPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </Paywall>
   );
 }

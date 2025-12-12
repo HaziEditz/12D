@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Paywall } from "@/components/paywall";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -139,24 +140,27 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map(i => (
-            <Card key={i}>
-              <CardContent className="pt-6">
-                <Skeleton className="h-4 w-24 mb-2" />
-                <Skeleton className="h-8 w-32" />
-              </CardContent>
-            </Card>
-          ))}
+      <Paywall featureName="the Dashboard">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {[1, 2, 3].map(i => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-8 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Skeleton className="h-80 w-full" />
         </div>
-        <Skeleton className="h-80 w-full" />
-      </div>
+      </Paywall>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <Paywall featureName="the Dashboard">
+      <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
@@ -431,6 +435,7 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Paywall>
   );
 }
