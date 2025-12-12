@@ -349,10 +349,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // PayPal routes
-  app.get("/setup", loadPaypalDefault);
-  app.post("/order", createPaypalOrder);
-  app.post("/order/:orderID/capture", capturePaypalOrder);
+  // PayPal routes with error handling
+  app.get("/setup", async (req, res) => {
+    try {
+      await loadPaypalDefault(req, res);
+    } catch (error) {
+      console.error("PayPal setup error:", error);
+      res.status(500).json({ error: "PayPal configuration error. Please check your credentials." });
+    }
+  });
+  
+  app.post("/order", async (req, res) => {
+    try {
+      await createPaypalOrder(req, res);
+    } catch (error) {
+      console.error("PayPal order error:", error);
+      res.status(500).json({ error: "Failed to create PayPal order" });
+    }
+  });
+  
+  app.post("/order/:orderID/capture", async (req, res) => {
+    try {
+      await capturePaypalOrder(req, res);
+    } catch (error) {
+      console.error("PayPal capture error:", error);
+      res.status(500).json({ error: "Failed to capture PayPal order" });
+    }
+  });
 
   // Subscription payment routes
   app.post("/api/payments/activate-subscription", requireAuth, async (req, res) => {
