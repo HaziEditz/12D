@@ -40,6 +40,8 @@ async function ensureAdminUser() {
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Session setup
+  const isProduction = process.env.NODE_ENV === "production";
+  
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "12digits-secret-key-change-in-prod",
@@ -50,10 +52,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }),
       cookie: {
         maxAge: 24 * 60 * 60 * 1000,
-        secure: false,
+        secure: isProduction,
+        sameSite: isProduction ? "lax" : "lax",
+        httpOnly: true,
       },
+      proxy: isProduction,
     })
   );
+  
+  if (isProduction) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(passport.initialize());
   app.use(passport.session());
