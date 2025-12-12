@@ -670,4 +670,83 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(500).json({ error: "Failed to activate subscription" });
     }
   });
+
+  // Profile routes
+  app.patch("/api/user/profile", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { displayName, bio, avatarUrl } = req.body;
+      
+      const updates: Partial<User> = {};
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (bio !== undefined) updates.bio = bio;
+      if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+      
+      await storage.updateUser(user.id, updates);
+      const updatedUser = await storage.getUserById(user.id);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { password: _, ...safeUser } = updatedUser;
+      res.json({ user: safeUser });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/user/password", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new passwords are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+      
+      const fullUser = await storage.getUserById(user.id);
+      if (!fullUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const isValid = await bcrypt.compare(currentPassword, fullUser.password);
+      if (!isValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, { password: hashedPassword });
+      
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const publicProfile = {
+        id: user.id,
+        displayName: user.displayName,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        role: user.role,
+        membershipTier: user.membershipTier,
+        lessonsCompleted: user.lessonsCompleted,
+        totalProfit: user.totalProfit,
+      };
+      
+      res.json(publicProfile);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }

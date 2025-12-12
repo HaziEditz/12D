@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   totalProfit: real("total_profit").default(0),
   lessonsCompleted: integer("lessons_completed").default(0),
   avatarUrl: text("avatar_url"),
+  bio: text("bio"),
   teacherId: varchar("teacher_id"),
   schoolEmail: text("school_email"),
   dailyTradesCount: integer("daily_trades_count").default(0),

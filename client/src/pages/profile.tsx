@@ -1,8 +1,10 @@
 import { useAuth } from "@/lib/auth-context";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   TrendingUp, 
   BookOpen, 
@@ -11,7 +13,8 @@ import {
   Calendar,
   Crown,
   GraduationCap,
-  Zap
+  Zap,
+  Settings
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -81,6 +84,7 @@ export default function ProfilePage() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <Avatar className="h-24 w-24">
+              <AvatarImage src={user?.avatarUrl || undefined} />
               <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                 {getInitials(user?.displayName ?? "U")}
               </AvatarFallback>
@@ -90,9 +94,14 @@ export default function ProfilePage() {
               <h1 className="text-2xl font-bold mb-1" data-testid="text-profile-name">
                 {user?.displayName}
               </h1>
-              <p className="text-muted-foreground mb-3" data-testid="text-profile-email">
+              <p className="text-muted-foreground mb-2" data-testid="text-profile-email">
                 {user?.email}
               </p>
+              {(user as any)?.bio && (
+                <p className="text-sm text-muted-foreground mb-3 max-w-md" data-testid="text-profile-bio">
+                  {(user as any).bio}
+                </p>
+              )}
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                 <Badge variant="secondary" className="gap-1" data-testid="badge-membership">
                   <MembershipIcon className="h-3 w-3" />
@@ -104,12 +113,20 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="text-center md:text-right">
-              <div className="flex items-center gap-2 justify-center md:justify-end mb-1">
-                <Trophy className="h-5 w-5 text-chart-4" />
-                <span className="text-2xl font-bold">#42</span>
+            <div className="text-center md:text-right flex flex-col gap-2 items-center md:items-end">
+              <Link href="/settings">
+                <Button variant="outline" className="gap-2" data-testid="button-edit-profile">
+                  <Settings className="h-4 w-4" />
+                  Edit Profile
+                </Button>
+              </Link>
+              <div>
+                <div className="flex items-center gap-2 justify-center md:justify-end mb-1">
+                  <Trophy className="h-5 w-5 text-chart-4" />
+                  <span className="text-2xl font-bold">#42</span>
+                </div>
+                <p className="text-sm text-muted-foreground">Leaderboard Rank</p>
               </div>
-              <p className="text-sm text-muted-foreground">Leaderboard Rank</p>
             </div>
           </div>
         </CardContent>
