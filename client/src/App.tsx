@@ -13,6 +13,7 @@ import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import ProfilePage from "@/pages/profile";
 import LessonsPage from "@/pages/lessons";
+import LessonDetailPage from "@/pages/lesson-detail";
 import DashboardPage from "@/pages/dashboard";
 import SimulatorPage from "@/pages/simulator";
 import LeaderboardPage from "@/pages/leaderboard";
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/lessons" component={LessonsPage} />
+      <Route path="/lessons/:id" component={LessonDetailPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/simulator" component={SimulatorPage} />
       <Route path="/leaderboard" component={LeaderboardPage} />

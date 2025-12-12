@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
+import { useLocation } from "wouter";
 
 export default function LessonsPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
@@ -127,7 +129,11 @@ export default function LessonsPage() {
                   <h3 className="font-semibold text-lg">{nextLesson.title}</h3>
                 </div>
               </div>
-              <Button className="gap-2" data-testid="button-continue-lesson">
+              <Button 
+                className="gap-2" 
+                data-testid="button-continue-lesson"
+                onClick={() => navigate(`/lessons/${nextLesson.id}`)}
+              >
                 Continue
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -181,6 +187,7 @@ export default function LessonsPage() {
                     variant={isCompleted ? "outline" : "default"} 
                     size="sm"
                     data-testid={`button-start-lesson-${lesson.id}`}
+                    onClick={() => navigate(`/lessons/${lesson.id}`)}
                   >
                     {isCompleted ? "Review" : "Start"}
                   </Button>

@@ -175,10 +175,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(progress);
   });
 
+  app.get("/api/lessons/:id", async (req, res) => {
+    const lesson = await storage.getLessonById(req.params.id);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found" });
+    }
+    res.json(lesson);
+  });
+
   app.post("/api/lessons/:id/progress", requireAuth, async (req, res) => {
     const user = req.user as User;
     const { completed } = req.body;
     await storage.updateLessonProgress(user.id, req.params.id, completed);
+    res.json({ success: true });
+  });
+
+  app.post("/api/lessons/:id/complete", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    await storage.updateLessonProgress(user.id, req.params.id, true);
     res.json({ success: true });
   });
 
