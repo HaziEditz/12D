@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
@@ -232,20 +233,49 @@ export default function SimulatorPage() {
         <Card className="flex-shrink-0">
           <CardContent className="py-3">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  {SYMBOLS.map((symbol) => (
-                    <Button
-                      key={symbol}
-                      variant={selectedSymbol === symbol ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedSymbol(symbol)}
-                      data-testid={`button-symbol-${symbol.replace("/", "-")}`}
-                    >
-                      {symbol}
-                    </Button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-3">
+                <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-symbol">
+                    <SelectValue placeholder="Select asset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Popular Stocks</SelectLabel>
+                      <SelectItem value="AAPL">AAPL - Apple</SelectItem>
+                      <SelectItem value="GOOGL">GOOGL - Google</SelectItem>
+                      <SelectItem value="MSFT">MSFT - Microsoft</SelectItem>
+                      <SelectItem value="AMZN">AMZN - Amazon</SelectItem>
+                      <SelectItem value="TSLA">TSLA - Tesla</SelectItem>
+                      <SelectItem value="META">META - Meta</SelectItem>
+                      <SelectItem value="NVDA">NVDA - Nvidia</SelectItem>
+                      <SelectItem value="NFLX">NFLX - Netflix</SelectItem>
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>Crypto</SelectLabel>
+                      <SelectItem value="BTC/USD">BTC - Bitcoin</SelectItem>
+                      <SelectItem value="ETH/USD">ETH - Ethereum</SelectItem>
+                      <SelectItem value="SOL/USD">SOL - Solana</SelectItem>
+                      <SelectItem value="DOGE/USD">DOGE - Dogecoin</SelectItem>
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>ETFs & Indices</SelectLabel>
+                      <SelectItem value="SPY">SPY - S&P 500</SelectItem>
+                      <SelectItem value="QQQ">QQQ - Nasdaq 100</SelectItem>
+                      <SelectItem value="DIA">DIA - Dow Jones</SelectItem>
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>More Stocks</SelectLabel>
+                      <SelectItem value="AMD">AMD - AMD</SelectItem>
+                      <SelectItem value="DIS">DIS - Disney</SelectItem>
+                      <SelectItem value="PYPL">PYPL - PayPal</SelectItem>
+                      <SelectItem value="UBER">UBER - Uber</SelectItem>
+                      <SelectItem value="COIN">COIN - Coinbase</SelectItem>
+                      <SelectItem value="BA">BA - Boeing</SelectItem>
+                      <SelectItem value="JPM">JPM - JPMorgan</SelectItem>
+                      <SelectItem value="V">V - Visa</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
               <Tabs value={timeframe} onValueChange={setTimeframe}>
                 <TabsList>
