@@ -21,6 +21,8 @@ import AdminPage from "@/pages/admin";
 import TeacherPage from "@/pages/teacher";
 import TeacherDashboard from "@/pages/teacher-dashboard";
 import PricingPage from "@/pages/pricing";
+import StrategiesPage from "@/pages/strategies";
+import AnalyticsPage from "@/pages/analytics";
 
 function Router() {
   return (
@@ -35,6 +37,8 @@ function Router() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/simulator" component={SimulatorPage} />
       <Route path="/leaderboard" component={LeaderboardPage} />
+      <Route path="/strategies" component={StrategiesPage} />
+      <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/teacher" component={TeacherPage} />
       <Route path="/classroom" component={TeacherDashboard} />

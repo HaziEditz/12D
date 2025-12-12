@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { isPremiumTier } from "@/lib/subscription";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -10,6 +11,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, 
   BookOpen, 
@@ -21,7 +23,11 @@ import {
   Menu,
   X,
   GraduationCap,
-  Settings
+  Settings,
+  Library,
+  BarChart3,
+  Lock,
+  Crown
 } from "lucide-react";
 import { useState } from "react";
 
@@ -29,12 +35,15 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const hasPremium = isPremiumTier(user);
 
   const navItems = [
-    { href: "/lessons", label: "Lessons", icon: BookOpen },
-    { href: "/simulator", label: "Simulator", icon: LineChart },
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+    { href: "/lessons", label: "Lessons", icon: BookOpen, premium: false },
+    { href: "/simulator", label: "Simulator", icon: LineChart, premium: false },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
+    { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
+    { href: "/strategies", label: "Strategies", icon: Library, premium: true },
+    { href: "/analytics", label: "Analytics", icon: BarChart3, premium: true },
   ];
 
   const getInitials = (name: string) => {
@@ -61,15 +70,22 @@ export function Navbar() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
+              const showLock = item.premium && !hasPremium;
               return (
                 <Link key={item.href} href={item.href}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
-                    className="gap-2"
+                    className={`gap-2 ${item.premium ? "relative" : ""}`}
                     data-testid={`link-${item.label.toLowerCase()}`}
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
+                    {showLock && (
+                      <Lock className="h-3 w-3 text-amber-500" />
+                    )}
+                    {item.premium && hasPremium && (
+                      <Crown className="h-3 w-3 text-amber-500" />
+                    )}
                   </Button>
                 </Link>
               );
@@ -171,6 +187,7 @@ export function Navbar() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
+              const showLock = item.premium && !hasPremium;
               return (
                 <Link 
                   key={item.href} 
@@ -183,6 +200,12 @@ export function Navbar() {
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
+                    {showLock && (
+                      <Lock className="h-3 w-3 text-amber-500 ml-auto" />
+                    )}
+                    {item.premium && hasPremium && (
+                      <Crown className="h-3 w-3 text-amber-500 ml-auto" />
+                    )}
                   </Button>
                 </Link>
               );

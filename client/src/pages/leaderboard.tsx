@@ -3,8 +3,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Medal, TrendingUp, Crown } from "lucide-react";
+import { Trophy, Medal, TrendingUp, Crown, Sparkles } from "lucide-react";
 import type { User } from "@shared/schema";
+
+function getMembershipBadge(tier: string | null | undefined, status: string | null | undefined) {
+  if (status !== "active" || !tier) return null;
+  
+  if (tier === "premium") {
+    return (
+      <Badge className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs">
+        <Crown className="w-3 h-3 mr-1" />
+        12Digits+
+      </Badge>
+    );
+  }
+  if (tier === "casual") {
+    return (
+      <Badge variant="secondary" className="text-xs">
+        Casual
+      </Badge>
+    );
+  }
+  if (tier === "school") {
+    return (
+      <Badge variant="outline" className="text-xs">
+        School
+      </Badge>
+    );
+  }
+  return null;
+}
 
 export default function LeaderboardPage() {
   const { data: leaderboard, isLoading } = useQuery<User[]>({
@@ -161,11 +189,12 @@ export default function LeaderboardPage() {
                     </Avatar>
                     
                     <div className="flex-1">
-                      <p className="font-semibold">{user.displayName}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{user.displayName}</p>
+                        {getMembershipBadge(user.membershipTier, user.membershipStatus)}
+                      </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>{user.lessonsCompleted ?? 0} lessons</span>
-                        <span className="w-1 h-1 rounded-full bg-muted-foreground" />
-                        <span className="capitalize">{user.membershipTier || "Free"}</span>
                       </div>
                     </div>
                     

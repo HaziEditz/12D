@@ -51,3 +51,23 @@ export function getSubscriptionStatus(user: User | null): {
   
   return { status: "expired", daysRemaining: 0, tier: null };
 }
+
+export function isPremiumTier(user: User | null): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  return user.membershipTier === "premium" && user.membershipStatus === "active";
+}
+
+export function getTierLevel(user: User | null): "none" | "trial" | "casual" | "school" | "premium" {
+  if (!user) return "none";
+  if (user.role === "admin") return "premium";
+  
+  if (hasActiveSubscription(user)) {
+    if (user.membershipTier === "premium") return "premium";
+    if (user.membershipTier === "school") return "school";
+    return "casual";
+  }
+  
+  if (!isTrialExpired(user)) return "trial";
+  return "none";
+}
