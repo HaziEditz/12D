@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Paywall } from "@/components/paywall";
 import { 
   BookOpen, 
@@ -11,11 +12,14 @@ import {
   CheckCircle2, 
   PlayCircle,
   ChevronRight,
-  Filter
+  Filter,
+  Lock,
+  Sparkles
 } from "lucide-react";
 import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
+import { isTrialUser } from "@/lib/subscription";
 
 export default function LessonsPage() {
   const { user } = useAuth();
@@ -47,7 +51,18 @@ export default function LessonsPage() {
     }
   };
 
-  const nextLesson = lessons?.find(l => !completedLessonIds.has(l.id));
+  const isDemoUser = isTrialUser(user);
+  
+  const isLessonLocked = (lesson: Lesson) => {
+    if (!isDemoUser) return false;
+    const difficulty = lesson.difficulty.toLowerCase();
+    return difficulty === "intermediate" || difficulty === "advanced";
+  };
+
+  const availableLessons = lessons?.filter(l => !isLessonLocked(l)) ?? [];
+  const lockedLessons = lessons?.filter(l => isLessonLocked(l)) ?? [];
+  
+  const nextLesson = availableLessons.find(l => !completedLessonIds.has(l.id));
 
   if (lessonsLoading) {
     return (
@@ -116,6 +131,24 @@ export default function LessonsPage() {
         </CardContent>
       </Card>
 
+      {isDemoUser && (
+        <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+          <Lock className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
+            <span>
+              Demo accounts can only access beginner lessons. 
+              <span className="font-medium"> Upgrade to unlock all {totalLessons} lessons!</span>
+            </span>
+            <Link href="/pricing">
+              <Button size="sm" className="gap-1">
+                <Sparkles className="h-3 w-3" />
+                Upgrade Now
+              </Button>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {nextLesson && (
         <Card className="mb-8 border-primary/50 bg-primary/5">
           <CardContent className="pt-6">
@@ -145,10 +178,11 @@ export default function LessonsPage() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {lessons?.map((lesson) => {
           const isCompleted = completedLessonIds.has(lesson.id);
+          const isLocked = isLessonLocked(lesson);
           return (
             <Card 
               key={lesson.id} 
-              className={isCompleted ? "opacity-75" : ""}
+              className={`${isCompleted ? "opacity-75" : ""} ${isLocked ? "opacity-60" : ""}`}
               data-testid={`card-lesson-${lesson.id}`}
             >
               <CardHeader>
@@ -161,7 +195,10 @@ export default function LessonsPage() {
                       >
                         {lesson.difficulty}
                       </Badge>
-                      {isCompleted && (
+                      {isLocked && (
+                        <Lock className="h-4 w-4 text-amber-500" />
+                      )}
+                      {isCompleted && !isLocked && (
                         <CheckCircle2 className="h-5 w-5 text-success" />
                       )}
                     </div>
@@ -183,14 +220,28 @@ export default function LessonsPage() {
                       {lesson.category}
                     </Badge>
                   </div>
-                  <Button 
-                    variant={isCompleted ? "outline" : "default"} 
-                    size="sm"
-                    data-testid={`button-start-lesson-${lesson.id}`}
-                    onClick={() => navigate(`/lessons/${lesson.id}`)}
-                  >
-                    {isCompleted ? "Review" : "Start"}
-                  </Button>
+                  {isLocked ? (
+                    <Link href="/pricing">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="gap-1"
+                        data-testid={`button-unlock-lesson-${lesson.id}`}
+                      >
+                        <Lock className="h-3 w-3" />
+                        Unlock
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button 
+                      variant={isCompleted ? "outline" : "default"} 
+                      size="sm"
+                      data-testid={`button-start-lesson-${lesson.id}`}
+                      onClick={() => navigate(`/lessons/${lesson.id}`)}
+                    >
+                      {isCompleted ? "Review" : "Start"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

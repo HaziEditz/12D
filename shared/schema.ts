@@ -19,12 +19,14 @@ export const users = pgTable("users", {
   membershipStatus: text("membership_status").default("inactive"),
   trialStartDate: timestamp("trial_start_date").defaultNow(),
   subscriptionId: text("subscription_id"),
-  simulatorBalance: real("simulator_balance").default(10000),
+  simulatorBalance: real("simulator_balance").default(5000),
   totalProfit: real("total_profit").default(0),
   lessonsCompleted: integer("lessons_completed").default(0),
   avatarUrl: text("avatar_url"),
   teacherId: varchar("teacher_id"),
   schoolEmail: text("school_email"),
+  dailyTradesCount: integer("daily_trades_count").default(0),
+  lastTradeDate: text("last_trade_date"),
 });
 
 export const lessons = pgTable("lessons", {

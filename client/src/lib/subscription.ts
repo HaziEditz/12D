@@ -71,3 +71,19 @@ export function getTierLevel(user: User | null): "none" | "trial" | "casual" | "
   if (!isTrialExpired(user)) return "trial";
   return "none";
 }
+
+export function isTrialUser(user: User | null): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return false;
+  if (hasActiveSubscription(user)) return false;
+  return !isTrialExpired(user);
+}
+
+export function getStartingBalance(user: User | null): number {
+  if (!user) return 5000;
+  if (user.role === "admin") return 10000;
+  if (hasActiveSubscription(user)) return 10000;
+  return 5000;
+}
+
+export const DEMO_DAILY_TRADE_LIMIT = 5;

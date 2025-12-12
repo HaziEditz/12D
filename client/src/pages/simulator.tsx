@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { Paywall } from "@/components/paywall";
+import { Link } from "wouter";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -18,10 +20,19 @@ import {
   Clock,
   X,
   Plus,
-  Minus
+  Minus,
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 import { createChart, ColorType, CandlestickData, Time, CandlestickSeries } from "lightweight-charts";
 import type { Trade } from "@shared/schema";
+
+interface TradeLimits {
+  isLimited: boolean;
+  remaining: number;
+  limit: number;
+  used: number;
+}
 
 const SYMBOLS = [
   // Popular Stocks
@@ -72,16 +83,22 @@ export default function SimulatorPage() {
     queryKey: ["/api/trades?open=true"],
   });
 
+  const { data: tradeLimits, refetch: refetchLimits } = useQuery<TradeLimits>({
+    queryKey: ["/api/trades/limits"],
+  });
+
   const openTradeMutation = useMutation({
     mutationFn: (data: { symbol: string; type: string; quantity: number; entryPrice: number }) =>
       apiRequest("POST", "/api/trades", data),
     onSuccess: () => {
       refetchTrades();
+      refetchLimits();
       refreshUser();
       toast({ title: "Trade opened successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to open trade", variant: "destructive" });
+    onError: (error: any) => {
+      const message = error?.message || "Failed to open trade";
+      toast({ title: message, variant: "destructive" });
     },
   });
 
@@ -354,6 +371,25 @@ export default function SimulatorPage() {
             <CardDescription>
               Buy if you think price will go up. Sell if you think it will go down.
             </CardDescription>
+            {tradeLimits?.isLimited && (
+              <div className="mt-2">
+                {tradeLimits.remaining > 0 ? (
+                  <Badge variant="secondary" className="text-xs">
+                    Demo: {tradeLimits.remaining}/{tradeLimits.limit} trades left today
+                  </Badge>
+                ) : (
+                  <Alert className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Daily limit reached. 
+                      <Link href="/pricing" className="text-primary font-medium ml-1">
+                        Upgrade for unlimited trades
+                      </Link>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -391,7 +427,7 @@ export default function SimulatorPage() {
               <Button 
                 className="bg-success hover:bg-success/90 text-success-foreground"
                 onClick={handleBuy}
-                disabled={openTradeMutation.isPending}
+                disabled={openTradeMutation.isPending || (tradeLimits?.isLimited && tradeLimits.remaining <= 0)}
                 data-testid="button-buy"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
@@ -400,7 +436,7 @@ export default function SimulatorPage() {
               <Button 
                 variant="destructive"
                 onClick={handleSell}
-                disabled={openTradeMutation.isPending}
+                disabled={openTradeMutation.isPending || (tradeLimits?.isLimited && tradeLimits.remaining <= 0)}
                 data-testid="button-sell"
               >
                 <TrendingDown className="h-4 w-4 mr-2" />

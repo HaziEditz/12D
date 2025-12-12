@@ -206,6 +206,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Trades routes
+  app.get("/api/trades/limits", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const DEMO_DAILY_TRADE_LIMIT = 5;
+    const isTrialUser = !user.subscriptionId && user.membershipStatus !== "active" && user.role !== "admin";
+    
+    if (!isTrialUser) {
+      return res.json({ isLimited: false, remaining: -1, limit: -1 });
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const lastTradeDate = user.lastTradeDate || "";
+    let dailyCount = user.dailyTradesCount ?? 0;
+    
+    // Reset count if it's a new day
+    if (lastTradeDate !== today) {
+      dailyCount = 0;
+    }
+    
+    res.json({
+      isLimited: true,
+      remaining: Math.max(0, DEMO_DAILY_TRADE_LIMIT - dailyCount),
+      limit: DEMO_DAILY_TRADE_LIMIT,
+      used: dailyCount
+    });
+  });
+
   app.get("/api/trades", requireAuth, async (req, res) => {
     const user = req.user as User;
     if (req.query.open) {
@@ -222,9 +248,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const user = req.user as User;
       const data = insertTradeSchema.parse({ ...req.body, userId: user.id });
       
+      // Check if user is on trial (demo) and enforce trade limits
+      const DEMO_DAILY_TRADE_LIMIT = 5;
+      const isTrialUser = !user.subscriptionId && user.membershipStatus !== "active" && user.role !== "admin";
+      
+      if (isTrialUser) {
+        const today = new Date().toISOString().split('T')[0];
+        const lastTradeDate = user.lastTradeDate || "";
+        let dailyCount = user.dailyTradesCount ?? 0;
+        
+        // Reset count if it's a new day
+        if (lastTradeDate !== today) {
+          dailyCount = 0;
+        }
+        
+        if (dailyCount >= DEMO_DAILY_TRADE_LIMIT) {
+          return res.status(400).json({ 
+            message: `Demo accounts are limited to ${DEMO_DAILY_TRADE_LIMIT} trades per day. Upgrade to Casual or Premium for unlimited trades!`,
+            tradeLimitReached: true
+          });
+        }
+        
+        // Update trade count
+        await storage.updateUser(user.id, {
+          dailyTradesCount: dailyCount + 1,
+          lastTradeDate: today
+        });
+      }
+      
       // Check if user has enough balance
       const cost = data.quantity * data.entryPrice;
-      if ((user.simulatorBalance ?? 10000) < cost) {
+      if ((user.simulatorBalance ?? 5000) < cost) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
 
