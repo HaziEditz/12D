@@ -286,18 +286,22 @@ export default function SimulatorPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Account
+              Your Virtual Money
             </CardTitle>
+            <CardDescription>Practice with fake money - no real risk!</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Balance</span>
+              <span className="text-sm text-muted-foreground">Available Balance</span>
               <span className="font-bold text-lg" data-testid="text-balance">
                 ${(user?.simulatorBalance ?? 10000).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Unrealized P/L</span>
+              <div>
+                <span className="text-sm text-muted-foreground">Open Trade Value</span>
+                <p className="text-xs text-muted-foreground">(profit/loss if closed now)</p>
+              </div>
               <span className={`font-semibold ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} data-testid="text-pnl">
                 {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
               </span>
@@ -307,11 +311,14 @@ export default function SimulatorPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Trade</CardTitle>
+            <CardTitle className="text-lg">Place a Trade</CardTitle>
+            <CardDescription>
+              Buy if you think price will go up. Sell if you think it will go down.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Quantity</label>
+              <label className="text-sm font-medium mb-2 block">How many units?</label>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
@@ -349,7 +356,7 @@ export default function SimulatorPage() {
                 data-testid="button-buy"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Buy
+                Buy (Long)
               </Button>
               <Button 
                 variant="destructive"
@@ -358,22 +365,28 @@ export default function SimulatorPage() {
                 data-testid="button-sell"
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
-                Sell
+                Sell (Short)
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Tip: After placing a trade, close it from "Your Active Trades" below to lock in profits or cut losses.
+            </p>
           </CardContent>
         </Card>
 
         <Card className="flex-1 min-h-0">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Open Positions</CardTitle>
-            <CardDescription>{openTrades?.length ?? 0} active trades</CardDescription>
+            <CardTitle className="text-lg">Your Active Trades</CardTitle>
+            <CardDescription>
+              {openTrades?.length ?? 0} open - Click "Close Trade" to finish and collect your profit/loss
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 max-h-60 overflow-y-auto">
             {(!openTrades || openTrades.length === 0) ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No open positions
-              </p>
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-2">No trades yet</p>
+                <p className="text-xs text-muted-foreground">Place your first trade above to get started!</p>
+              </div>
             ) : (
               openTrades.map((trade) => {
                 const pnl = trade.type === "buy"
@@ -400,15 +413,18 @@ export default function SimulatorPage() {
                       <p className={`font-semibold text-sm ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
                       </p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {pnl >= 0 ? 'Profit' : 'Loss'}
+                      </p>
                       <Button
-                        variant="ghost"
+                        variant={pnl >= 0 ? "default" : "destructive"}
                         size="sm"
-                        className="h-6 px-2 text-xs"
+                        className="h-7 px-3 text-xs"
                         onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: currentPrice })}
                         data-testid={`button-close-${trade.id}`}
                       >
                         <X className="h-3 w-3 mr-1" />
-                        Close
+                        Close Trade
                       </Button>
                     </div>
                   </div>
