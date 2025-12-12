@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
@@ -19,7 +18,8 @@ import {
   DollarSign,
   BarChart3,
   GraduationCap,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
 
 interface Class {
@@ -41,6 +41,13 @@ interface StudentProgress {
   profitableTrades: number;
 }
 
+interface NewStudentResult {
+  id: string;
+  displayName: string;
+  email: string;
+  temporaryPassword: string;
+}
+
 export default function TeacherDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,9 +56,9 @@ export default function TeacherDashboard() {
   const [newClassDescription, setNewClassDescription] = useState("");
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentEmail, setNewStudentEmail] = useState("");
-  const [newStudentPassword, setNewStudentPassword] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [addStudentOpen, setAddStudentOpen] = useState(false);
+  const [createdStudent, setCreatedStudent] = useState<NewStudentResult | null>(null);
 
   const { data: classes, isLoading: classesLoading } = useQuery<Class[]>({
     queryKey: ["/api/teacher/classes"],
@@ -91,19 +98,17 @@ export default function TeacherDashboard() {
 
   const addStudentMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/teacher/classes/${selectedClass?.id}/students`, {
+      const response = await apiRequest("POST", `/api/teacher/classes/${selectedClass?.id}/students`, {
         displayName: newStudentName,
         email: newStudentEmail,
-        password: newStudentPassword,
       });
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classes", selectedClass?.id, "students"] });
+      setCreatedStudent(data.student);
       setNewStudentName("");
       setNewStudentEmail("");
-      setNewStudentPassword("");
-      setAddStudentOpen(false);
-      toast({ title: "Student account created!" });
     },
     onError: (error: any) => {
       toast({ title: "Failed to add student", description: error.message, variant: "destructive" });
@@ -125,18 +130,24 @@ export default function TeacherDashboard() {
     toast({ title: "Join code copied!" });
   };
 
-  const generatePassword = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let password = "";
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+  const copyCredentials = () => {
+    if (createdStudent) {
+      const text = `Email: ${createdStudent.email}\nPassword: ${createdStudent.temporaryPassword}`;
+      navigator.clipboard.writeText(text);
+      toast({ title: "Login credentials copied!" });
     }
-    setNewStudentPassword(password);
+  };
+
+  const closeStudentDialog = () => {
+    setAddStudentOpen(false);
+    setCreatedStudent(null);
+    setNewStudentName("");
+    setNewStudentEmail("");
   };
 
   if (!user || (user.role !== "teacher" && user.role !== "admin")) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]" data-testid="unauthorized-message">
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">You need to be a teacher to access this page.</p>
@@ -150,7 +161,7 @@ export default function TeacherDashboard() {
     <div className="h-[calc(100vh-4rem)] flex flex-col p-4 gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
             <GraduationCap className="h-6 w-6" />
             Teacher Dashboard
           </h1>
@@ -202,6 +213,7 @@ export default function TeacherDashboard() {
                       disabled={!newClassName || createClassMutation.isPending}
                       data-testid="button-submit-class"
                     >
+                      {createClassMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Create Class
                     </Button>
                   </DialogFooter>
@@ -211,9 +223,11 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-2">
             {classesLoading ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>
+              <div className="flex items-center justify-center py-8" data-testid="loading-classes">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
             ) : !classes || classes.length === 0 ? (
-              <div className="text-center py-8">
+              <div className="text-center py-8" data-testid="empty-classes">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">No classes yet</p>
                 <p className="text-xs text-muted-foreground">Create your first class to get started</p>
@@ -229,7 +243,7 @@ export default function TeacherDashboard() {
                   data-testid={`class-item-${cls.id}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">{cls.name}</span>
+                    <span className="font-medium" data-testid={`text-class-name-${cls.id}`}>{cls.name}</span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex items-center gap-2 mt-1">
@@ -245,7 +259,7 @@ export default function TeacherDashboard() {
 
         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
           {!selectedClass ? (
-            <Card className="flex-1 flex items-center justify-center">
+            <Card className="flex-1 flex items-center justify-center" data-testid="no-class-selected">
               <CardContent className="text-center">
                 <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <h2 className="text-xl font-semibold mb-2">Select a Class</h2>
@@ -260,7 +274,7 @@ export default function TeacherDashboard() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div>
-                      <CardTitle>{selectedClass.name}</CardTitle>
+                      <CardTitle data-testid="text-selected-class-name">{selectedClass.name}</CardTitle>
                       {selectedClass.description && (
                         <CardDescription>{selectedClass.description}</CardDescription>
                       )}
@@ -279,9 +293,14 @@ export default function TeacherDashboard() {
                         variant="destructive"
                         size="sm"
                         onClick={() => deleteClassMutation.mutate(selectedClass.id)}
+                        disabled={deleteClassMutation.isPending}
                         data-testid="button-delete-class"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {deleteClassMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -293,9 +312,12 @@ export default function TeacherDashboard() {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <CardTitle className="text-lg">Students</CardTitle>
-                      <CardDescription>{students?.length ?? 0} students enrolled</CardDescription>
+                      <CardDescription data-testid="text-student-count">{students?.length ?? 0} students enrolled</CardDescription>
                     </div>
-                    <Dialog open={addStudentOpen} onOpenChange={setAddStudentOpen}>
+                    <Dialog open={addStudentOpen} onOpenChange={(open) => {
+                      if (!open) closeStudentDialog();
+                      else setAddStudentOpen(true);
+                    }}>
                       <DialogTrigger asChild>
                         <Button size="sm" data-testid="button-add-student">
                           <Plus className="h-4 w-4 mr-2" />
@@ -303,69 +325,97 @@ export default function TeacherDashboard() {
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Create Student Account</DialogTitle>
-                          <DialogDescription>
-                            Create a login for your student. Share these credentials with them so they can access the platform.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div>
-                            <label className="text-sm font-medium">Student Name</label>
-                            <Input
-                              placeholder="e.g., John Smith"
-                              value={newStudentName}
-                              onChange={(e) => setNewStudentName(e.target.value)}
-                              data-testid="input-student-name"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Email</label>
-                            <Input
-                              type="email"
-                              placeholder="e.g., john.smith@school.edu"
-                              value={newStudentEmail}
-                              onChange={(e) => setNewStudentEmail(e.target.value)}
-                              data-testid="input-student-email"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Password</label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="text"
-                                placeholder="Create a password"
-                                value={newStudentPassword}
-                                onChange={(e) => setNewStudentPassword(e.target.value)}
-                                data-testid="input-student-password"
-                              />
-                              <Button variant="outline" onClick={generatePassword} type="button">
-                                Generate
-                              </Button>
+                        {createdStudent ? (
+                          <>
+                            <DialogHeader>
+                              <DialogTitle>Student Account Created</DialogTitle>
+                              <DialogDescription>
+                                Share these login credentials with your student. They can use these to sign in.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="p-4 rounded-lg bg-muted">
+                                <div className="space-y-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Student Name</p>
+                                    <p className="font-medium" data-testid="text-created-student-name">{createdStudent.displayName}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Email</p>
+                                    <p className="font-medium" data-testid="text-created-student-email">{createdStudent.email}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Temporary Password</p>
+                                    <p className="font-mono font-medium text-lg" data-testid="text-created-student-password">{createdStudent.temporaryPassword}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                The student should change their password after logging in for the first time.
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Share this password with your student so they can log in
-                            </p>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            onClick={() => addStudentMutation.mutate()}
-                            disabled={!newStudentName || !newStudentEmail || !newStudentPassword || addStudentMutation.isPending}
-                            data-testid="button-submit-student"
-                          >
-                            Create Account
-                          </Button>
-                        </DialogFooter>
+                            <DialogFooter className="gap-2">
+                              <Button variant="outline" onClick={copyCredentials} data-testid="button-copy-credentials">
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Credentials
+                              </Button>
+                              <Button onClick={closeStudentDialog} data-testid="button-done-creating">
+                                Done
+                              </Button>
+                            </DialogFooter>
+                          </>
+                        ) : (
+                          <>
+                            <DialogHeader>
+                              <DialogTitle>Create Student Account</DialogTitle>
+                              <DialogDescription>
+                                Enter the student's details. A secure password will be automatically generated.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div>
+                                <label className="text-sm font-medium">Student Name</label>
+                                <Input
+                                  placeholder="e.g., John Smith"
+                                  value={newStudentName}
+                                  onChange={(e) => setNewStudentName(e.target.value)}
+                                  data-testid="input-student-name"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Email</label>
+                                <Input
+                                  type="email"
+                                  placeholder="e.g., john.smith@school.edu"
+                                  value={newStudentEmail}
+                                  onChange={(e) => setNewStudentEmail(e.target.value)}
+                                  data-testid="input-student-email"
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button
+                                onClick={() => addStudentMutation.mutate()}
+                                disabled={!newStudentName || !newStudentEmail || addStudentMutation.isPending}
+                                data-testid="button-submit-student"
+                              >
+                                {addStudentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Create Account
+                              </Button>
+                            </DialogFooter>
+                          </>
+                        )}
                       </DialogContent>
                     </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-y-auto">
                   {studentsLoading ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Loading students...</p>
+                    <div className="flex items-center justify-center py-8" data-testid="loading-students">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
                   ) : !students || students.length === 0 ? (
-                    <div className="text-center py-8">
+                    <div className="text-center py-8" data-testid="empty-students">
                       <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                       <p className="text-sm text-muted-foreground">No students yet</p>
                       <p className="text-xs text-muted-foreground">Add your first student to this class</p>
@@ -380,8 +430,8 @@ export default function TeacherDashboard() {
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium">{student.displayName}</span>
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className="font-medium" data-testid={`text-student-name-${student.id}`}>{student.displayName}</span>
                                 <Badge variant="outline" className="text-xs">{student.email}</Badge>
                               </div>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -389,21 +439,21 @@ export default function TeacherDashboard() {
                                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">Lessons</p>
-                                    <p className="font-medium">{student.lessonsCompleted}</p>
+                                    <p className="font-medium" data-testid={`text-lessons-${student.id}`}>{student.lessonsCompleted}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">Balance</p>
-                                    <p className="font-medium">${student.simulatorBalance.toLocaleString()}</p>
+                                    <p className="font-medium" data-testid={`text-balance-${student.id}`}>${student.simulatorBalance.toLocaleString()}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">Total Profit</p>
-                                    <p className={`font-medium ${student.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                    <p className={`font-medium ${student.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} data-testid={`text-profit-${student.id}`}>
                                       {student.totalProfit >= 0 ? '+' : ''}${student.totalProfit.toFixed(2)}
                                     </p>
                                   </div>
@@ -412,7 +462,7 @@ export default function TeacherDashboard() {
                                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">Trades</p>
-                                    <p className="font-medium">
+                                    <p className="font-medium" data-testid={`text-trades-${student.id}`}>
                                       {student.profitableTrades}/{student.totalTrades} wins
                                     </p>
                                   </div>
@@ -423,6 +473,7 @@ export default function TeacherDashboard() {
                               variant="ghost"
                               size="icon"
                               onClick={() => removeStudentMutation.mutate(student.id)}
+                              disabled={removeStudentMutation.isPending}
                               data-testid={`button-remove-student-${student.id}`}
                             >
                               <Trash2 className="h-4 w-4 text-muted-foreground" />

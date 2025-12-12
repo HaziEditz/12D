@@ -445,7 +445,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ message: "Not authorized" });
       }
       
-      const { displayName, email, password } = req.body;
+      const { displayName, email } = req.body;
+      
+      if (!displayName || !email) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
       
       // Check if student email already exists
       const existingUser = await storage.getUserByEmail(email);
@@ -453,10 +457,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "A user with this email already exists" });
       }
       
+      // Generate secure random password server-side
+      const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+      
       // Create student account
       const student = await storage.createUser({
         email,
-        password,
+        password: generatedPassword,
         displayName,
         role: "student",
         membershipTier: "school",
@@ -475,7 +482,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         student: { 
           id: student.id, 
           displayName: student.displayName, 
-          email: student.email 
+          email: student.email,
+          temporaryPassword: generatedPassword,
         } 
       });
     } catch (error: any) {
