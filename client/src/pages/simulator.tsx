@@ -58,15 +58,15 @@ export default function SimulatorPage() {
   const [timeframe, setTimeframe] = useState("1m");
   const [candleData, setCandleData] = useState<CandlestickData[]>([]);
 
-  const { data: openTrades } = useQuery<Trade[]>({
-    queryKey: ["/api/trades", "open"],
+  const { data: openTrades, refetch: refetchTrades } = useQuery<Trade[]>({
+    queryKey: ["/api/trades?open=true"],
   });
 
   const openTradeMutation = useMutation({
     mutationFn: (data: { symbol: string; type: string; quantity: number; entryPrice: number }) =>
       apiRequest("POST", "/api/trades", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      refetchTrades();
       refreshUser();
       toast({ title: "Trade opened successfully" });
     },
@@ -79,7 +79,7 @@ export default function SimulatorPage() {
     mutationFn: ({ id, exitPrice }: { id: string; exitPrice: number }) =>
       apiRequest("PATCH", `/api/trades/${id}/close`, { exitPrice }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      refetchTrades();
       refreshUser();
       toast({ title: "Trade closed" });
     },
