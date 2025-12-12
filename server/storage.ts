@@ -2,9 +2,11 @@ import { db } from "./db";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
+  schools, classes, classStudents,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
-  type Assignment, type InsertAssignment
+  type Assignment, type InsertAssignment, type School, type InsertSchool,
+  type Class, type InsertClass, type ClassStudent, type InsertClassStudent
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -48,6 +50,24 @@ export interface IStorage {
   // Admin stats
   getUsersCount(): Promise<number>;
   getLessonsCount(): Promise<number>;
+  
+  // Schools
+  createSchool(data: InsertSchool): Promise<School>;
+  getSchoolByAdmin(adminUserId: string): Promise<School | undefined>;
+  updateSchool(id: string, data: Partial<School>): Promise<School | undefined>;
+  
+  // Classes
+  createClass(data: InsertClass): Promise<Class>;
+  getClassesByTeacher(teacherId: string): Promise<Class[]>;
+  getClassById(id: string): Promise<Class | undefined>;
+  getClassByJoinCode(joinCode: string): Promise<Class | undefined>;
+  deleteClass(id: string): Promise<void>;
+  
+  // Class Students
+  addStudentToClass(data: InsertClassStudent): Promise<ClassStudent>;
+  getStudentsByClass(classId: string): Promise<User[]>;
+  removeStudentFromClass(classId: string, studentId: string): Promise<void>;
+  getClassesByStudent(studentId: string): Promise<Class[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -222,6 +242,75 @@ export class DatabaseStorage implements IStorage {
   async getLessonsCount(): Promise<number> {
     const result = await db.select().from(lessons);
     return result.length;
+  }
+
+  // Schools
+  async createSchool(data: InsertSchool): Promise<School> {
+    const [school] = await db.insert(schools).values(data).returning();
+    return school;
+  }
+
+  async getSchoolByAdmin(adminUserId: string): Promise<School | undefined> {
+    const [school] = await db.select().from(schools).where(eq(schools.adminUserId, adminUserId)).limit(1);
+    return school;
+  }
+
+  async updateSchool(id: string, data: Partial<School>): Promise<School | undefined> {
+    const [school] = await db.update(schools).set(data).where(eq(schools.id, id)).returning();
+    return school;
+  }
+
+  // Classes
+  async createClass(data: InsertClass): Promise<Class> {
+    const [cls] = await db.insert(classes).values(data).returning();
+    return cls;
+  }
+
+  async getClassesByTeacher(teacherId: string): Promise<Class[]> {
+    return db.select().from(classes).where(eq(classes.teacherId, teacherId));
+  }
+
+  async getClassById(id: string): Promise<Class | undefined> {
+    const [cls] = await db.select().from(classes).where(eq(classes.id, id)).limit(1);
+    return cls;
+  }
+
+  async getClassByJoinCode(joinCode: string): Promise<Class | undefined> {
+    const [cls] = await db.select().from(classes).where(eq(classes.joinCode, joinCode)).limit(1);
+    return cls;
+  }
+
+  async deleteClass(id: string): Promise<void> {
+    await db.delete(classStudents).where(eq(classStudents.classId, id));
+    await db.delete(classes).where(eq(classes.id, id));
+  }
+
+  // Class Students
+  async addStudentToClass(data: InsertClassStudent): Promise<ClassStudent> {
+    const [cs] = await db.insert(classStudents).values(data).returning();
+    return cs;
+  }
+
+  async getStudentsByClass(classId: string): Promise<User[]> {
+    const studentLinks = await db.select().from(classStudents).where(eq(classStudents.classId, classId));
+    const studentIds = studentLinks.map(s => s.studentId);
+    if (studentIds.length === 0) return [];
+    const students = await db.select().from(users);
+    return students.filter(u => studentIds.includes(u.id));
+  }
+
+  async removeStudentFromClass(classId: string, studentId: string): Promise<void> {
+    await db.delete(classStudents).where(
+      and(eq(classStudents.classId, classId), eq(classStudents.studentId, studentId))
+    );
+  }
+
+  async getClassesByStudent(studentId: string): Promise<Class[]> {
+    const enrollments = await db.select().from(classStudents).where(eq(classStudents.studentId, studentId));
+    const classIds = enrollments.map(e => e.classId);
+    if (classIds.length === 0) return [];
+    const allClasses = await db.select().from(classes);
+    return allClasses.filter(c => classIds.includes(c.id));
   }
 }
 

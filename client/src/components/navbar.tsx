@@ -114,11 +114,11 @@ export function Navbar() {
                       Profile
                     </Link>
                   </DropdownMenuItem>
-                  {user?.role === "teacher" && (
+                  {(user?.role === "teacher" || user?.role === "admin") && (
                     <DropdownMenuItem asChild>
-                      <Link href="/teacher" className="flex items-center gap-2 cursor-pointer" data-testid="link-teacher">
+                      <Link href="/classroom" className="flex items-center gap-2 cursor-pointer" data-testid="link-classroom">
                         <GraduationCap className="h-4 w-4" />
-                        Teacher Panel
+                        My Classroom
                       </Link>
                     </DropdownMenuItem>
                   )}

@@ -6,7 +6,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
-import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema } from "@shared/schema";
+import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema } from "@shared/schema";
 import type { User } from "@shared/schema";
 import memorystore from "memorystore";
 
@@ -344,6 +344,154 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const data = insertAssignmentSchema.parse({ ...req.body, teacherId: user.id });
       const assignment = await storage.createAssignment(data);
       res.json(assignment);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Teacher Class Management Routes
+  app.get("/api/teacher/classes", requireTeacher, async (req, res) => {
+    const user = req.user as User;
+    const teacherClasses = await storage.getClassesByTeacher(user.id);
+    res.json(teacherClasses);
+  });
+
+  app.post("/api/teacher/classes", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { name, description } = req.body;
+      
+      // Generate a random join code
+      const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      // Get or create school for this teacher
+      let school = await storage.getSchoolByAdmin(user.id);
+      if (!school) {
+        school = await storage.createSchool({
+          name: `${user.displayName}'s School`,
+          adminUserId: user.id,
+        });
+      }
+      
+      const classData = {
+        schoolId: school.id,
+        teacherId: user.id,
+        name,
+        description: description || null,
+        joinCode,
+      };
+      
+      const newClass = await storage.createClass(classData);
+      res.json(newClass);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/teacher/classes/:id", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const cls = await storage.getClassById(req.params.id);
+      if (!cls || cls.teacherId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to delete this class" });
+      }
+      await storage.deleteClass(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/teacher/classes/:id/students", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const cls = await storage.getClassById(req.params.id);
+      if (!cls || cls.teacherId !== user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const students = await storage.getStudentsByClass(req.params.id);
+      
+      // Get progress data for each student
+      const studentsWithProgress = await Promise.all(students.map(async (student) => {
+        const progress = await storage.getLessonProgress(student.id);
+        const trades = await storage.getTradesByUser(student.id);
+        const completedLessons = progress.filter(p => p.completed).length;
+        const totalTrades = trades.length;
+        const profitableTrades = trades.filter(t => t.profit && t.profit > 0).length;
+        
+        return {
+          id: student.id,
+          displayName: student.displayName,
+          email: student.email,
+          lessonsCompleted: completedLessons,
+          totalProfit: student.totalProfit ?? 0,
+          simulatorBalance: student.simulatorBalance ?? 10000,
+          totalTrades,
+          profitableTrades,
+        };
+      }));
+      
+      res.json(studentsWithProgress);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/teacher/classes/:id/students", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const cls = await storage.getClassById(req.params.id);
+      if (!cls || cls.teacherId !== user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const { displayName, email, password } = req.body;
+      
+      // Check if student email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "A user with this email already exists" });
+      }
+      
+      // Create student account
+      const student = await storage.createUser({
+        email,
+        password,
+        displayName,
+        role: "student",
+        membershipTier: "school",
+        membershipStatus: "active",
+        teacherId: user.id,
+      });
+      
+      // Add student to class
+      await storage.addStudentToClass({
+        classId: req.params.id,
+        studentId: student.id,
+      });
+      
+      res.json({ 
+        success: true, 
+        student: { 
+          id: student.id, 
+          displayName: student.displayName, 
+          email: student.email 
+        } 
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/teacher/classes/:classId/students/:studentId", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const cls = await storage.getClassById(req.params.classId);
+      if (!cls || cls.teacherId !== user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.removeStudentFromClass(req.params.classId, req.params.studentId);
+      res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

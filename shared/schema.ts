@@ -106,6 +106,33 @@ export const strategies = pgTable("strategies", {
   difficulty: text("difficulty").notNull(),
 });
 
+export const schools = pgTable("schools", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  adminUserId: varchar("admin_user_id").notNull(),
+  subscriptionId: text("subscription_id"),
+  seatCount: integer("seat_count").default(0),
+  seatsUsed: integer("seats_used").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classes = pgTable("classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  schoolId: varchar("school_id").notNull(),
+  teacherId: varchar("teacher_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  joinCode: text("join_code").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classStudents = pgTable("class_students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -115,6 +142,9 @@ export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id:
 export const insertAssignmentProgressSchema = createInsertSchema(assignmentProgress).omit({ id: true });
 export const insertFriendshipSchema = createInsertSchema(friendships).omit({ id: true });
 export const insertStrategySchema = createInsertSchema(strategies).omit({ id: true });
+export const insertSchoolSchema = createInsertSchema(schools).omit({ id: true, createdAt: true });
+export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true });
+export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, joinedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -134,6 +164,12 @@ export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
 export type Friendship = typeof friendships.$inferSelect;
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 export type Strategy = typeof strategies.$inferSelect;
+export type InsertSchool = z.infer<typeof insertSchoolSchema>;
+export type School = typeof schools.$inferSelect;
+export type InsertClass = z.infer<typeof insertClassSchema>;
+export type Class = typeof classes.$inferSelect;
+export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
+export type ClassStudent = typeof classStudents.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

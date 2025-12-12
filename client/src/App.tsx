@@ -18,6 +18,7 @@ import SimulatorPage from "@/pages/simulator";
 import LeaderboardPage from "@/pages/leaderboard";
 import AdminPage from "@/pages/admin";
 import TeacherPage from "@/pages/teacher";
+import TeacherDashboard from "@/pages/teacher-dashboard";
 import PricingPage from "@/pages/pricing";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/teacher" component={TeacherPage} />
+      <Route path="/classroom" component={TeacherDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
