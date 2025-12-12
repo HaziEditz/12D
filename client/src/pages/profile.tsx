@@ -67,7 +67,7 @@ export default function ProfilePage() {
     },
     {
       label: "Member Since",
-      value: "Dec 2024",
+      value: "Dec 2025",
       icon: Calendar,
       color: "text-muted-foreground"
     }

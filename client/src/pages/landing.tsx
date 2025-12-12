@@ -310,7 +310,7 @@ export default function LandingPage() {
               <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 12Digits. All rights reserved.
+              © 2025 12Digits. All rights reserved.
             </p>
           </div>
         </div>

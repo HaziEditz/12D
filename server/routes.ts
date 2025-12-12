@@ -616,8 +616,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { promoCode } = req.body;
       const user = req.user as User;
 
-      // Validate promo code
-      if (promoCode !== "12DIGITS!") {
+      // Define valid promo codes and their tiers
+      const promoCodes: Record<string, { tier: string; message: string }> = {
+        "12DIGITS!": { tier: "casual", message: "Promo code redeemed! You now have free Casual access." },
+        "12DIGITSISCOOL25": { tier: "premium", message: "Promo code redeemed! You now have free 12Digits+ Premium access." },
+      };
+
+      const promoConfig = promoCodes[promoCode];
+      if (!promoConfig) {
         return res.status(400).json({ error: "Invalid promo code" });
       }
 
@@ -626,14 +632,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ error: "You already have an active subscription" });
       }
 
-      // Activate free casual subscription
+      // Activate free subscription based on promo code
       await storage.updateUser(user.id, {
-        membershipTier: "casual",
+        membershipTier: promoConfig.tier,
         membershipStatus: "active",
-        subscriptionId: `PROMO-12DIGITS-${Date.now()}`,
+        subscriptionId: `PROMO-${promoCode}-${Date.now()}`,
       });
 
-      res.json({ success: true, message: "Promo code redeemed! You now have free Casual access." });
+      res.json({ success: true, message: promoConfig.message });
     } catch (error) {
       console.error("Promo redemption error:", error);
       res.status(500).json({ error: "Failed to redeem promo code" });
