@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getSubscriptionStatus } from "@/lib/subscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, GraduationCap, User, Sparkles } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import SubscriptionPayPalButton from "@/components/SubscriptionPayPalButton";
 
 const plans = [
   {
@@ -61,53 +60,9 @@ const plans = [
 ];
 
 export default function Pricing() {
-  const { user, refreshUser } = useAuth();
-  const { toast } = useToast();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [loading, setLoading] = useState<string | null>(null);
   const status = getSubscriptionStatus(user);
-
-  const handleSubscribe = async (planId: string) => {
-    if (!user) {
-      navigate("/register");
-      return;
-    }
-
-    setLoading(planId);
-    try {
-      const response = await fetch("/api/payments/create-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ tier: planId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create subscription");
-      }
-
-      const data = await response.json();
-      
-      if (data.approvalUrl) {
-        window.location.href = data.approvalUrl;
-      } else {
-        toast({
-          title: "Subscription Created",
-          description: "Your subscription has been activated!",
-        });
-        await refreshUser();
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to process subscription. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(null);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
@@ -172,22 +127,33 @@ export default function Pricing() {
                 </CardContent>
                 
                 <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={plan.popular ? "default" : "outline"}
-                    size="lg"
-                    disabled={isCurrentPlan || loading === plan.id}
-                    onClick={() => handleSubscribe(plan.id)}
-                    data-testid={`button-subscribe-${plan.id}`}
-                  >
-                    {loading === plan.id ? (
-                      <span className="animate-spin mr-2">...</span>
-                    ) : isCurrentPlan ? (
-                      "Current Plan"
-                    ) : (
-                      "Get Started"
-                    )}
-                  </Button>
+                  {isCurrentPlan ? (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      size="lg"
+                      disabled
+                      data-testid={`button-subscribe-${plan.id}`}
+                    >
+                      Current Plan
+                    </Button>
+                  ) : !user ? (
+                    <Button
+                      className="w-full"
+                      variant={plan.popular ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => navigate("/register")}
+                      data-testid={`button-subscribe-${plan.id}`}
+                    >
+                      Get Started
+                    </Button>
+                  ) : (
+                    <SubscriptionPayPalButton
+                      planId={plan.id}
+                      amount={plan.price.toString()}
+                      planName={plan.name}
+                    />
+                  )}
                 </CardFooter>
               </Card>
             );

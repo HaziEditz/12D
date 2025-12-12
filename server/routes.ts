@@ -355,107 +355,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/order/:orderID/capture", capturePaypalOrder);
 
   // Subscription payment routes
-  const tierPrices: Record<string, string> = {
-    school: "8.49",
-    casual: "9.49",
-    premium: "14.49",
-  };
-
-  app.post("/api/payments/create-subscription", requireAuth, async (req, res) => {
+  app.post("/api/payments/activate-subscription", requireAuth, async (req, res) => {
     try {
-      const { tier } = req.body;
+      const { tier, orderId } = req.body;
       const user = req.user as User;
 
-      if (!tier || !tierPrices[tier]) {
+      const validTiers = ["school", "casual", "premium"];
+      if (!tier || !validTiers.includes(tier)) {
         return res.status(400).json({ error: "Invalid subscription tier" });
       }
 
-      const price = tierPrices[tier];
-      
-      // Create a PayPal order for the subscription
-      const { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET } = process.env;
-      
-      const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
-      
-      const orderResponse = await fetch("https://api-m.sandbox.paypal.com/v2/checkout/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          intent: "CAPTURE",
-          purchase_units: [{
-            amount: {
-              currency_code: "USD",
-              value: price,
-            },
-            description: `12Digits ${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan - Monthly Subscription`,
-          }],
-          application_context: {
-            return_url: `${req.protocol}://${req.get('host')}/api/payments/capture-subscription?tier=${tier}`,
-            cancel_url: `${req.protocol}://${req.get('host')}/pricing`,
-            brand_name: "12Digits",
-            user_action: "PAY_NOW",
-          },
-        }),
+      // Update user's subscription status
+      await storage.updateUser(user.id, {
+        membershipTier: tier,
+        membershipStatus: "active",
+        subscriptionId: orderId,
       });
 
-      const orderData = await orderResponse.json();
-      
-      if (orderData.id) {
-        // Find the approval URL
-        const approvalLink = orderData.links?.find((link: any) => link.rel === "approve");
-        if (approvalLink) {
-          return res.json({ approvalUrl: approvalLink.href, orderId: orderData.id });
-        }
-      }
-
-      res.status(500).json({ error: "Failed to create PayPal order" });
+      res.json({ success: true });
     } catch (error) {
-      console.error("Subscription error:", error);
-      res.status(500).json({ error: "Failed to create subscription" });
-    }
-  });
-
-  app.get("/api/payments/capture-subscription", requireAuth, async (req, res) => {
-    try {
-      const { token, tier } = req.query;
-      const user = req.user as User;
-
-      if (!token || !tier) {
-        return res.redirect("/pricing?error=missing_params");
-      }
-
-      const { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET } = process.env;
-      const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
-
-      // Capture the order
-      const captureResponse = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${token}/capture`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${auth}`,
-        },
-      });
-
-      const captureData = await captureResponse.json();
-
-      if (captureData.status === "COMPLETED") {
-        // Update user's subscription status
-        await storage.updateUser(user.id, {
-          membershipTier: tier as string,
-          membershipStatus: "active",
-          subscriptionId: captureData.id,
-        });
-        
-        return res.redirect("/dashboard?subscription=success");
-      }
-
-      res.redirect("/pricing?error=payment_failed");
-    } catch (error) {
-      console.error("Capture error:", error);
-      res.redirect("/pricing?error=capture_failed");
+      console.error("Subscription activation error:", error);
+      res.status(500).json({ error: "Failed to activate subscription" });
     }
   });
 }
