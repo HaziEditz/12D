@@ -100,9 +100,8 @@ export default function SubscriptionPayPalButton({
       try {
         if (!(window as any).paypal) {
           const script = document.createElement("script");
-          script.src = import.meta.env.PROD
-            ? "https://www.paypal.com/web-sdk/v6/core"
-            : "https://www.sandbox.paypal.com/web-sdk/v6/core";
+          // Always use live PayPal since we have live credentials
+          script.src = "https://www.paypal.com/web-sdk/v6/core";
           script.async = true;
           script.onload = () => initPayPal();
           document.body.appendChild(script);
