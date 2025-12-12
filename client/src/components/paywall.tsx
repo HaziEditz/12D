@@ -28,6 +28,44 @@ export function Paywall({ children, featureName = "this feature" }: PaywallProps
 
   const status = getSubscriptionStatus(user);
 
+  // If user is not logged in, show login prompt instead of trial ended
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="max-w-lg w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Lock className="w-8 h-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Sign In Required</CardTitle>
+            <CardDescription className="text-base">
+              Please log in or create an account to access {featureName}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2">
+              <Link href="/login">
+                <Button className="w-full" size="lg" data-testid="button-login">
+                  Log In
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button variant="outline" className="w-full" size="lg" data-testid="button-register">
+                  Create Account
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button variant="ghost" className="w-full" data-testid="button-back-home">
+                  Back to Home
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center min-h-[60vh] p-4">
       <Card className="max-w-lg w-full">
