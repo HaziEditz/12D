@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Loader2, Eye, EyeOff } from "lucide-react";
+import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, CreditCard } from "lucide-react";
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
@@ -18,6 +19,8 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showTeacherPopup, setShowTeacherPopup] = useState(false);
+  const [pendingTeacherData, setPendingTeacherData] = useState<RegisterInput | null>(null);
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -30,6 +33,12 @@ export default function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterInput) => {
+    if (data.role === "teacher") {
+      setPendingTeacherData(data);
+      setShowTeacherPopup(true);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await register(data.email, data.password, data.displayName, data.role);
@@ -38,6 +47,34 @@ export default function RegisterPage() {
         description: "Welcome to 12Digits. Start your trading journey!",
       });
       setLocation("/dashboard");
+    } catch (error) {
+      toast({
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "Could not create account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTeacherContinue = async () => {
+    if (!pendingTeacherData) return;
+    
+    setIsLoading(true);
+    try {
+      await register(
+        pendingTeacherData.email, 
+        pendingTeacherData.password, 
+        pendingTeacherData.displayName, 
+        pendingTeacherData.role
+      );
+      toast({
+        title: "Account created!",
+        description: "Now let's set up your School subscription.",
+      });
+      setShowTeacherPopup(false);
+      setLocation("/pricing");
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -180,6 +217,54 @@ export default function RegisterPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showTeacherPopup} onOpenChange={setShowTeacherPopup}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <GraduationCap className="h-8 w-8 text-primary" />
+            </div>
+            <DialogTitle className="text-center text-xl">Welcome, Teacher!</DialogTitle>
+            <DialogDescription className="text-center">
+              To access the Teacher Dashboard and manage your students, you'll need to subscribe to our School Plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg bg-muted p-4">
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                School Plan - $8.49/student/month
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Create unlimited classes</li>
+                <li>Add and manage student accounts</li>
+                <li>Track student progress and performance</li>
+                <li>Class leaderboards and analytics</li>
+                <li>Full access to all lessons and simulator</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button 
+              onClick={handleTeacherContinue} 
+              className="w-full"
+              disabled={isLoading}
+              data-testid="button-teacher-continue"
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue to Plans
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowTeacherPopup(false)}
+              className="w-full"
+              data-testid="button-teacher-cancel"
+            >
+              Go Back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

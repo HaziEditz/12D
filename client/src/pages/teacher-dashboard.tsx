@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,12 @@ import {
   BarChart3,
   GraduationCap,
   ChevronRight,
-  Loader2
+  Loader2,
+  Trophy,
+  Crown,
+  Medal,
+  CreditCard,
+  Lock
 } from "lucide-react";
 
 interface Class {
@@ -151,6 +157,43 @@ export default function TeacherDashboard() {
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">You need to be a teacher to access this page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const hasActiveSubscription = user.role === "admin" || (user.membershipTier === "school" && user.membershipStatus === "active");
+
+  if (!hasActiveSubscription && user.role === "teacher") {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]" data-testid="subscription-required">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <Lock className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">Subscription Required</h2>
+            <p className="text-muted-foreground mb-6">
+              To access the Teacher Dashboard and manage your students, you need an active School Plan subscription.
+            </p>
+            <div className="rounded-lg bg-muted p-4 mb-6 text-left">
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                School Plan - $8.49/student/month
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Create unlimited classes</li>
+                <li>Add and manage student accounts</li>
+                <li>Track student progress and performance</li>
+                <li>Class leaderboards and analytics</li>
+              </ul>
+            </div>
+            <Link href="/pricing">
+              <Button className="w-full" data-testid="button-subscribe">
+                Subscribe Now
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -306,6 +349,62 @@ export default function TeacherDashboard() {
                   </div>
                 </CardHeader>
               </Card>
+
+              {students && students.length > 0 && (
+                <Card data-testid="card-class-leaderboard">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-yellow-500" />
+                      Class Leaderboard
+                    </CardTitle>
+                    <CardDescription>Top performing students by total profit</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {[...students]
+                        .sort((a, b) => (b.totalProfit ?? 0) - (a.totalProfit ?? 0))
+                        .slice(0, 5)
+                        .map((student, index) => (
+                          <div 
+                            key={student.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg ${
+                              index === 0 ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                              index === 1 ? 'bg-slate-400/10 border border-slate-400/20' :
+                              index === 2 ? 'bg-orange-600/10 border border-orange-600/20' :
+                              'bg-muted/50'
+                            }`}
+                            data-testid={`leaderboard-row-${index + 1}`}
+                          >
+                            <div className="flex items-center justify-center w-8 h-8">
+                              {index === 0 ? (
+                                <Crown className="h-6 w-6 text-yellow-500" />
+                              ) : index === 1 ? (
+                                <Medal className="h-5 w-5 text-slate-400" />
+                              ) : index === 2 ? (
+                                <Medal className="h-5 w-5 text-orange-600" />
+                              ) : (
+                                <span className="text-lg font-bold text-muted-foreground">{index + 1}</span>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium" data-testid={`leaderboard-name-${index + 1}`}>{student.displayName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {student.lessonsCompleted} lessons | {student.profitableTrades}/{student.totalTrades} wins
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-bold ${student.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} data-testid={`leaderboard-profit-${index + 1}`}>
+                                {student.totalProfit >= 0 ? '+' : ''}${student.totalProfit.toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">${student.simulatorBalance.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card className="flex-1 overflow-hidden flex flex-col">
                 <CardHeader className="pb-3 flex-shrink-0">
