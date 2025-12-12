@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Check, Crown, GraduationCap, User, Sparkles, Tag, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import SubscriptionPayPalButton from "@/components/SubscriptionPayPalButton";
 
 const plans = [
@@ -91,6 +91,9 @@ export default function Pricing() {
       
       if (response.ok) {
         await refreshUser();
+        // Invalidate all queries that depend on user subscription status
+        queryClient.invalidateQueries({ queryKey: ["/api/trades/limits"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         toast({
           title: "Success!",
           description: "Promo code redeemed! You now have free Casual access.",

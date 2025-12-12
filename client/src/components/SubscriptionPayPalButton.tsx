@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 
 interface SubscriptionPayPalButtonProps {
   planId: string;
@@ -62,6 +63,9 @@ export default function SubscriptionPayPalButton({
       if (orderData.status === "COMPLETED") {
         await activateSubscription(data.orderId);
         await refreshUser();
+        // Invalidate all queries that depend on user subscription status
+        queryClient.invalidateQueries({ queryKey: ["/api/trades/limits"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         toast({
           title: "Subscription Activated!",
           description: `Welcome to ${planName}! Your subscription is now active.`,
