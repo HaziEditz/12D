@@ -2,7 +2,16 @@
 
 ## Overview
 
-12Digits is a professional trading education platform that provides real-time market simulation, structured lessons, and comprehensive tools for learning to trade. The platform targets three membership tiers: School (for educators/students), Casual (individual learners), and 12Digits+ (premium features). Core features include a real-time trading simulator with $10,000 virtual balance, structured curriculum with progress tracking, portfolio management dashboard, global leaderboards, and teacher administration tools.
+12Digits is a professional trading education platform that provides real-time market simulation, structured lessons, and comprehensive tools for learning to trade. The platform targets three membership tiers: School (for educators/students), Casual (individual learners), and 12Digits+ (premium features). 
+
+**Casual Tier Features** (Free):
+- Lessons, Simulator, Dashboard, Leaderboard, Achievements
+- Watchlist - Track favorite stocks with price monitoring
+- Trading Tips - Daily tips and market insights
+
+**Premium Features** (12Digits+):
+- Command Center (Terminal), Strategies, Analytics
+- Trade Journal, News Feed, Economic Calendar, Risk Calculator
 
 ## User Preferences
 
