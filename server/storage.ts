@@ -412,6 +412,32 @@ export class DatabaseStorage implements IStorage {
     const [ua] = await db.update(userAchievements).set(updates).where(eq(userAchievements.id, id)).returning();
     return ua;
   }
+
+  async deleteUserAccount(userId: string): Promise<void> {
+    // Delete user achievements
+    await db.delete(userAchievements).where(eq(userAchievements.userId, userId));
+    
+    // Delete trades
+    await db.delete(trades).where(eq(trades.userId, userId));
+    
+    // Delete portfolio items
+    await db.delete(portfolioItems).where(eq(portfolioItems.userId, userId));
+    
+    // Delete lesson progress
+    await db.delete(lessonProgress).where(eq(lessonProgress.userId, userId));
+    
+    // Remove from class enrollments
+    await db.delete(classStudents).where(eq(classStudents.studentId, userId));
+    
+    // If teacher, delete their classes
+    await db.delete(classes).where(eq(classes.teacherId, userId));
+    
+    // Delete assignments created by this user (if teacher)
+    await db.delete(assignments).where(eq(assignments.teacherId, userId));
+    
+    // Finally delete the user
+    await db.delete(users).where(eq(users.id, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

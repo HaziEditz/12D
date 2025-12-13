@@ -1037,4 +1037,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Delete account endpoint
+  app.delete("/api/user/account", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Delete all user-related data
+      await storage.deleteUserAccount(user.id);
+      
+      // Logout the user
+      req.logout(() => {
+        res.json({ success: true });
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }
