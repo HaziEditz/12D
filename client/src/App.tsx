@@ -23,6 +23,11 @@ import TeacherDashboard from "@/pages/teacher-dashboard";
 import PricingPage from "@/pages/pricing";
 import StrategiesPage from "@/pages/strategies";
 import AnalyticsPage from "@/pages/analytics";
+import CommandCenterPage from "@/pages/command-center";
+import TradeJournalPage from "@/pages/trade-journal";
+import NewsPage from "@/pages/news";
+import EconomicCalendarPage from "@/pages/economic-calendar";
+import RiskCalculatorPage from "@/pages/risk-calculator";
 import SettingsPage from "@/pages/settings";
 import PublicProfilePage from "@/pages/public-profile";
 import UsersPage from "@/pages/users";
@@ -43,6 +48,11 @@ function Router() {
       <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/strategies" component={StrategiesPage} />
       <Route path="/analytics" component={AnalyticsPage} />
+      <Route path="/command-center" component={CommandCenterPage} />
+      <Route path="/journal" component={TradeJournalPage} />
+      <Route path="/news" component={NewsPage} />
+      <Route path="/calendar" component={EconomicCalendarPage} />
+      <Route path="/risk-calculator" component={RiskCalculatorPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/achievements" component={AchievementsPage} />
       <Route path="/users" component={UsersPage} />

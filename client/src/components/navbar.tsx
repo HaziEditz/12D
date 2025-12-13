@@ -28,7 +28,12 @@ import {
   BarChart3,
   Lock,
   Crown,
-  Award
+  Award,
+  Zap,
+  BookOpenText,
+  Newspaper,
+  Calendar,
+  Calculator
 } from "lucide-react";
 import { useState } from "react";
 
@@ -44,8 +49,16 @@ export function Navbar() {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
     { href: "/achievements", label: "Achievements", icon: Award, premium: false },
+    { href: "/command-center", label: "Terminal", icon: Zap, premium: true },
     { href: "/strategies", label: "Strategies", icon: Library, premium: true },
     { href: "/analytics", label: "Analytics", icon: BarChart3, premium: true },
+  ];
+
+  const premiumMenuItems = [
+    { href: "/journal", label: "Trade Journal", icon: BookOpenText },
+    { href: "/news", label: "News Feed", icon: Newspaper },
+    { href: "/calendar", label: "Calendar", icon: Calendar },
+    { href: "/risk-calculator", label: "Risk Calc", icon: Calculator },
   ];
 
   const getInitials = (name: string) => {
@@ -138,6 +151,26 @@ export function Navbar() {
                       Settings
                     </Link>
                   </DropdownMenuItem>
+                  {hasPremium && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1 text-xs text-muted-foreground flex items-center gap-1">
+                        <Crown className="h-3 w-3 text-amber-500" />
+                        Premium Tools
+                      </div>
+                      {premiumMenuItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <DropdownMenuItem key={item.href} asChild>
+                            <Link href={item.href} className="flex items-center gap-2 cursor-pointer" data-testid={`link-premium-${item.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                              <Icon className="h-4 w-4" />
+                              {item.label}
+                            </Link>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </>
+                  )}
                   {(user?.role === "teacher" || user?.role === "admin") && (
                     <DropdownMenuItem asChild>
                       <Link href="/classroom" className="flex items-center gap-2 cursor-pointer" data-testid="link-classroom">
