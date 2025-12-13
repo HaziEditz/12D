@@ -1036,9 +1036,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ error: "Invalid promo code" });
       }
 
-      // Check if user already has an active subscription
-      if (user.membershipStatus === "active" && user.subscriptionId) {
-        return res.status(400).json({ error: "You already have an active subscription" });
+      // Define tier hierarchy for upgrades
+      const tierRank: Record<string, number> = {
+        "casual": 1,
+        "school": 2,
+        "premium": 3,
+      };
+
+      const currentTierRank = tierRank[user.membershipTier || "casual"] || 0;
+      const newTierRank = tierRank[promoConfig.tier] || 0;
+
+      // Check if user already has the same or higher tier
+      if (user.membershipStatus === "active" && currentTierRank >= newTierRank) {
+        return res.status(400).json({ error: "You already have this tier or a higher membership" });
       }
 
       // Activate free subscription based on promo code
