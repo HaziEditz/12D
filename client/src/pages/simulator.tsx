@@ -90,6 +90,7 @@ export default function SimulatorPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const seriesRef = useRef<any>(null);
+  const lastChartSymbolRef = useRef<string>("");
   
   const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
   const [quantity, setQuantity] = useState("1");
@@ -262,6 +263,12 @@ export default function SimulatorPage() {
 
   useEffect(() => {
     if (!chartContainerRef.current || candleData.length === 0) return;
+    
+    // Only recreate chart when symbol changes
+    if (lastChartSymbolRef.current === selectedSymbol && chartRef.current) {
+      return;
+    }
+    lastChartSymbolRef.current = selectedSymbol;
 
     if (chartRef.current) {
       chartRef.current.remove();
