@@ -33,7 +33,9 @@ import {
   BookOpenText,
   Newspaper,
   Calendar,
-  Calculator
+  Calculator,
+  Star,
+  Lightbulb
 } from "lucide-react";
 import { useState } from "react";
 
@@ -49,6 +51,8 @@ export function Navbar() {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
     { href: "/achievements", label: "Achievements", icon: Award, premium: false },
+    { href: "/watchlist", label: "Watchlist", icon: Star, premium: false },
+    { href: "/tips", label: "Tips", icon: Lightbulb, premium: false },
     { href: "/command-center", label: "Terminal", icon: Zap, premium: true },
     { href: "/strategies", label: "Strategies", icon: Library, premium: true },
     { href: "/analytics", label: "Analytics", icon: BarChart3, premium: true },
@@ -81,7 +85,7 @@ export function Navbar() {
         </Link>
 
         {isAuthenticated && (
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;

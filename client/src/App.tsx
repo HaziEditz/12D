@@ -32,6 +32,8 @@ import SettingsPage from "@/pages/settings";
 import PublicProfilePage from "@/pages/public-profile";
 import UsersPage from "@/pages/users";
 import AchievementsPage from "@/pages/achievements";
+import WatchlistPage from "@/pages/watchlist";
+import TipsPage from "@/pages/tips";
 
 function Router() {
   return (
@@ -46,6 +48,8 @@ function Router() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/simulator" component={SimulatorPage} />
       <Route path="/leaderboard" component={LeaderboardPage} />
+      <Route path="/watchlist" component={WatchlistPage} />
+      <Route path="/tips" component={TipsPage} />
       <Route path="/strategies" component={StrategiesPage} />
       <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/command-center" component={CommandCenterPage} />
