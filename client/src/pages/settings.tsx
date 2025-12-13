@@ -13,8 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { User, KeyRound, Camera, ArrowLeft, Save, Loader2 } from "lucide-react";
+import { User, KeyRound, Camera, ArrowLeft, Save, Loader2, Volume2, VolumeX } from "lucide-react";
+import { isSoundEnabled, setSoundEnabled, playNotificationSound } from "@/lib/sounds";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
@@ -38,6 +41,15 @@ export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [soundEnabled, setSoundEnabledState] = useState(isSoundEnabled());
+
+  const handleSoundToggle = (enabled: boolean) => {
+    setSoundEnabledState(enabled);
+    setSoundEnabled(enabled);
+    if (enabled) {
+      playNotificationSound();
+    }
+  };
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -328,6 +340,34 @@ export default function SettingsPage() {
                 </Button>
               </form>
             </Form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+              Sound & Notifications
+            </CardTitle>
+            <CardDescription>
+              Control sound effects and audio notifications
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="sound-toggle">Sound Effects</Label>
+                <p className="text-sm text-muted-foreground">
+                  Play sounds for trades, achievements, and notifications
+                </p>
+              </div>
+              <Switch
+                id="sound-toggle"
+                checked={soundEnabled}
+                onCheckedChange={handleSoundToggle}
+                data-testid="switch-sound-toggle"
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -17,6 +17,7 @@ import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { playLessonCompleteSound } from "@/lib/sounds";
 
 export default function LessonDetailPage() {
   const { user } = useAuth();
@@ -48,6 +49,7 @@ export default function LessonDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lessons/progress"] });
+      playLessonCompleteSound();
       toast({
         title: "Lesson Complete!",
         description: "Great job! You've completed this lesson.",

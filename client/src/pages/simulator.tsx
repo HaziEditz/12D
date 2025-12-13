@@ -12,6 +12,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { Paywall } from "@/components/paywall";
 import { Link } from "wouter";
+import { playTradeSound } from "@/lib/sounds";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -94,6 +95,7 @@ export default function SimulatorPage() {
       refetchTrades();
       refetchLimits();
       refreshUser();
+      playTradeSound();
       toast({ title: "Trade opened successfully" });
     },
     onError: (error: any) => {
@@ -108,6 +110,7 @@ export default function SimulatorPage() {
     onSuccess: () => {
       refetchTrades();
       refreshUser();
+      playTradeSound();
       toast({ title: "Trade closed" });
     },
     onError: () => {
