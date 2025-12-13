@@ -138,6 +138,10 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)))
       .limit(1);
     
+    const wasCompleted = existing.length > 0 && existing[0].completed;
+    const isNewCompletion = completed && !wasCompleted;
+    const isUncompletion = !completed && wasCompleted;
+    
     if (existing.length > 0) {
       await db.update(lessonProgress)
         .set({ completed, completedAt: completed ? new Date() : null })
@@ -149,6 +153,16 @@ export class DatabaseStorage implements IStorage {
         completed,
         completedAt: completed ? new Date() : null,
       });
+    }
+    
+    // Update user's lessonsCompleted count
+    if (isNewCompletion || isUncompletion) {
+      const user = await this.getUserById(userId);
+      if (user) {
+        const currentCount = user.lessonsCompleted ?? 0;
+        const newCount = isNewCompletion ? currentCount + 1 : Math.max(0, currentCount - 1);
+        await this.updateUser(userId, { lessonsCompleted: newCount });
+      }
     }
   }
 
