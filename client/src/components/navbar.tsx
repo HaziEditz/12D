@@ -155,6 +155,22 @@ export function Navbar() {
                       Settings
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-xs text-muted-foreground flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3 text-primary" />
+                    Your Features
+                  </div>
+                  {navItems.filter(item => !item.premium).map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link href={item.href} className="flex items-center gap-2 cursor-pointer" data-testid={`link-menu-${item.label.toLowerCase()}`}>
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
                   {hasPremium && (
                     <>
                       <DropdownMenuSeparator />
