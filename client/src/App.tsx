@@ -25,6 +25,7 @@ import StrategiesPage from "@/pages/strategies";
 import AnalyticsPage from "@/pages/analytics";
 import SettingsPage from "@/pages/settings";
 import PublicProfilePage from "@/pages/public-profile";
+import UsersPage from "@/pages/users";
 
 function Router() {
   return (
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/strategies" component={StrategiesPage} />
       <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/users" component={UsersPage} />
       <Route path="/users/:id" component={PublicProfilePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/teacher" component={TeacherPage} />

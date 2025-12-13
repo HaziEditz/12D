@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, ilike, or } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents,
@@ -18,6 +18,7 @@ export interface IStorage {
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
   getLeaderboard(): Promise<User[]>;
   getStudentsByTeacher(teacherId: string): Promise<User[]>;
+  searchUsers(query: string): Promise<User[]>;
   
   // Lessons
   createLesson(data: InsertLesson): Promise<Lesson>;
@@ -102,6 +103,18 @@ export class DatabaseStorage implements IStorage {
 
   async getStudentsByTeacher(teacherId: string): Promise<User[]> {
     return db.select().from(users).where(eq(users.teacherId, teacherId));
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    const searchPattern = `%${query}%`;
+    return db.select().from(users)
+      .where(
+        or(
+          ilike(users.displayName, searchPattern),
+          ilike(users.email, searchPattern)
+        )
+      )
+      .limit(20);
   }
 
   // Lessons

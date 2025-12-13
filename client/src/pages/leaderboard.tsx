@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -169,44 +170,45 @@ export default function LeaderboardPage() {
               {leaderboard.map((user, index) => {
                 const rank = index + 1;
                 return (
-                  <div
-                    key={user.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${getRankStyle(rank)}`}
-                    data-testid={`row-leaderboard-${rank}`}
-                  >
-                    <div className="w-12 flex items-center justify-center">
-                      {getRankIcon(rank) || (
-                        <span className="text-xl font-bold text-muted-foreground">
-                          #{rank}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {getInitials(user.displayName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold">{user.displayName}</p>
-                        {getMembershipBadge(user.membershipTier, user.membershipStatus)}
+                  <Link key={user.id} href={`/users/${user.id}`}>
+                    <div
+                      className={`flex items-center gap-4 p-4 rounded-lg border transition-colors hover-elevate cursor-pointer ${getRankStyle(rank)}`}
+                      data-testid={`row-leaderboard-${rank}`}
+                    >
+                      <div className="w-12 flex items-center justify-center">
+                        {getRankIcon(rank) || (
+                          <span className="text-xl font-bold text-muted-foreground">
+                            #{rank}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{user.lessonsCompleted ?? 0} lessons</span>
+                      
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {getInitials(user.displayName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold">{user.displayName}</p>
+                          {getMembershipBadge(user.membershipTier, user.membershipStatus)}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>{user.lessonsCompleted ?? 0} lessons</span>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <p className={`text-lg font-bold ${(user.totalProfit ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {(user.totalProfit ?? 0) >= 0 ? '+' : ''}${(user.totalProfit ?? 0).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Balance: ${(user.simulatorBalance ?? 10000).toLocaleString()}
+                        </p>
                       </div>
                     </div>
-                    
-                    <div className="text-right">
-                      <p className={`text-lg font-bold ${(user.totalProfit ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {(user.totalProfit ?? 0) >= 0 ? '+' : ''}${(user.totalProfit ?? 0).toLocaleString()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Balance: ${(user.simulatorBalance ?? 10000).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

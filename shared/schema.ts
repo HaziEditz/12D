@@ -136,6 +136,24 @@ export const classStudents = pgTable("class_students", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(),
+  category: text("category").notNull(),
+  requirement: integer("requirement").notNull(),
+  xpReward: integer("xp_reward").notNull().default(10),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  achievementId: varchar("achievement_id").notNull(),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+  progress: integer("progress").default(0),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -148,6 +166,8 @@ export const insertStrategySchema = createInsertSchema(strategies).omit({ id: tr
 export const insertSchoolSchema = createInsertSchema(schools).omit({ id: true, createdAt: true });
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true });
 export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, joinedAt: true });
+export const insertAchievementSchema = createInsertSchema(achievements);
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true, unlockedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -173,6 +193,10 @@ export type InsertClass = z.infer<typeof insertClassSchema>;
 export type Class = typeof classes.$inferSelect;
 export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
 export type ClassStudent = typeof classStudents.$inferSelect;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
