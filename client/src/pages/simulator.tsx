@@ -258,7 +258,7 @@ export default function SimulatorPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSymbol]);
 
   useEffect(() => {
     if (!chartContainerRef.current || candleData.length === 0) return;
@@ -310,7 +310,7 @@ export default function SimulatorPage() {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [candleData.length > 0]);
+  }, [selectedSymbol, candleData]);
 
   const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);
