@@ -27,7 +27,8 @@ import {
   Library,
   BarChart3,
   Lock,
-  Crown
+  Crown,
+  Award
 } from "lucide-react";
 import { useState } from "react";
 
@@ -42,6 +43,7 @@ export function Navbar() {
     { href: "/simulator", label: "Simulator", icon: LineChart, premium: false },
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
+    { href: "/achievements", label: "Achievements", icon: Award, premium: false },
     { href: "/strategies", label: "Strategies", icon: Library, premium: true },
     { href: "/analytics", label: "Analytics", icon: BarChart3, premium: true },
   ];

@@ -2,11 +2,12 @@ import { db } from "./db";
 import { eq, desc, and, isNull, ilike, or } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
-  schools, classes, classStudents,
+  schools, classes, classStudents, achievements, userAchievements,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
-  type Class, type InsertClass, type ClassStudent, type InsertClassStudent
+  type Class, type InsertClass, type ClassStudent, type InsertClassStudent,
+  type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -69,6 +70,14 @@ export interface IStorage {
   getStudentsByClass(classId: string): Promise<User[]>;
   removeStudentFromClass(classId: string, studentId: string): Promise<void>;
   getClassesByStudent(studentId: string): Promise<Class[]>;
+  
+  // Achievements
+  createAchievement(data: InsertAchievement): Promise<Achievement>;
+  getAchievements(): Promise<Achievement[]>;
+  getAchievementById(id: string): Promise<Achievement | undefined>;
+  getUserAchievements(userId: string): Promise<UserAchievement[]>;
+  unlockAchievement(userId: string, achievementId: string): Promise<UserAchievement>;
+  updateAchievementProgress(userId: string, achievementId: string, progress: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -338,6 +347,57 @@ export class DatabaseStorage implements IStorage {
     if (classIds.length === 0) return [];
     const allClasses = await db.select().from(classes);
     return allClasses.filter(c => classIds.includes(c.id));
+  }
+
+  // Achievements
+  async createAchievement(data: InsertAchievement): Promise<Achievement> {
+    const [achievement] = await db.insert(achievements).values(data).returning();
+    return achievement;
+  }
+
+  async getAchievements(): Promise<Achievement[]> {
+    return db.select().from(achievements);
+  }
+
+  async getAchievementById(id: string): Promise<Achievement | undefined> {
+    const [achievement] = await db.select().from(achievements).where(eq(achievements.id, id)).limit(1);
+    return achievement;
+  }
+
+  async getUserAchievements(userId: string): Promise<UserAchievement[]> {
+    return db.select().from(userAchievements).where(eq(userAchievements.userId, userId));
+  }
+
+  async unlockAchievement(userId: string, achievementId: string): Promise<UserAchievement> {
+    const existing = await db.select().from(userAchievements)
+      .where(and(eq(userAchievements.userId, userId), eq(userAchievements.achievementId, achievementId)))
+      .limit(1);
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    const [ua] = await db.insert(userAchievements).values({
+      userId,
+      achievementId,
+      progress: 100,
+    }).returning();
+    return ua;
+  }
+
+  async updateAchievementProgress(userId: string, achievementId: string, progress: number): Promise<void> {
+    const existing = await db.select().from(userAchievements)
+      .where(and(eq(userAchievements.userId, userId), eq(userAchievements.achievementId, achievementId)))
+      .limit(1);
+    if (existing.length > 0) {
+      await db.update(userAchievements)
+        .set({ progress })
+        .where(and(eq(userAchievements.userId, userId), eq(userAchievements.achievementId, achievementId)));
+    } else {
+      await db.insert(userAchievements).values({
+        userId,
+        achievementId,
+        progress,
+      });
+    }
   }
 }
 

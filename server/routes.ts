@@ -38,6 +38,55 @@ async function ensureAdminUser() {
   }
 }
 
+// Seed achievements
+async function seedAchievements() {
+  const existingAchievements = await storage.getAchievements();
+  if (existingAchievements.length > 0) return;
+
+  const achievementsList = [
+    // Trading (1-10)
+    { id: "first-trade", name: "First Trade", description: "Execute your first trade", icon: "TrendingUp", category: "trading", requirement: 1, xpReward: 10 },
+    { id: "day-trader", name: "Day Trader", description: "Complete 10 trades", icon: "TrendingUp", category: "trading", requirement: 10, xpReward: 25 },
+    { id: "active-trader", name: "Active Trader", description: "Complete 50 trades", icon: "TrendingUp", category: "trading", requirement: 50, xpReward: 50 },
+    { id: "master-trader", name: "Master Trader", description: "Complete 100 trades", icon: "Zap", category: "trading", requirement: 100, xpReward: 100 },
+    { id: "trading-legend", name: "Trading Legend", description: "Complete 500 trades", icon: "Award", category: "trading", requirement: 500, xpReward: 250 },
+    { id: "first-profit", name: "First Profit", description: "Make your first profitable trade", icon: "DollarSign", category: "trading", requirement: 1, xpReward: 15 },
+    { id: "winning-streak", name: "Winning Streak", description: "5 profitable trades in a row", icon: "Zap", category: "trading", requirement: 5, xpReward: 50 },
+    { id: "double-down", name: "Double Down", description: "Make $1,000 total profit", icon: "DollarSign", category: "trading", requirement: 1000, xpReward: 75 },
+    { id: "high-roller", name: "High Roller", description: "Make $5,000 total profit", icon: "DollarSign", category: "trading", requirement: 5000, xpReward: 150 },
+    { id: "mogul", name: "Mogul", description: "Make $10,000 total profit", icon: "Award", category: "trading", requirement: 10000, xpReward: 300 },
+    // Learning (11-15)
+    { id: "student", name: "Student", description: "Complete your first lesson", icon: "BookOpen", category: "learning", requirement: 1, xpReward: 10 },
+    { id: "scholar", name: "Scholar", description: "Complete 5 lessons", icon: "BookOpen", category: "learning", requirement: 5, xpReward: 30 },
+    { id: "graduate", name: "Graduate", description: "Complete 10 lessons", icon: "GraduationCap", category: "learning", requirement: 10, xpReward: 60 },
+    { id: "professor", name: "Professor", description: "Complete 25 lessons", icon: "GraduationCap", category: "learning", requirement: 25, xpReward: 125 },
+    { id: "valedictorian", name: "Valedictorian", description: "Complete all available lessons", icon: "Award", category: "learning", requirement: 100, xpReward: 500 },
+    // Balance (16-20)
+    { id: "starter", name: "Starter", description: "Reach $6,000 balance", icon: "Wallet", category: "balance", requirement: 6000, xpReward: 20 },
+    { id: "growing", name: "Growing", description: "Reach $10,000 balance", icon: "Wallet", category: "balance", requirement: 10000, xpReward: 50 },
+    { id: "wealthy", name: "Wealthy", description: "Reach $15,000 balance", icon: "CreditCard", category: "balance", requirement: 15000, xpReward: 100 },
+    { id: "rich", name: "Rich", description: "Reach $25,000 balance", icon: "DollarSign", category: "balance", requirement: 25000, xpReward: 200 },
+    { id: "elite", name: "Elite", description: "Reach $50,000 balance", icon: "Crown", category: "balance", requirement: 50000, xpReward: 500 },
+    // Social (21-25)
+    { id: "public-profile", name: "Public Profile", description: "Add a bio to your profile", icon: "User", category: "social", requirement: 1, xpReward: 10 },
+    { id: "picture-perfect", name: "Picture Perfect", description: "Add an avatar to your profile", icon: "Image", category: "social", requirement: 1, xpReward: 10 },
+    { id: "networker", name: "Networker", description: "Add your first friend", icon: "UserPlus", category: "social", requirement: 1, xpReward: 15 },
+    { id: "popular", name: "Popular", description: "Have 10 friends", icon: "Users", category: "social", requirement: 10, xpReward: 50 },
+    { id: "influencer", name: "Influencer", description: "Have 25 friends", icon: "Heart", category: "social", requirement: 25, xpReward: 100 },
+    // Milestones (26-30)
+    { id: "early-bird", name: "Early Bird", description: "Log in for the first time", icon: "Star", category: "milestone", requirement: 1, xpReward: 5 },
+    { id: "dedicated", name: "Dedicated", description: "Log in for 7 days", icon: "Star", category: "milestone", requirement: 7, xpReward: 35 },
+    { id: "committed", name: "Committed", description: "Log in for 30 days", icon: "Trophy", category: "milestone", requirement: 30, xpReward: 150 },
+    { id: "premium-member", name: "Premium Member", description: "Subscribe to a premium plan", icon: "Crown", category: "milestone", requirement: 1, xpReward: 50 },
+    { id: "top-10", name: "Top 10", description: "Reach top 10 on the leaderboard", icon: "Trophy", category: "milestone", requirement: 1, xpReward: 200 },
+  ];
+
+  for (const achievement of achievementsList) {
+    await storage.createAchievement(achievement);
+  }
+  console.log("Seeded 30 achievements");
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Session setup
   const isProduction = process.env.NODE_ENV === "production";
@@ -124,8 +173,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(403).json({ message: "Forbidden" });
   };
 
-  // Ensure admin exists
+  // Ensure admin exists and seed achievements
   await ensureAdminUser();
+  await seedAchievements();
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -759,6 +809,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       };
       
       res.json(publicProfile);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Achievements routes
+  app.get("/api/achievements", async (req, res) => {
+    try {
+      const allAchievements = await storage.getAchievements();
+      res.json(allAchievements);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/user/achievements", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userAchievementsList = await storage.getUserAchievements(user.id);
+      const allAchievements = await storage.getAchievements();
+      
+      const achievementsWithProgress = allAchievements.map(achievement => {
+        const userAchievement = userAchievementsList.find(ua => ua.achievementId === achievement.id);
+        return {
+          ...achievement,
+          unlocked: !!userAchievement && (userAchievement.progress ?? 0) >= 100,
+          unlockedAt: userAchievement?.unlockedAt,
+          progress: userAchievement?.progress ?? 0,
+        };
+      });
+      
+      res.json(achievementsWithProgress);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:id/achievements", async (req, res) => {
+    try {
+      const userAchievementsList = await storage.getUserAchievements(req.params.id);
+      const allAchievements = await storage.getAchievements();
+      
+      const unlockedAchievements = allAchievements
+        .filter(achievement => {
+          const ua = userAchievementsList.find(u => u.achievementId === achievement.id);
+          return ua && (ua.progress ?? 0) >= 100;
+        })
+        .map(achievement => {
+          const ua = userAchievementsList.find(u => u.achievementId === achievement.id);
+          return {
+            ...achievement,
+            unlockedAt: ua?.unlockedAt,
+          };
+        });
+      
+      res.json(unlockedAchievements);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

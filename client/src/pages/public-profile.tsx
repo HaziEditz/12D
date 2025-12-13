@@ -11,7 +11,12 @@ import {
   GraduationCap,
   Zap,
   Target,
-  User
+  User,
+  Award,
+  Star,
+  DollarSign,
+  Users,
+  Calendar
 } from "lucide-react";
 
 interface PublicUser {
@@ -25,12 +30,39 @@ interface PublicUser {
   totalProfit: number | null;
 }
 
+interface UserAchievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  xpReward: number;
+  unlockedAt: string;
+}
+
+const categoryIcons: Record<string, any> = {
+  trading: TrendingUp,
+  learning: BookOpen,
+  balance: DollarSign,
+  social: Users,
+  milestone: Calendar,
+};
+
+const getCategoryIcon = (category: string) => {
+  return categoryIcons[category] || Award;
+};
+
 export default function PublicProfilePage() {
   const [, params] = useRoute("/users/:id");
   const userId = params?.id;
 
   const { data: profile, isLoading, error } = useQuery<PublicUser>({
     queryKey: ["/api/users", userId],
+    enabled: !!userId,
+  });
+
+  const { data: achievements } = useQuery<UserAchievement[]>({
+    queryKey: ["/api/users", userId, "achievements"],
     enabled: !!userId,
   });
 
@@ -167,6 +199,49 @@ export default function PublicProfilePage() {
           );
         })}
       </div>
+
+      {achievements && achievements.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-amber-500" />
+              Achievements ({achievements.length})
+            </CardTitle>
+            <CardDescription>Unlocked achievements</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {achievements.slice(0, 6).map((achievement) => {
+                const CategoryIcon = getCategoryIcon(achievement.category);
+                return (
+                  <div
+                    key={achievement.id}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/50"
+                    data-testid={`achievement-${achievement.id}`}
+                  >
+                    <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                      <CategoryIcon className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{achievement.name}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{achievement.description}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="h-3 w-3 text-amber-500" />
+                        <span className="text-xs text-amber-600">+{achievement.xpReward} XP</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {achievements.length > 6 && (
+              <p className="text-sm text-muted-foreground text-center mt-4">
+                +{achievements.length - 6} more achievements
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
