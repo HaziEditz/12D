@@ -35,9 +35,14 @@ export interface IStorage {
   // Trades
   createTrade(data: InsertTrade): Promise<Trade>;
   getOpenTrades(userId: string): Promise<Trade[]>;
+  getPendingTrades(userId: string): Promise<Trade[]>;
+  getAllActiveTrades(userId: string): Promise<Trade[]>;
+  updateTrade(id: string, data: Partial<Trade>): Promise<Trade | undefined>;
   closeTrade(id: string, exitPrice: number): Promise<Trade | undefined>;
+  cancelTrade(id: string): Promise<Trade | undefined>;
   getTradesByUser(userId: string): Promise<Trade[]>;
   getTotalTradesCount(): Promise<number>;
+  getTradeById(id: string): Promise<Trade | undefined>;
   
   // Portfolio
   getPortfolio(userId: string): Promise<PortfolioItem[]>;
@@ -199,6 +204,37 @@ export class DatabaseStorage implements IStorage {
   async getOpenTrades(userId: string): Promise<Trade[]> {
     return db.select().from(trades)
       .where(and(eq(trades.userId, userId), eq(trades.status, "open")));
+  }
+
+  async getPendingTrades(userId: string): Promise<Trade[]> {
+    return db.select().from(trades)
+      .where(and(eq(trades.userId, userId), eq(trades.status, "pending")));
+  }
+
+  async getAllActiveTrades(userId: string): Promise<Trade[]> {
+    return db.select().from(trades)
+      .where(and(
+        eq(trades.userId, userId),
+        or(eq(trades.status, "open"), eq(trades.status, "pending"))
+      ));
+  }
+
+  async updateTrade(id: string, data: Partial<Trade>): Promise<Trade | undefined> {
+    const [trade] = await db.update(trades).set(data).where(eq(trades.id, id)).returning();
+    return trade;
+  }
+
+  async getTradeById(id: string): Promise<Trade | undefined> {
+    const [trade] = await db.select().from(trades).where(eq(trades.id, id)).limit(1);
+    return trade;
+  }
+
+  async cancelTrade(id: string): Promise<Trade | undefined> {
+    const [trade] = await db.update(trades)
+      .set({ status: "cancelled", closedAt: new Date() })
+      .where(eq(trades.id, id))
+      .returning();
+    return trade;
   }
 
   async closeTrade(id: string, exitPrice: number): Promise<Trade | undefined> {

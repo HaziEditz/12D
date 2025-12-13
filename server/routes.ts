@@ -405,8 +405,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/trades", requireAuth, async (req, res) => {
     const user = req.user as User;
     if (req.query.open) {
-      const openTrades = await storage.getOpenTrades(user.id);
-      res.json(openTrades);
+      // Return both open and pending trades for the active trades view
+      const activeTrades = await storage.getAllActiveTrades(user.id);
+      res.json(activeTrades);
+    } else if (req.query.pending) {
+      const pendingTrades = await storage.getPendingTrades(user.id);
+      res.json(pendingTrades);
     } else {
       const allTrades = await storage.getTradesByUser(user.id);
       res.json(allTrades);
@@ -416,7 +420,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/trades", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const data = insertTradeSchema.parse({ ...req.body, userId: user.id });
+      const { orderType = "market", triggerPrice, stopLossPrice, takeProfitPrice, trailingPercent, ...rest } = req.body;
+      
+      // Validate order type
+      const validOrderTypes = ["market", "limit", "stop", "stop_loss", "take_profit", "trailing_stop", "oco"];
+      if (!validOrderTypes.includes(orderType)) {
+        return res.status(400).json({ message: "Invalid order type" });
+      }
+      
+      // Determine status based on order type
+      const isMarketOrder = orderType === "market";
+      const status = isMarketOrder ? "open" : "pending";
+      
+      // Validate trigger prices for non-market orders
+      if (!isMarketOrder) {
+        if (orderType === "limit" || orderType === "stop") {
+          if (!triggerPrice || triggerPrice <= 0) {
+            return res.status(400).json({ message: "Trigger price is required for limit/stop orders" });
+          }
+        }
+        if (orderType === "stop_loss" && (!stopLossPrice || stopLossPrice <= 0)) {
+          return res.status(400).json({ message: "Stop loss price is required" });
+        }
+        if (orderType === "take_profit" && (!takeProfitPrice || takeProfitPrice <= 0)) {
+          return res.status(400).json({ message: "Take profit price is required" });
+        }
+        if (orderType === "trailing_stop" && (!trailingPercent || trailingPercent <= 0 || trailingPercent > 50)) {
+          return res.status(400).json({ message: "Trailing percent must be between 0 and 50" });
+        }
+        if (orderType === "oco") {
+          if (!stopLossPrice || !takeProfitPrice || stopLossPrice <= 0 || takeProfitPrice <= 0) {
+            return res.status(400).json({ message: "Both stop loss and take profit prices are required for OCO orders" });
+          }
+        }
+      }
+      
+      const data = insertTradeSchema.parse({ 
+        ...rest, 
+        userId: user.id,
+        orderType,
+        status,
+        triggerPrice: triggerPrice || null,
+        stopLossPrice: stopLossPrice || null,
+        takeProfitPrice: takeProfitPrice || null,
+        trailingPercent: trailingPercent || null,
+        trailingHighPrice: orderType === "trailing_stop" ? rest.entryPrice : null,
+      });
       
       // Check if user is on trial (demo) and enforce trade limits
       const DEMO_DAILY_TRADE_LIMIT = 5;
@@ -446,10 +495,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
       
-      // Check if user has enough balance
-      const cost = data.quantity * data.entryPrice;
-      if ((user.simulatorBalance ?? 5000) < cost) {
-        return res.status(400).json({ message: "Insufficient balance" });
+      // Check if user has enough balance (for market orders that execute immediately)
+      if (isMarketOrder) {
+        const cost = data.quantity * data.entryPrice;
+        if ((user.simulatorBalance ?? 5000) < cost) {
+          return res.status(400).json({ message: "Insufficient balance" });
+        }
       }
 
       const trade = await storage.createTrade(data);
@@ -466,6 +517,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!trade) {
         return res.status(404).json({ message: "Trade not found" });
       }
+      res.json(trade);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/trades/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const existingTrade = await storage.getTradeById(req.params.id);
+      if (!existingTrade) {
+        return res.status(404).json({ message: "Trade not found" });
+      }
+      if (existingTrade.status !== "pending") {
+        return res.status(400).json({ message: "Only pending orders can be cancelled" });
+      }
+      const trade = await storage.cancelTrade(req.params.id);
       res.json(trade);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
