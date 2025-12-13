@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   schoolEmail: text("school_email"),
   dailyTradesCount: integer("daily_trades_count").default(0),
   lastTradeDate: text("last_trade_date"),
+  xp: integer("xp").default(0),
 });
 
 export const lessons = pgTable("lessons", {
@@ -174,7 +175,7 @@ export const insertSchoolSchema = createInsertSchema(schools).omit({ id: true, c
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true });
 export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, joinedAt: true });
 export const insertAchievementSchema = createInsertSchema(achievements);
-export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true, unlockedAt: true });
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
