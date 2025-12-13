@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
@@ -23,10 +24,26 @@ import {
   Plus,
   Minus,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Target,
+  Shield,
+  Percent,
+  Layers
 } from "lucide-react";
 import { createChart, ColorType, CandlestickData, Time, CandlestickSeries } from "lightweight-charts";
 import type { Trade } from "@shared/schema";
+
+type OrderType = "market" | "limit" | "stop" | "stop_loss" | "take_profit" | "trailing_stop" | "oco";
+
+const ORDER_TYPE_INFO: Record<OrderType, { label: string; description: string; icon: typeof Target }> = {
+  market: { label: "Market", description: "Execute immediately at current price", icon: Activity },
+  limit: { label: "Limit", description: "Buy below or sell above a target price", icon: Target },
+  stop: { label: "Stop", description: "Buy above or sell below a trigger price", icon: AlertCircle },
+  stop_loss: { label: "Stop Loss", description: "Auto-close if price drops to limit losses", icon: Shield },
+  take_profit: { label: "Take Profit", description: "Auto-close when price reaches profit target", icon: TrendingUp },
+  trailing_stop: { label: "Trailing Stop", description: "Dynamic stop that follows price movement", icon: Percent },
+  oco: { label: "OCO", description: "One-Cancels-Other: combines stop loss and take profit", icon: Layers },
+};
 
 interface TradeLimits {
   isLimited: boolean;
@@ -79,6 +96,11 @@ export default function SimulatorPage() {
   const [currentPrice, setCurrentPrice] = useState(0);
   const [timeframe, setTimeframe] = useState("1m");
   const [candleData, setCandleData] = useState<CandlestickData[]>([]);
+  const [orderType, setOrderType] = useState<OrderType>("market");
+  const [triggerPrice, setTriggerPrice] = useState("");
+  const [stopLossPrice, setStopLossPrice] = useState("");
+  const [takeProfitPrice, setTakeProfitPrice] = useState("");
+  const [trailingPercent, setTrailingPercent] = useState("5");
 
   const { data: openTrades, refetch: refetchTrades } = useQuery<Trade[]>({
     queryKey: ["/api/trades?open=true"],
@@ -89,14 +111,27 @@ export default function SimulatorPage() {
   });
 
   const openTradeMutation = useMutation({
-    mutationFn: (data: { symbol: string; type: string; quantity: number; entryPrice: number }) =>
-      apiRequest("POST", "/api/trades", data),
-    onSuccess: () => {
+    mutationFn: (data: { 
+      symbol: string; 
+      type: string; 
+      quantity: number; 
+      entryPrice: number;
+      orderType?: string;
+      triggerPrice?: number;
+      stopLossPrice?: number;
+      takeProfitPrice?: number;
+      trailingPercent?: number;
+    }) => apiRequest("POST", "/api/trades", data),
+    onSuccess: (_, variables) => {
       refetchTrades();
       refetchLimits();
       refreshUser();
       playTradeSound();
-      toast({ title: "Trade opened successfully" });
+      const isPending = variables.orderType && variables.orderType !== "market";
+      toast({ 
+        title: isPending ? "Order placed successfully" : "Trade opened successfully",
+        description: isPending ? "Your order will execute when the price target is reached" : undefined
+      });
     },
     onError: (error: any) => {
       const message = error?.message || "Failed to open trade";
@@ -115,6 +150,17 @@ export default function SimulatorPage() {
     },
     onError: () => {
       toast({ title: "Failed to close trade", variant: "destructive" });
+    },
+  });
+
+  const cancelTradeMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/trades/${id}/cancel`),
+    onSuccess: () => {
+      refetchTrades();
+      toast({ title: "Order cancelled" });
+    },
+    onError: () => {
+      toast({ title: "Failed to cancel order", variant: "destructive" });
     },
   });
 
@@ -211,35 +257,109 @@ export default function SimulatorPage() {
     };
   }, [candleData.length > 0]);
 
-  const handleBuy = () => {
+  const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);
     if (isNaN(qty) || qty <= 0) {
       toast({ title: "Invalid quantity", variant: "destructive" });
-      return;
+      return null;
     }
-    openTradeMutation.mutate({
+
+    const payload: {
+      symbol: string;
+      type: string;
+      quantity: number;
+      entryPrice: number;
+      orderType?: string;
+      triggerPrice?: number;
+      stopLossPrice?: number;
+      takeProfitPrice?: number;
+      trailingPercent?: number;
+    } = {
       symbol: selectedSymbol,
-      type: "buy",
+      type,
       quantity: qty,
       entryPrice: currentPrice,
-    });
+      orderType,
+    };
+
+    if (orderType === "limit" || orderType === "stop") {
+      const trigger = parseFloat(triggerPrice);
+      if (isNaN(trigger) || trigger <= 0) {
+        toast({ title: "Please enter a valid trigger price", variant: "destructive" });
+        return null;
+      }
+      payload.triggerPrice = trigger;
+    }
+
+    if (orderType === "stop_loss") {
+      const sl = parseFloat(stopLossPrice);
+      if (isNaN(sl) || sl <= 0) {
+        toast({ title: "Please enter a valid stop loss price", variant: "destructive" });
+        return null;
+      }
+      payload.stopLossPrice = sl;
+    }
+
+    if (orderType === "take_profit") {
+      const tp = parseFloat(takeProfitPrice);
+      if (isNaN(tp) || tp <= 0) {
+        toast({ title: "Please enter a valid take profit price", variant: "destructive" });
+        return null;
+      }
+      payload.takeProfitPrice = tp;
+    }
+
+    if (orderType === "trailing_stop") {
+      const trail = parseFloat(trailingPercent);
+      if (isNaN(trail) || trail <= 0 || trail > 50) {
+        toast({ title: "Please enter a valid trailing percentage (1-50%)", variant: "destructive" });
+        return null;
+      }
+      payload.trailingPercent = trail;
+    }
+
+    if (orderType === "oco") {
+      const sl = parseFloat(stopLossPrice);
+      const tp = parseFloat(takeProfitPrice);
+      if (isNaN(sl) || sl <= 0) {
+        toast({ title: "Please enter a valid stop loss price", variant: "destructive" });
+        return null;
+      }
+      if (isNaN(tp) || tp <= 0) {
+        toast({ title: "Please enter a valid take profit price", variant: "destructive" });
+        return null;
+      }
+      payload.stopLossPrice = sl;
+      payload.takeProfitPrice = tp;
+    }
+
+    return payload;
+  };
+
+  const handleBuy = () => {
+    const payload = buildTradePayload("buy");
+    if (payload) {
+      openTradeMutation.mutate(payload);
+    }
   };
 
   const handleSell = () => {
-    const qty = parseFloat(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      toast({ title: "Invalid quantity", variant: "destructive" });
-      return;
+    const payload = buildTradePayload("sell");
+    if (payload) {
+      openTradeMutation.mutate(payload);
     }
-    openTradeMutation.mutate({
-      symbol: selectedSymbol,
-      type: "sell",
-      quantity: qty,
-      entryPrice: currentPrice,
-    });
+  };
+
+  const resetOrderForm = () => {
+    setOrderType("market");
+    setTriggerPrice("");
+    setStopLossPrice("");
+    setTakeProfitPrice("");
+    setTrailingPercent("5");
   };
 
   const totalProfit = openTrades?.reduce((sum, trade) => {
+    if (trade.status === "pending") return sum;
     const pnl = trade.type === "buy" 
       ? (currentPrice - trade.entryPrice) * trade.quantity
       : (trade.entryPrice - currentPrice) * trade.quantity;
@@ -396,7 +516,29 @@ export default function SimulatorPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">How many units?</label>
+              <Label className="text-sm font-medium mb-2 block">Order Type</Label>
+              <Select value={orderType} onValueChange={(value) => setOrderType(value as OrderType)}>
+                <SelectTrigger data-testid="select-order-type">
+                  <SelectValue placeholder="Select order type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(ORDER_TYPE_INFO) as [OrderType, typeof ORDER_TYPE_INFO["market"]][]).map(([key, info]) => (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        <info.icon className="h-4 w-4" />
+                        <span>{info.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ORDER_TYPE_INFO[orderType].description}
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">How many units?</Label>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
@@ -423,6 +565,116 @@ export default function SimulatorPage() {
                 </Button>
               </div>
             </div>
+
+            {(orderType === "limit" || orderType === "stop") && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">
+                  {orderType === "limit" ? "Limit Price" : "Stop Price"} ($)
+                </Label>
+                <Input
+                  type="number"
+                  value={triggerPrice}
+                  onChange={(e) => setTriggerPrice(e.target.value)}
+                  placeholder={`Enter ${orderType} price`}
+                  step="0.01"
+                  min="0"
+                  data-testid="input-trigger-price"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {orderType === "limit" 
+                    ? "Order executes when price reaches this level" 
+                    : "Order triggers when price breaks this level"}
+                </p>
+              </div>
+            )}
+
+            {orderType === "stop_loss" && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Stop Loss Price ($)</Label>
+                <Input
+                  type="number"
+                  value={stopLossPrice}
+                  onChange={(e) => setStopLossPrice(e.target.value)}
+                  placeholder="Enter stop loss price"
+                  step="0.01"
+                  min="0"
+                  data-testid="input-stop-loss"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Position closes automatically if price drops to this level
+                </p>
+              </div>
+            )}
+
+            {orderType === "take_profit" && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Take Profit Price ($)</Label>
+                <Input
+                  type="number"
+                  value={takeProfitPrice}
+                  onChange={(e) => setTakeProfitPrice(e.target.value)}
+                  placeholder="Enter take profit price"
+                  step="0.01"
+                  min="0"
+                  data-testid="input-take-profit"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Position closes automatically when price reaches this target
+                </p>
+              </div>
+            )}
+
+            {orderType === "trailing_stop" && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Trailing Percentage (%)</Label>
+                <Input
+                  type="number"
+                  value={trailingPercent}
+                  onChange={(e) => setTrailingPercent(e.target.value)}
+                  placeholder="Enter trailing %"
+                  step="0.5"
+                  min="0.5"
+                  max="50"
+                  data-testid="input-trailing-percent"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Stop follows price up, triggers if price drops by this percentage
+                </p>
+              </div>
+            )}
+
+            {orderType === "oco" && (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Stop Loss Price ($)</Label>
+                  <Input
+                    type="number"
+                    value={stopLossPrice}
+                    onChange={(e) => setStopLossPrice(e.target.value)}
+                    placeholder="Enter stop loss price"
+                    step="0.01"
+                    min="0"
+                    data-testid="input-oco-stop-loss"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Take Profit Price ($)</Label>
+                  <Input
+                    type="number"
+                    value={takeProfitPrice}
+                    onChange={(e) => setTakeProfitPrice(e.target.value)}
+                    placeholder="Enter take profit price"
+                    step="0.01"
+                    min="0"
+                    data-testid="input-oco-take-profit"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  First target hit closes position and cancels the other order
+                </p>
+              </div>
+            )}
+
             <div className="text-sm text-muted-foreground text-center">
               Total: ${(parseFloat(quantity || "0") * currentPrice).toFixed(2)}
             </div>
@@ -434,7 +686,7 @@ export default function SimulatorPage() {
                 data-testid="button-buy"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Buy (Long)
+                {orderType === "market" ? "Buy (Long)" : "Place Buy"}
               </Button>
               <Button 
                 variant="destructive"
@@ -443,11 +695,13 @@ export default function SimulatorPage() {
                 data-testid="button-sell"
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
-                Sell (Short)
+                {orderType === "market" ? "Sell (Short)" : "Place Sell"}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              Tip: After placing a trade, close it from "Your Active Trades" below to lock in profits or cut losses.
+              {orderType === "market" 
+                ? "Tip: After placing a trade, close it from \"Your Active Trades\" below to lock in profits or cut losses."
+                : "Pending orders will execute automatically when your price target is reached."}
             </p>
           </CardContent>
         </Card>
@@ -456,7 +710,7 @@ export default function SimulatorPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Your Active Trades</CardTitle>
             <CardDescription>
-              {openTrades?.length ?? 0} open - Click "Close Trade" to finish and collect your profit/loss
+              {openTrades?.length ?? 0} position{(openTrades?.length ?? 0) !== 1 ? 's' : ''} - Manage your open and pending orders
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 max-h-60 overflow-y-auto">
@@ -467,43 +721,83 @@ export default function SimulatorPage() {
               </div>
             ) : (
               openTrades.map((trade) => {
+                const isPending = trade.status === "pending";
                 const pnl = trade.type === "buy"
                   ? (currentPrice - trade.entryPrice) * trade.quantity
                   : (trade.entryPrice - currentPrice) * trade.quantity;
+                const orderTypeLabel = trade.orderType ? ORDER_TYPE_INFO[trade.orderType as OrderType]?.label || trade.orderType : "Market";
+                
                 return (
                   <div 
                     key={trade.id} 
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    className={`flex items-center justify-between p-3 rounded-lg ${isPending ? 'bg-muted/30 border border-dashed' : 'bg-muted/50'}`}
                     data-testid={`position-${trade.id}`}
                   >
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1">
                         <Badge variant={trade.type === "buy" ? "default" : "destructive"} className="text-xs">
                           {trade.type.toUpperCase()}
                         </Badge>
-                        <span className="font-medium text-sm">{trade.symbol}</span>
+                        {trade.orderType && trade.orderType !== "market" && (
+                          <Badge variant="outline" className="text-xs">
+                            {orderTypeLabel}
+                          </Badge>
+                        )}
+                        {isPending && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium text-sm block mt-1">{trade.symbol}</span>
+                      <p className="text-xs text-muted-foreground">
                         {trade.quantity} @ ${trade.entryPrice.toFixed(2)}
                       </p>
+                      {isPending && (
+                        <p className="text-xs text-muted-foreground">
+                          {trade.triggerPrice && `Trigger: $${trade.triggerPrice.toFixed(2)}`}
+                          {trade.stopLossPrice && `SL: $${trade.stopLossPrice.toFixed(2)}`}
+                          {trade.takeProfitPrice && ` TP: $${trade.takeProfitPrice.toFixed(2)}`}
+                          {trade.trailingPercent && `Trail: ${trade.trailingPercent}%`}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
-                      <p className={`font-semibold text-sm ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        {pnl >= 0 ? 'Profit' : 'Loss'}
-                      </p>
-                      <Button
-                        variant={pnl >= 0 ? "default" : "destructive"}
-                        size="sm"
-                        className="h-7 px-3 text-xs"
-                        onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: currentPrice })}
-                        data-testid={`button-close-${trade.id}`}
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Close Trade
-                      </Button>
+                      {!isPending && (
+                        <>
+                          <p className={`font-semibold text-sm ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {pnl >= 0 ? 'Profit' : 'Loss'}
+                          </p>
+                        </>
+                      )}
+                      {isPending ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          onClick={() => cancelTradeMutation.mutate(trade.id)}
+                          disabled={cancelTradeMutation.isPending}
+                          data-testid={`button-cancel-${trade.id}`}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Cancel
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={pnl >= 0 ? "default" : "destructive"}
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: currentPrice })}
+                          data-testid={`button-close-${trade.id}`}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Close
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
