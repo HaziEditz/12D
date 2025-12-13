@@ -221,8 +221,6 @@ export default function SimulatorPage() {
 
   // Generate fresh chart data and create chart when symbol changes
   useEffect(() => {
-    if (!chartContainerRef.current) return;
-
     // Generate fresh data for this symbol
     const data = generateCandlestickData(100);
     setCandleData(data);
@@ -233,40 +231,48 @@ export default function SimulatorPage() {
     // Clean up existing chart
     if (chartRef.current) {
       chartRef.current.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
     }
 
-    // Create new chart
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'hsl(var(--foreground))',
-      },
-      grid: {
-        vertLines: { color: 'hsl(var(--border))' },
-        horzLines: { color: 'hsl(var(--border))' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 400,
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+    // Use requestAnimationFrame to ensure DOM is ready
+    const createChartInstance = () => {
+      if (!chartContainerRef.current) return;
 
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: 'hsl(142, 71%, 45%)',
-      downColor: 'hsl(0, 72%, 51%)',
-      borderUpColor: 'hsl(142, 71%, 45%)',
-      borderDownColor: 'hsl(0, 72%, 51%)',
-      wickUpColor: 'hsl(142, 71%, 45%)',
-      wickDownColor: 'hsl(0, 72%, 51%)',
-    });
+      const chart = createChart(chartContainerRef.current, {
+        layout: {
+          background: { type: ColorType.Solid, color: 'transparent' },
+          textColor: 'hsl(var(--foreground))',
+        },
+        grid: {
+          vertLines: { color: 'hsl(var(--border))' },
+          horzLines: { color: 'hsl(var(--border))' },
+        },
+        width: chartContainerRef.current.clientWidth,
+        height: 400,
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
 
-    series.setData(data);
-    chart.timeScale().fitContent();
+      const series = chart.addSeries(CandlestickSeries, {
+        upColor: 'hsl(142, 71%, 45%)',
+        downColor: 'hsl(0, 72%, 51%)',
+        borderUpColor: 'hsl(142, 71%, 45%)',
+        borderDownColor: 'hsl(0, 72%, 51%)',
+        wickUpColor: 'hsl(142, 71%, 45%)',
+        wickDownColor: 'hsl(0, 72%, 51%)',
+      });
 
-    chartRef.current = chart;
-    seriesRef.current = series;
+      series.setData(data);
+      chart.timeScale().fitContent();
+
+      chartRef.current = chart;
+      seriesRef.current = series;
+    };
+
+    const animationId = requestAnimationFrame(createChartInstance);
 
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
@@ -276,8 +282,13 @@ export default function SimulatorPage() {
 
     window.addEventListener('resize', handleResize);
     return () => {
+      cancelAnimationFrame(animationId);
       window.removeEventListener('resize', handleResize);
-      chart.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+      }
     };
   }, [selectedSymbol]);
 
