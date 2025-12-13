@@ -618,8 +618,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Define valid promo codes and their tiers
       const promoCodes: Record<string, { tier: string; message: string }> = {
-        "12DIGITS!": { tier: "casual", message: "Promo code redeemed! You now have free Casual access." },
-        "12DIGITSISCOOL25": { tier: "premium", message: "Promo code redeemed! You now have free 12Digits+ Premium access." },
+        "12DIGITS!": { tier: "school", message: "Promo code redeemed! You now have free School Plan access." },
+        "12DIGITS+": { tier: "premium", message: "Promo code redeemed! You now have free 12Digits+ Premium access." },
       };
 
       const promoConfig = promoCodes[promoCode];
