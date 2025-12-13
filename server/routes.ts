@@ -366,12 +366,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const user = req.user as User;
     const { completed } = req.body;
     await storage.updateLessonProgress(user.id, req.params.id, completed);
+    
+    // Check and award achievements after lesson progress
+    if (completed) {
+      await checkAndAwardAchievements(user.id);
+    }
+    
     res.json({ success: true });
   });
 
   app.post("/api/lessons/:id/complete", requireAuth, async (req, res) => {
     const user = req.user as User;
     await storage.updateLessonProgress(user.id, req.params.id, true);
+    
+    // Check and award achievements after completing a lesson
+    await checkAndAwardAchievements(user.id);
+    
     res.json({ success: true });
   });
 
@@ -504,6 +514,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const trade = await storage.createTrade(data);
+      
+      // Check and award achievements after creating a trade
+      await checkAndAwardAchievements(user.id);
+      
       res.json(trade);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -512,11 +526,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/trades/:id/close", requireAuth, async (req, res) => {
     try {
+      const user = req.user as User;
       const { exitPrice } = req.body;
       const trade = await storage.closeTrade(req.params.id, exitPrice);
       if (!trade) {
         return res.status(404).json({ message: "Trade not found" });
       }
+      
+      // Check and award achievements after closing a trade
+      await checkAndAwardAchievements(user.id);
+      
       res.json(trade);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
