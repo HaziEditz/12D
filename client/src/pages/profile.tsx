@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth-context";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,13 @@ import {
 
 export default function ProfilePage() {
   const { user } = useAuth();
+
+  const { data: leaderboard } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/leaderboard"],
+  });
+
+  const userRank = leaderboard?.findIndex(u => u.id === user?.id) ?? -1;
+  const displayRank = userRank >= 0 ? `#${userRank + 1}` : "---";
 
   const getInitials = (name: string) => {
     return name
@@ -123,7 +131,7 @@ export default function ProfilePage() {
               <div>
                 <div className="flex items-center gap-2 justify-center md:justify-end mb-1">
                   <Trophy className="h-5 w-5 text-chart-4" />
-                  <span className="text-2xl font-bold">#42</span>
+                  <span className="text-2xl font-bold" data-testid="text-leaderboard-rank">{displayRank}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Leaderboard Rank</p>
               </div>
