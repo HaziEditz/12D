@@ -164,6 +164,61 @@ export default function SimulatorPage() {
     },
   });
 
+  // Store prices for all symbols for trigger checking
+  const pricesRef = useRef<Record<string, number>>({});
+  
+  // Update price ref whenever currentPrice changes
+  useEffect(() => {
+    if (currentPrice > 0) {
+      pricesRef.current[selectedSymbol] = currentPrice;
+    }
+  }, [currentPrice, selectedSymbol]);
+
+  // Check pending order triggers periodically
+  useEffect(() => {
+    const checkTriggers = async () => {
+      if (Object.keys(pricesRef.current).length === 0) return;
+      
+      try {
+        const response = await apiRequest("POST", "/api/trades/check-triggers", {
+          prices: pricesRef.current
+        });
+        
+        if (response.executed > 0) {
+          refetchTrades();
+          refreshUser();
+          playTradeSound();
+          toast({ 
+            title: `${response.executed} order${response.executed > 1 ? 's' : ''} executed`,
+            description: "Your pending order(s) have been triggered"
+          });
+        }
+        
+        if (response.closed > 0) {
+          refetchTrades();
+          refreshUser();
+          playTradeSound();
+          const exitReasons = response.closedTrades?.map((t: Trade) => {
+            if (t.orderType === "trailing_stop") return "Trailing Stop";
+            if (t.takeProfitPrice && t.exitPrice && t.exitPrice >= t.takeProfitPrice) return "Take Profit";
+            if (t.stopLossPrice) return "Stop Loss";
+            return "Auto-close";
+          });
+          toast({ 
+            title: `${response.closed} trade${response.closed > 1 ? 's' : ''} closed`,
+            description: exitReasons?.join(", ") || "Exit conditions met"
+          });
+        }
+      } catch (error) {
+        // Silently fail - this runs in background
+      }
+    };
+
+    // Check triggers every 2 seconds
+    const interval = setInterval(checkTriggers, 2000);
+    return () => clearInterval(interval);
+  }, [refetchTrades, refreshUser, toast]);
+
   useEffect(() => {
     const data = generateCandlestickData(100);
     setCandleData(data);

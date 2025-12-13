@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema } from "@shared/schema";
-import type { User } from "@shared/schema";
+import type { User, Trade } from "@shared/schema";
 import memorystore from "memorystore";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
@@ -534,6 +534,158 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const trade = await storage.cancelTrade(req.params.id);
       res.json(trade);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Price monitoring endpoint - checks and executes pending orders based on current prices
+  app.post("/api/trades/check-triggers", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { prices } = req.body as { prices: Record<string, number> };
+      
+      if (!prices || typeof prices !== 'object') {
+        return res.status(400).json({ message: "Prices object is required" });
+      }
+
+      const pendingTrades = await storage.getPendingTrades(user.id);
+      const openTrades = await storage.getOpenTrades(user.id);
+      const executedTrades: Trade[] = [];
+      const closedTrades: Trade[] = [];
+
+      // Check pending orders for execution
+      for (const trade of pendingTrades) {
+        const currentPrice = prices[trade.symbol];
+        if (currentPrice === undefined) continue;
+
+        let shouldExecute = false;
+
+        switch (trade.orderType) {
+          case "limit":
+            // Limit buy: execute when price drops to or below trigger
+            // Limit sell: execute when price rises to or above trigger
+            if (trade.type === "buy" && trade.triggerPrice && currentPrice <= trade.triggerPrice) {
+              shouldExecute = true;
+            } else if (trade.type === "sell" && trade.triggerPrice && currentPrice >= trade.triggerPrice) {
+              shouldExecute = true;
+            }
+            break;
+
+          case "stop":
+            // Stop buy: execute when price rises to or above trigger
+            // Stop sell: execute when price drops to or below trigger
+            if (trade.type === "buy" && trade.triggerPrice && currentPrice >= trade.triggerPrice) {
+              shouldExecute = true;
+            } else if (trade.type === "sell" && trade.triggerPrice && currentPrice <= trade.triggerPrice) {
+              shouldExecute = true;
+            }
+            break;
+
+          case "stop_loss":
+          case "take_profit":
+          case "trailing_stop":
+            // These orders open immediately at current price, then monitor for exit
+            shouldExecute = true;
+            break;
+
+          case "oco":
+            // OCO opens immediately, then monitors for SL or TP exit
+            shouldExecute = true;
+            break;
+        }
+
+        if (shouldExecute) {
+          // Execute the pending order - set status to open, use stored entryPrice or current price
+          const entryPriceToUse = trade.entryPrice > 0 ? trade.entryPrice : currentPrice;
+          const executedTrade = await storage.updateTrade(trade.id, {
+            status: "open",
+            entryPrice: entryPriceToUse,
+            trailingHighPrice: trade.orderType === "trailing_stop" ? entryPriceToUse : trade.trailingHighPrice,
+          });
+          if (executedTrade) {
+            executedTrades.push(executedTrade);
+          }
+        }
+      }
+
+      // Check open trades for exit conditions (SL, TP, trailing stop, OCO)
+      const allOpenTrades = [...openTrades, ...executedTrades.filter(t => t.status === "open")];
+      
+      for (const trade of allOpenTrades) {
+        const currentPrice = prices[trade.symbol];
+        if (currentPrice === undefined) continue;
+
+        let shouldClose = false;
+        let exitReason = "";
+
+        // Check stop loss
+        if (trade.stopLossPrice) {
+          if (trade.type === "buy" && currentPrice <= trade.stopLossPrice) {
+            shouldClose = true;
+            exitReason = "stop_loss";
+          } else if (trade.type === "sell" && currentPrice >= trade.stopLossPrice) {
+            shouldClose = true;
+            exitReason = "stop_loss";
+          }
+        }
+
+        // Check take profit
+        if (!shouldClose && trade.takeProfitPrice) {
+          if (trade.type === "buy" && currentPrice >= trade.takeProfitPrice) {
+            shouldClose = true;
+            exitReason = "take_profit";
+          } else if (trade.type === "sell" && currentPrice <= trade.takeProfitPrice) {
+            shouldClose = true;
+            exitReason = "take_profit";
+          }
+        }
+
+        // Check trailing stop
+        if (!shouldClose && trade.trailingPercent && trade.trailingHighPrice) {
+          if (trade.type === "buy") {
+            // For buy trades: track highest price, stop triggers when price drops by trailingPercent from high
+            if (currentPrice > trade.trailingHighPrice) {
+              // Price went higher, update the trailing high
+              await storage.updateTrade(trade.id, { trailingHighPrice: currentPrice });
+            } else {
+              // Check if price has dropped enough to trigger stop
+              const trailingStopPrice = trade.trailingHighPrice * (1 - trade.trailingPercent / 100);
+              if (currentPrice <= trailingStopPrice) {
+                shouldClose = true;
+                exitReason = "trailing_stop";
+              }
+            }
+          } else {
+            // For sell trades: track lowest price, stop triggers when price rises by trailingPercent from low
+            if (currentPrice < trade.trailingHighPrice) {
+              // Price went lower, update the trailing low
+              await storage.updateTrade(trade.id, { trailingHighPrice: currentPrice });
+            } else {
+              // Check if price has risen enough to trigger stop
+              const trailingStopPrice = trade.trailingHighPrice * (1 + trade.trailingPercent / 100);
+              if (currentPrice >= trailingStopPrice) {
+                shouldClose = true;
+                exitReason = "trailing_stop";
+              }
+            }
+          }
+        }
+
+        if (shouldClose) {
+          const closedTrade = await storage.closeTrade(trade.id, currentPrice);
+          if (closedTrade) {
+            closedTrades.push(closedTrade);
+          }
+        }
+      }
+
+      res.json({
+        executed: executedTrades.length,
+        closed: closedTrades.length,
+        executedTrades,
+        closedTrades,
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
