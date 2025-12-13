@@ -90,7 +90,6 @@ export default function SimulatorPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const seriesRef = useRef<any>(null);
-  const lastChartSymbolRef = useRef<string>("");
   
   const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
   const [quantity, setQuantity] = useState("1");
@@ -220,14 +219,69 @@ export default function SimulatorPage() {
     return () => clearInterval(interval);
   }, [refetchTrades, refreshUser, toast]);
 
+  // Generate fresh chart data and create chart when symbol changes
   useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    // Generate fresh data for this symbol
     const data = generateCandlestickData(100);
     setCandleData(data);
     if (data.length > 0) {
       setCurrentPrice(data[data.length - 1].close);
     }
+
+    // Clean up existing chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+    }
+
+    // Create new chart
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: 'hsl(var(--foreground))',
+      },
+      grid: {
+        vertLines: { color: 'hsl(var(--border))' },
+        horzLines: { color: 'hsl(var(--border))' },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 400,
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: 'hsl(142, 71%, 45%)',
+      downColor: 'hsl(0, 72%, 51%)',
+      borderUpColor: 'hsl(142, 71%, 45%)',
+      borderDownColor: 'hsl(0, 72%, 51%)',
+      wickUpColor: 'hsl(142, 71%, 45%)',
+      wickDownColor: 'hsl(0, 72%, 51%)',
+    });
+
+    series.setData(data);
+    chart.timeScale().fitContent();
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+    };
   }, [selectedSymbol]);
 
+  // Live price updates - only updates existing candles, doesn't recreate chart
   useEffect(() => {
     const interval = setInterval(() => {
       setCandleData(prev => {
@@ -260,64 +314,6 @@ export default function SimulatorPage() {
 
     return () => clearInterval(interval);
   }, [selectedSymbol]);
-
-  useEffect(() => {
-    if (!chartContainerRef.current || candleData.length === 0) return;
-    
-    // Only recreate chart when symbol changes
-    if (lastChartSymbolRef.current === selectedSymbol && chartRef.current) {
-      return;
-    }
-    lastChartSymbolRef.current = selectedSymbol;
-
-    if (chartRef.current) {
-      chartRef.current.remove();
-    }
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'hsl(var(--foreground))',
-      },
-      grid: {
-        vertLines: { color: 'hsl(var(--border))' },
-        horzLines: { color: 'hsl(var(--border))' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 400,
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: 'hsl(142, 71%, 45%)',
-      downColor: 'hsl(0, 72%, 51%)',
-      borderUpColor: 'hsl(142, 71%, 45%)',
-      borderDownColor: 'hsl(0, 72%, 51%)',
-      wickUpColor: 'hsl(142, 71%, 45%)',
-      wickDownColor: 'hsl(0, 72%, 51%)',
-    });
-
-    series.setData(candleData);
-    chart.timeScale().fitContent();
-
-    chartRef.current = chart;
-    seriesRef.current = series;
-
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-    };
-  }, [selectedSymbol, candleData]);
 
   const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);
