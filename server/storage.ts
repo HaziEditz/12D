@@ -78,6 +78,8 @@ export interface IStorage {
   getUserAchievements(userId: string): Promise<UserAchievement[]>;
   unlockAchievement(userId: string, achievementId: string): Promise<UserAchievement>;
   updateAchievementProgress(userId: string, achievementId: string, progress: number): Promise<void>;
+  createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement>;
+  updateUserAchievement(id: string, updates: Partial<UserAchievement>): Promise<UserAchievement | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -389,15 +391,26 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     if (existing.length > 0) {
       await db.update(userAchievements)
-        .set({ progress })
+        .set({ progress, unlockedAt: progress >= 100 ? new Date() : null })
         .where(and(eq(userAchievements.userId, userId), eq(userAchievements.achievementId, achievementId)));
     } else {
       await db.insert(userAchievements).values({
         userId,
         achievementId,
         progress,
+        unlockedAt: progress >= 100 ? new Date() : null,
       });
     }
+  }
+
+  async createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement> {
+    const [ua] = await db.insert(userAchievements).values(data).returning();
+    return ua;
+  }
+
+  async updateUserAchievement(id: string, updates: Partial<UserAchievement>): Promise<UserAchievement | undefined> {
+    const [ua] = await db.update(userAchievements).set(updates).where(eq(userAchievements.id, id)).returning();
+    return ua;
   }
 }
 

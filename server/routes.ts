@@ -9,6 +9,7 @@ import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./payp
 import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema } from "@shared/schema";
 import type { User } from "@shared/schema";
 import memorystore from "memorystore";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 const MemoryStore = memorystore(session);
 
@@ -85,6 +86,125 @@ async function seedAchievements() {
     await storage.createAchievement(achievement);
   }
   console.log("Seeded 30 achievements");
+}
+
+// Retroactive achievement check - awards achievements based on current user stats
+async function checkAndAwardAchievements(userId: string): Promise<void> {
+  const user = await storage.getUserById(userId);
+  if (!user) return;
+
+  const trades = await storage.getTradesByUser(userId);
+  const lessonProgress = await storage.getLessonProgress(userId);
+  const completedLessons = lessonProgress.filter(lp => lp.completed).length;
+  const balance = user.simulatorBalance ?? 10000;
+  const totalProfit = user.totalProfit ?? 0;
+  const profitableTrades = trades.filter(t => t.profit && t.profit > 0);
+
+  const achievements = await storage.getAchievements();
+  const userAchievements = await storage.getUserAchievements(userId);
+
+  for (const achievement of achievements) {
+    const existingUa = userAchievements.find(ua => ua.achievementId === achievement.id);
+    if (existingUa && existingUa.progress === 100) continue;
+
+    let currentProgress = 0;
+    let shouldUnlock = false;
+
+    switch (achievement.category) {
+      case "trading":
+        if (achievement.id === "first-trade") {
+          currentProgress = trades.length >= 1 ? 100 : 0;
+        } else if (achievement.id === "day-trader") {
+          currentProgress = Math.min(100, (trades.length / 10) * 100);
+        } else if (achievement.id === "active-trader") {
+          currentProgress = Math.min(100, (trades.length / 50) * 100);
+        } else if (achievement.id === "master-trader") {
+          currentProgress = Math.min(100, (trades.length / 100) * 100);
+        } else if (achievement.id === "trading-legend") {
+          currentProgress = Math.min(100, (trades.length / 500) * 100);
+        } else if (achievement.id === "first-profit") {
+          currentProgress = profitableTrades.length >= 1 ? 100 : 0;
+        } else if (achievement.id === "double-down") {
+          currentProgress = Math.min(100, (totalProfit / 1000) * 100);
+        } else if (achievement.id === "high-roller") {
+          currentProgress = Math.min(100, (totalProfit / 5000) * 100);
+        } else if (achievement.id === "mogul") {
+          currentProgress = Math.min(100, (totalProfit / 10000) * 100);
+        }
+        break;
+
+      case "learning":
+        if (achievement.id === "student") {
+          currentProgress = completedLessons >= 1 ? 100 : 0;
+        } else if (achievement.id === "scholar") {
+          currentProgress = Math.min(100, (completedLessons / 5) * 100);
+        } else if (achievement.id === "graduate") {
+          currentProgress = Math.min(100, (completedLessons / 10) * 100);
+        } else if (achievement.id === "professor") {
+          currentProgress = Math.min(100, (completedLessons / 25) * 100);
+        }
+        break;
+
+      case "balance":
+        if (achievement.id === "starter") {
+          currentProgress = balance >= 6000 ? 100 : Math.min(99, (balance / 6000) * 100);
+        } else if (achievement.id === "growing") {
+          currentProgress = balance >= 10000 ? 100 : Math.min(99, (balance / 10000) * 100);
+        } else if (achievement.id === "wealthy") {
+          currentProgress = balance >= 15000 ? 100 : Math.min(99, (balance / 15000) * 100);
+        } else if (achievement.id === "rich") {
+          currentProgress = balance >= 25000 ? 100 : Math.min(99, (balance / 25000) * 100);
+        } else if (achievement.id === "elite") {
+          currentProgress = balance >= 50000 ? 100 : Math.min(99, (balance / 50000) * 100);
+        }
+        break;
+
+      case "social":
+        if (achievement.id === "public-profile") {
+          currentProgress = user.bio ? 100 : 0;
+        } else if (achievement.id === "picture-perfect") {
+          currentProgress = user.avatarUrl ? 100 : 0;
+        }
+        break;
+
+      case "milestone":
+        if (achievement.id === "early-bird") {
+          currentProgress = 100;
+        } else if (achievement.id === "premium-member") {
+          currentProgress = user.subscriptionId ? 100 : 0;
+        }
+        break;
+    }
+
+    shouldUnlock = currentProgress >= 100;
+    const roundedProgress = Math.round(currentProgress);
+
+    if (existingUa) {
+      if (roundedProgress > (existingUa.progress ?? 0)) {
+        await storage.updateUserAchievement(existingUa.id, {
+          progress: roundedProgress,
+          unlockedAt: shouldUnlock ? new Date() : null,
+        });
+        if (shouldUnlock) {
+          await storage.updateUser(userId, {
+            xp: (user.xp ?? 0) + achievement.xpReward,
+          });
+        }
+      }
+    } else if (roundedProgress > 0) {
+      await storage.createUserAchievement({
+        userId: userId,
+        achievementId: achievement.id,
+        progress: roundedProgress,
+        unlockedAt: shouldUnlock ? new Date() : null,
+      });
+      if (shouldUnlock) {
+        await storage.updateUser(userId, {
+          xp: (user.xp ?? 0) + achievement.xpReward,
+        });
+      }
+    }
+  }
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
@@ -865,6 +985,54 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       
       res.json(unlockedAchievements);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Object storage routes for profile picture uploads
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/objects/upload", requireAuth, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/user/avatar", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { avatarURL } = req.body;
+      const objectStorageService = new ObjectStorageService();
+      const avatarPath = objectStorageService.normalizeObjectEntityPath(avatarURL);
+      await storage.updateUser(user.id, { avatarUrl: avatarPath });
+      res.json({ avatarPath });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Retroactive achievement check endpoint
+  app.post("/api/achievements/check", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await checkAndAwardAchievements(user.id);
+      res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

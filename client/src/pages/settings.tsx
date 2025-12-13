@@ -10,19 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { User, KeyRound, Camera, ArrowLeft, Save, Loader2, Volume2, VolumeX } from "lucide-react";
+import { User, KeyRound, ArrowLeft, Save, Loader2, Volume2, VolumeX } from "lucide-react";
 import { isSoundEnabled, setSoundEnabled, playNotificationSound } from "@/lib/sounds";
+import { AvatarUploader } from "@/components/AvatarUploader";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
-  avatarUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  avatarUrl: z.string().optional().or(z.literal("")),
 });
 
 const passwordSchema = z.object({
@@ -166,35 +165,22 @@ export default function SettingsPage() {
             <Form {...profileForm}>
               <form onSubmit={profileForm.handleSubmit((data) => profileMutation.mutate(data))} className="space-y-6">
                 <div className="flex items-center gap-6">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={profileForm.watch("avatarUrl") || undefined} />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                      {getInitials(profileForm.watch("displayName") || user.displayName || "U")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <AvatarUploader
+                    currentAvatarUrl={profileForm.watch("avatarUrl") || null}
+                    displayName={profileForm.watch("displayName") || user.displayName || "U"}
+                    onUploadComplete={(avatarPath) => {
+                      profileForm.setValue("avatarUrl", avatarPath);
+                      toast({
+                        title: "Avatar uploaded",
+                        description: "Your profile picture has been updated.",
+                      });
+                      refreshUser();
+                    }}
+                  />
                   <div className="flex-1">
-                    <FormField
-                      control={profileForm.control}
-                      name="avatarUrl"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Profile Picture URL</FormLabel>
-                          <FormControl>
-                            <div className="flex gap-2">
-                              <Input 
-                                placeholder="https://example.com/avatar.jpg" 
-                                {...field}
-                                data-testid="input-avatar-url"
-                              />
-                            </div>
-                          </FormControl>
-                          <FormDescription>
-                            Enter a URL for your profile picture
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <p className="text-sm text-muted-foreground">
+                      Click the camera icon to upload a new profile picture
+                    </p>
                   </div>
                 </div>
 
