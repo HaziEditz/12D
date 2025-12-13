@@ -18,6 +18,16 @@ import {
   Settings
 } from "lucide-react";
 
+interface Lesson {
+  id: string;
+  difficulty: string;
+}
+
+interface LessonProgress {
+  lessonId: string;
+  completed: boolean;
+}
+
 export default function ProfilePage() {
   const { user } = useAuth();
 
@@ -25,8 +35,43 @@ export default function ProfilePage() {
     queryKey: ["/api/leaderboard"],
   });
 
+  const { data: lessons } = useQuery<Lesson[]>({
+    queryKey: ["/api/lessons"],
+  });
+
+  const { data: lessonProgress } = useQuery<LessonProgress[]>({
+    queryKey: ["/api/lessons/progress"],
+    enabled: !!user,
+  });
+
   const userRank = leaderboard?.findIndex(u => u.id === user?.id) ?? -1;
   const displayRank = userRank >= 0 ? `#${userRank + 1}` : "---";
+
+  // Calculate lesson progress by difficulty
+  const completedLessonIds = new Set(
+    lessonProgress?.filter(lp => lp.completed).map(lp => lp.lessonId) ?? []
+  );
+  
+  const lessonsByDifficulty = {
+    beginner: lessons?.filter(l => l.difficulty === "beginner") ?? [],
+    intermediate: lessons?.filter(l => l.difficulty === "intermediate") ?? [],
+    advanced: lessons?.filter(l => l.difficulty === "advanced") ?? [],
+  };
+
+  const completedByDifficulty = {
+    beginner: lessonsByDifficulty.beginner.filter(l => completedLessonIds.has(l.id)).length,
+    intermediate: lessonsByDifficulty.intermediate.filter(l => completedLessonIds.has(l.id)).length,
+    advanced: lessonsByDifficulty.advanced.filter(l => completedLessonIds.has(l.id)).length,
+  };
+
+  const totalByDifficulty = {
+    beginner: lessonsByDifficulty.beginner.length || 15,
+    intermediate: lessonsByDifficulty.intermediate.length || 20,
+    advanced: lessonsByDifficulty.advanced.length || 15,
+  };
+
+  const totalCompleted = completedLessonIds.size;
+  const totalLessons = lessons?.length || 50;
 
   const getInitials = (name: string) => {
     return name
@@ -72,7 +117,7 @@ export default function ProfilePage() {
     },
     {
       label: "Lessons Completed",
-      value: user?.lessonsCompleted ?? 0,
+      value: totalCompleted,
       icon: BookOpen,
       color: "text-primary"
     },
@@ -84,7 +129,7 @@ export default function ProfilePage() {
     }
   ];
 
-  const completionPercentage = Math.min(((user?.lessonsCompleted ?? 0) / 50) * 100, 100);
+  const completionPercentage = Math.min((totalCompleted / totalLessons) * 100, 100);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -175,7 +220,7 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Overall Completion</span>
                 <span className="text-sm text-muted-foreground">
-                  {user?.lessonsCompleted ?? 0} / 50 lessons
+                  {totalCompleted} / {totalLessons} lessons
                 </span>
               </div>
               <Progress value={completionPercentage} className="h-2" />
@@ -184,18 +229,36 @@ export default function ProfilePage() {
             <div className="grid md:grid-cols-3 gap-4 pt-4">
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground mb-1">Beginner</p>
-                <p className="text-lg font-semibold">15/15</p>
-                <Badge variant="secondary" className="mt-2 text-xs">Complete</Badge>
+                <p className="text-lg font-semibold">{completedByDifficulty.beginner}/{totalByDifficulty.beginner}</p>
+                <Badge 
+                  variant={completedByDifficulty.beginner === totalByDifficulty.beginner ? "secondary" : "outline"} 
+                  className="mt-2 text-xs"
+                >
+                  {completedByDifficulty.beginner === totalByDifficulty.beginner ? "Complete" : 
+                   completedByDifficulty.beginner > 0 ? "In Progress" : "Not Started"}
+                </Badge>
               </div>
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground mb-1">Intermediate</p>
-                <p className="text-lg font-semibold">{Math.min(user?.lessonsCompleted ?? 0, 20) - 15 > 0 ? Math.min(user?.lessonsCompleted ?? 0, 20) - 15 : 0}/20</p>
-                <Badge variant="outline" className="mt-2 text-xs">In Progress</Badge>
+                <p className="text-lg font-semibold">{completedByDifficulty.intermediate}/{totalByDifficulty.intermediate}</p>
+                <Badge 
+                  variant={completedByDifficulty.intermediate === totalByDifficulty.intermediate ? "secondary" : "outline"} 
+                  className="mt-2 text-xs"
+                >
+                  {completedByDifficulty.intermediate === totalByDifficulty.intermediate ? "Complete" : 
+                   completedByDifficulty.intermediate > 0 ? "In Progress" : "Not Started"}
+                </Badge>
               </div>
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground mb-1">Advanced</p>
-                <p className="text-lg font-semibold">0/15</p>
-                <Badge variant="outline" className="mt-2 text-xs">Locked</Badge>
+                <p className="text-lg font-semibold">{completedByDifficulty.advanced}/{totalByDifficulty.advanced}</p>
+                <Badge 
+                  variant={completedByDifficulty.advanced === totalByDifficulty.advanced ? "secondary" : "outline"} 
+                  className="mt-2 text-xs"
+                >
+                  {completedByDifficulty.advanced === totalByDifficulty.advanced ? "Complete" : 
+                   completedByDifficulty.advanced > 0 ? "In Progress" : "Not Started"}
+                </Badge>
               </div>
             </div>
           </div>

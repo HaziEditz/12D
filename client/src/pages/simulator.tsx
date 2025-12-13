@@ -413,8 +413,12 @@ export default function SimulatorPage() {
     setTrailingPercent("5");
   };
 
+  // Only calculate profit for trades of the currently selected symbol
+  // to avoid incorrect calculations when viewing different symbols
   const totalProfit = openTrades?.reduce((sum, trade) => {
     if (trade.status === "pending") return sum;
+    // Only include trades for the currently selected symbol
+    if (trade.symbol !== selectedSymbol) return sum;
     const pnl = trade.type === "buy" 
       ? (currentPrice - trade.entryPrice) * trade.quantity
       : (trade.entryPrice - currentPrice) * trade.quantity;
