@@ -1027,6 +1027,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Define valid promo codes and their tiers
       const promoCodes: Record<string, { tier: string; message: string }> = {
         "12DIGITS!": { tier: "school", message: "Promo code redeemed! You now have free School Plan access." },
+        "CASUAL!": { tier: "casual", message: "Promo code redeemed! You now have free Casual Plan access." },
         "12DIGITS+": { tier: "premium", message: "Promo code redeemed! You now have free 12Digits+ Premium access." },
       };
 

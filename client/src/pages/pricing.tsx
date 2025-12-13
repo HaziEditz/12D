@@ -19,6 +19,7 @@ const plans = [
     period: "/student/month",
     description: "Perfect for teachers and educational institutions",
     icon: GraduationCap,
+    hasPromoCode: true,
     features: [
       "Manage up to 30 students",
       "Create custom assignments",
@@ -53,6 +54,7 @@ const plans = [
     period: "/month",
     description: "Advanced features for serious traders",
     icon: Crown,
+    hasPromoCode: true,
     features: [
       "Everything in Casual",
       "Advanced analytics dashboard",
@@ -90,13 +92,14 @@ export default function Pricing() {
       });
       
       if (response.ok) {
+        const data = await response.json();
         await refreshUser();
         // Invalidate all queries that depend on user subscription status
         queryClient.invalidateQueries({ queryKey: ["/api/trades/limits"] });
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         toast({
           title: "Success!",
-          description: "Promo code redeemed! You now have free Casual access.",
+          description: data.message || "Promo code redeemed successfully!",
         });
         navigate("/dashboard");
       } else {
