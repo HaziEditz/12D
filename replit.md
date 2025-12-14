@@ -9,9 +9,10 @@
 - Watchlist - Track favorite stocks with price monitoring
 - Trading Tips - Daily tips and market insights
 
-**Premium Features** (12Digits+):
+**Premium Features** (12Digits+ or Trial Users):
 - Command Center (Terminal), Strategies, Analytics
 - Trade Journal, News Feed, Economic Calendar, Risk Calculator
+- Friends System - Connect with other traders, send/accept friend requests
 
 ## User Preferences
 
