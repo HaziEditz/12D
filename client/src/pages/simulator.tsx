@@ -230,9 +230,10 @@ export default function SimulatorPage() {
       if (Object.keys(pricesRef.current).length === 0) return;
       
       try {
-        const response = await apiRequest("POST", "/api/trades/check-triggers", {
+        const res = await apiRequest("POST", "/api/trades/check-triggers", {
           prices: pricesRef.current
-        }) as TriggerResponse;
+        });
+        const response = await res.json() as TriggerResponse;
         
         if (response.executed > 0) {
           refetchTrades();
@@ -868,9 +869,13 @@ export default function SimulatorPage() {
             ) : (
               openTrades.map((trade) => {
                 const isPending = trade.status === "pending";
+                // Use the stored price for this trade's symbol, fall back to currentPrice if viewing that symbol
+                const tradePrice = trade.symbol === selectedSymbol 
+                  ? currentPrice 
+                  : (pricesRef.current[trade.symbol] || trade.entryPrice);
                 const pnl = trade.type === "buy"
-                  ? (currentPrice - trade.entryPrice) * trade.quantity
-                  : (trade.entryPrice - currentPrice) * trade.quantity;
+                  ? (tradePrice - trade.entryPrice) * trade.quantity
+                  : (trade.entryPrice - tradePrice) * trade.quantity;
                 const orderTypeLabel = trade.orderType ? ORDER_TYPE_INFO[trade.orderType as OrderType]?.label || trade.orderType : "Market";
                 
                 return (
@@ -937,7 +942,7 @@ export default function SimulatorPage() {
                           variant={pnl >= 0 ? "default" : "destructive"}
                           size="sm"
                           className="h-7 px-3 text-xs"
-                          onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: currentPrice })}
+                          onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: tradePrice })}
                           data-testid={`button-close-${trade.id}`}
                         >
                           <X className="h-3 w-3 mr-1" />
