@@ -95,26 +95,43 @@ const SYMBOL_BASE_PRICES: Record<string, number> = {
   V: 315.00,
 };
 
-function generateCandlestickData(count: number, symbol: string): CandlestickData[] {
+function generateCandlestickData(count: number, basePrice: number): CandlestickData[] {
   const data: CandlestickData[] = [];
-  const symbolBasePrice = SYMBOL_BASE_PRICES[symbol] ?? 100;
-  let basePrice = symbolBasePrice * (0.98 + Math.random() * 0.04);
+  let price = basePrice * (0.98 + Math.random() * 0.04);
   const now = Math.floor(Date.now() / 1000);
   
   for (let i = count; i >= 0; i--) {
     const time = (now - i * 60) as Time;
     const volatility = 0.02;
-    const change = (Math.random() - 0.5) * 2 * volatility * basePrice;
-    const open = basePrice;
-    const close = basePrice + change;
-    const high = Math.max(open, close) + Math.random() * volatility * basePrice;
-    const low = Math.min(open, close) - Math.random() * volatility * basePrice;
+    const change = (Math.random() - 0.5) * 2 * volatility * price;
+    const open = price;
+    const close = price + change;
+    const high = Math.max(open, close) + Math.random() * volatility * price;
+    const low = Math.min(open, close) - Math.random() * volatility * price;
     
     data.push({ time, open, high, low, close });
-    basePrice = close;
+    price = close;
   }
   
   return data;
+}
+
+function isCryptoSymbol(symbol: string): boolean {
+  return symbol.includes("/");
+}
+
+async function fetchRealTimePrice(symbol: string): Promise<number | null> {
+  if (isCryptoSymbol(symbol)) {
+    return null;
+  }
+  try {
+    const response = await fetch(`/api/stocks/quote/${encodeURIComponent(symbol)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.price || null;
+  } catch {
+    return null;
+  }
 }
 
 export default function SimulatorPage() {
@@ -252,14 +269,38 @@ export default function SimulatorPage() {
     return () => clearInterval(interval);
   }, [refetchTrades, refreshUser, toast]);
 
-  // Generate fresh chart data and create chart when symbol changes
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false);
+  const [priceSource, setPriceSource] = useState<"live" | "simulated">("simulated");
+
+  // Fetch real-time price and generate chart data when symbol changes
   useEffect(() => {
-    // Generate fresh data for this symbol with realistic base price
-    const data = generateCandlestickData(100, selectedSymbol);
-    setCandleData(data);
-    if (data.length > 0) {
-      setCurrentPrice(data[data.length - 1].close);
-    }
+    let cancelled = false;
+    
+    const initializeData = async () => {
+      setIsLoadingPrice(true);
+      
+      const realPrice = await fetchRealTimePrice(selectedSymbol);
+      if (cancelled) return;
+      
+      const basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
+      setPriceSource(realPrice ? "live" : "simulated");
+      
+      const data = generateCandlestickData(100, basePrice);
+      setCandleData(data);
+      if (data.length > 0) {
+        setCurrentPrice(data[data.length - 1].close);
+      }
+      setIsLoadingPrice(false);
+    };
+    
+    initializeData();
+    
+    return () => { cancelled = true; };
+  }, [selectedSymbol]);
+
+  // Create/update chart when candleData changes
+  useEffect(() => {
+    if (candleData.length === 0) return;
 
     // Clean up existing chart
     if (chartRef.current) {
@@ -268,7 +309,6 @@ export default function SimulatorPage() {
       seriesRef.current = null;
     }
 
-    // Use requestAnimationFrame to ensure DOM is ready
     const createChartInstance = () => {
       if (!chartContainerRef.current) return;
 
@@ -298,7 +338,7 @@ export default function SimulatorPage() {
         wickDownColor: 'hsl(0, 72%, 51%)',
       });
 
-      series.setData(data);
+      series.setData(candleData);
       chart.timeScale().fitContent();
 
       chartRef.current = chart;
@@ -323,7 +363,7 @@ export default function SimulatorPage() {
         seriesRef.current = null;
       }
     };
-  }, [selectedSymbol]);
+  }, [candleData.length > 0 ? candleData[0].time : null, selectedSymbol]);
 
   // Live price updates - only updates existing candles, doesn't recreate chart
   useEffect(() => {
