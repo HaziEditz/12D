@@ -154,7 +154,7 @@ function CommandCenterContent() {
       const res = await apiRequest("POST", "/api/trades", tradeData);
       return res.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       const total = variables.quantity * variables.price;
       setRecentTrades(prev => [
         { type: variables.type.toUpperCase(), symbol: variables.symbol, qty: variables.quantity, total },
@@ -164,9 +164,9 @@ function CommandCenterContent() {
         title: `${variables.type === "buy" ? "Bought" : "Sold"} ${variables.symbol}`,
         description: `${variables.quantity} shares at $${variables.price.toFixed(2)} = $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
-      refreshUser();
+      await queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      await refreshUser();
     },
     onError: (error: Error) => {
       toast({
