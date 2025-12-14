@@ -1663,7 +1663,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Friends routes - require paid membership (includes trial access)
+  // Middleware for features requiring any paid membership (casual, school, premium) or trial
   const requirePaidMembership = (req: Request, res: Response, next: NextFunction) => {
     const user = req.user as User;
     if (!user) {
@@ -1690,7 +1690,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(403).json({ message: "This feature requires a paid membership" });
   };
 
-  app.get("/api/friends", requireAuth, requirePaidMembership, async (req, res) => {
+  // Middleware for premium-only features (12Digits+ tier or trial users only)
+  const requirePremiumContent = (req: Request, res: Response, next: NextFunction) => {
+    const user = req.user as User;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    // Admin always has access
+    if (user.role === "admin") {
+      return next();
+    }
+    // Premium tier subscription
+    if (user.membershipTier === "premium" && user.membershipStatus === "active" && user.subscriptionId) {
+      return next();
+    }
+    // Check trial period (14 days) - trial users get premium access
+    const TRIAL_DAYS = 14;
+    if (user.trialStartDate) {
+      const trialStart = new Date(user.trialStartDate);
+      const now = new Date();
+      const daysSinceStart = Math.floor((now.getTime() - trialStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceStart < TRIAL_DAYS) {
+        return next();
+      }
+    }
+    res.status(403).json({ message: "This feature requires 12Digits+ Premium or a trial subscription" });
+  };
+
+  app.get("/api/friends", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const friends = await storage.getFriends(user.id);
@@ -1700,7 +1727,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/friends/requests", requireAuth, requirePaidMembership, async (req, res) => {
+  app.get("/api/friends/requests", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const requests = await storage.getFriendRequests(user.id);
@@ -1710,7 +1737,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/request", requireAuth, requirePaidMembership, async (req, res) => {
+  app.post("/api/friends/request", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const { friendId } = req.body;
@@ -1735,7 +1762,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/accept/:id", requireAuth, requirePaidMembership, async (req, res) => {
+  app.post("/api/friends/accept/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const friendshipId = req.params.id;
@@ -1760,7 +1787,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/reject/:id", requireAuth, requirePaidMembership, async (req, res) => {
+  app.post("/api/friends/reject/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const friendshipId = req.params.id;
@@ -1781,7 +1808,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete("/api/friends/:id", requireAuth, requirePaidMembership, async (req, res) => {
+  app.delete("/api/friends/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       await storage.removeFriend(req.params.id, user.id);
@@ -1810,7 +1837,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Chat Messages (Premium feature)
-  app.get("/api/chat/:friendId", requireAuth, requirePaidMembership, async (req, res) => {
+  app.get("/api/chat/:friendId", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const friendId = req.params.friendId;
@@ -1822,7 +1849,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/chat", requireAuth, requirePaidMembership, async (req, res) => {
+  app.post("/api/chat", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const parsed = insertChatMessageSchema.parse({
@@ -1883,7 +1910,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Journal API (Premium feature)
-  app.get("/api/journal", requireAuth, requirePaidMembership, async (req, res) => {
+  app.get("/api/journal", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const entries = await storage.getJournalEntries(user.id);
@@ -1893,7 +1920,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/journal", requireAuth, requirePaidMembership, async (req, res) => {
+  app.post("/api/journal", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const user = req.user as User;
       const entry = await storage.createJournalEntry({
@@ -1917,7 +1944,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/journal/:id", requireAuth, requirePaidMembership, async (req, res) => {
+  app.patch("/api/journal/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       const entry = await storage.updateJournalEntry(req.params.id, req.body);
       if (!entry) {
@@ -1929,7 +1956,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete("/api/journal/:id", requireAuth, requirePaidMembership, async (req, res) => {
+  app.delete("/api/journal/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       await storage.deleteJournalEntry(req.params.id);
       res.json({ success: true });

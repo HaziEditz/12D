@@ -1,5 +1,5 @@
 import { useAuth } from "@/lib/auth-context";
-import { canAccessPremiumFeatures, getSubscriptionStatus, isPremiumTier } from "@/lib/subscription";
+import { canAccessPremiumFeatures, getSubscriptionStatus, isPremiumTier, canAccessPremiumContent, isTrialUser, getTrialDaysRemaining } from "@/lib/subscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -218,7 +218,31 @@ export function PremiumPaywall({ children, featureName = "this feature" }: Premi
     );
   }
 
-  if (isPremiumTier(user)) {
+  if (canAccessPremiumContent(user)) {
+    if (isTrialUser(user)) {
+      const daysRemaining = getTrialDaysRemaining(user);
+      return (
+        <>
+          <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/10 border-b border-amber-500/20 px-4 py-2">
+            <div className="container mx-auto flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4 text-amber-500" />
+                <span>
+                  <strong>{daysRemaining} days</strong> left to try premium features
+                </span>
+              </div>
+              <Link href="/pricing">
+                <Button size="sm" variant="default" className="bg-gradient-to-r from-amber-500 to-amber-600" data-testid="button-upgrade-premium-trial">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Upgrade to 12Digits+
+                </Button>
+              </Link>
+            </div>
+          </div>
+          {children}
+        </>
+      );
+    }
     return <>{children}</>;
   }
 
