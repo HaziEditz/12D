@@ -1,16 +1,17 @@
 import { db } from "./db";
-import { eq, desc, and, isNull, ilike, or } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, ilike, or, sql } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
-  friendships,
+  friendships, chatMessages,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
   type Class, type InsertClass, type ClassStudent, type InsertClassStudent,
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement,
   type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
-  type Friendship, type InsertFriendship, type Strategy, type InsertStrategy
+  type Friendship, type InsertFriendship, type Strategy, type InsertStrategy,
+  type ChatMessage, type InsertChatMessage
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -122,6 +123,12 @@ export interface IStorage {
   removeFriend(id: string, userId: string): Promise<void>;
   getFriendshipById(id: string): Promise<Friendship | undefined>;
   getFriendCount(userId: string): Promise<number>;
+  
+  // Chat Messages
+  getChatMessages(userId1: string, userId2: string): Promise<ChatMessage[]>;
+  sendChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
+  markMessagesAsRead(senderId: string, receiverId: string): Promise<void>;
+  getUnreadMessageCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -664,6 +671,36 @@ export class DatabaseStorage implements IStorage {
   async getFriendCount(userId: string): Promise<number> {
     const friends = await this.getFriends(userId);
     return friends.length;
+  }
+
+  // Chat Messages
+  async getChatMessages(userId1: string, userId2: string): Promise<ChatMessage[]> {
+    return db.select().from(chatMessages)
+      .where(
+        or(
+          and(eq(chatMessages.senderId, userId1), eq(chatMessages.receiverId, userId2)),
+          and(eq(chatMessages.senderId, userId2), eq(chatMessages.receiverId, userId1))
+        )
+      )
+      .orderBy(asc(chatMessages.createdAt));
+  }
+
+  async sendChatMessage(data: InsertChatMessage): Promise<ChatMessage> {
+    const [message] = await db.insert(chatMessages).values(data).returning();
+    return message;
+  }
+
+  async markMessagesAsRead(senderId: string, receiverId: string): Promise<void> {
+    await db.update(chatMessages)
+      .set({ isRead: true })
+      .where(and(eq(chatMessages.senderId, senderId), eq(chatMessages.receiverId, receiverId)));
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.receiverId, userId), eq(chatMessages.isRead, false)));
+    return result[0]?.count ?? 0;
   }
 }
 

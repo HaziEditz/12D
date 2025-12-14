@@ -185,6 +185,15 @@ export const marketInsights = pgTable("market_insights", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull(),
+  receiverId: varchar("receiver_id").notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -201,6 +210,7 @@ export const insertAchievementSchema = createInsertSchema(achievements);
 export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true });
 export const insertTradingTipSchema = createInsertSchema(tradingTips).omit({ id: true, createdAt: true });
 export const insertMarketInsightSchema = createInsertSchema(marketInsights).omit({ id: true, createdAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -234,6 +244,8 @@ export type InsertTradingTip = z.infer<typeof insertTradingTipSchema>;
 export type TradingTip = typeof tradingTips.$inferSelect;
 export type InsertMarketInsight = z.infer<typeof insertMarketInsightSchema>;
 export type MarketInsight = typeof marketInsights.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
