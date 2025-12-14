@@ -1698,4 +1698,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Chat Messages (Premium feature)
+  app.get("/api/chat/:friendId", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const friendId = req.params.friendId;
+      const messages = await storage.getChatMessages(user.id, friendId);
+      await storage.markMessagesAsRead(friendId, user.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/chat", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const parsed = insertChatMessageSchema.parse({
+        senderId: user.id,
+        receiverId: req.body.receiverId,
+        content: req.body.content,
+      });
+      const message = await storage.sendChatMessage(parsed);
+      res.json(message);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/chat/unread/count", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const count = await storage.getUnreadMessageCount(user.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }
