@@ -35,7 +35,8 @@ import {
   Calendar,
   Calculator,
   Star,
-  Lightbulb
+  Lightbulb,
+  Users
 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,6 +60,7 @@ export function Navbar() {
   ];
 
   const premiumMenuItems = [
+    { href: "/friends", label: "Friends", icon: Users },
     { href: "/journal", label: "Trade Journal", icon: BookOpenText },
     { href: "/news", label: "News Feed", icon: Newspaper },
     { href: "/calendar", label: "Calendar", icon: Calendar },
