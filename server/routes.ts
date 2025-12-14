@@ -1812,6 +1812,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       const friendship = await storage.sendFriendRequest(user.id, friendId);
+      
+      await storage.createNotification({
+        userId: friendId,
+        type: "friend_request",
+        title: "New Friend Request",
+        message: `${user.displayName} sent you a friend request`,
+        data: { friendshipId: friendship.id, senderId: user.id },
+        isRead: false,
+      });
+      
       res.json(friendship);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -1833,6 +1843,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       const updated = await storage.acceptFriendRequest(friendshipId);
+      
+      await storage.createNotification({
+        userId: friendship.userId,
+        type: "friend_accepted",
+        title: "Friend Request Accepted",
+        message: `${user.displayName} accepted your friend request`,
+        data: { friendshipId: friendship.id },
+        isRead: false,
+      });
       
       await checkAndAwardAchievements(user.id);
       await checkAndAwardAchievements(friendship.userId);
@@ -2015,6 +2034,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/journal/:id", requireAuth, requirePremiumContent, async (req, res) => {
     try {
       await storage.deleteJournalEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Notifications API
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const notifications = await storage.getNotifications(user.id);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const count = await storage.getUnreadNotificationCount(user.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const notification = await storage.markNotificationRead(req.params.id, user.id);
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.markAllNotificationsRead(user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.deleteNotification(req.params.id, user.id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });

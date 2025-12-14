@@ -39,6 +39,7 @@ import {
   Users
 } from "lucide-react";
 import { useState } from "react";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -125,6 +126,8 @@ export function Navbar() {
                   ${user?.simulatorBalance?.toLocaleString() ?? "10,000"}
                 </span>
               </div>
+
+              <NotificationBell />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

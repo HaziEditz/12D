@@ -3,7 +3,7 @@ import { eq, desc, asc, and, isNull, ilike, or, sql } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
-  friendships, chatMessages, watchlistItems, journalEntries,
+  friendships, chatMessages, watchlistItems, journalEntries, notifications,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -12,7 +12,8 @@ import {
   type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
   type Friendship, type InsertFriendship, type Strategy, type InsertStrategy,
   type ChatMessage, type InsertChatMessage,
-  type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry
+  type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry,
+  type Notification, type InsertNotification
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -143,6 +144,14 @@ export interface IStorage {
   createJournalEntry(data: InsertJournalEntry): Promise<JournalEntry>;
   updateJournalEntry(id: string, data: Partial<JournalEntry>): Promise<JournalEntry | undefined>;
   deleteJournalEntry(id: string): Promise<void>;
+  
+  // Notifications
+  getNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(data: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  deleteNotification(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -778,6 +787,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteJournalEntry(id: string): Promise<void> {
     await db.delete(journalEntries).where(eq(journalEntries.id, id));
+  }
+
+  // Notifications
+  async getNotifications(userId: string): Promise<Notification[]> {
+    return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(50);
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    return result[0]?.count ?? 0;
+  }
+
+  async createNotification(data: InsertNotification): Promise<Notification> {
+    const [notification] = await db.insert(notifications).values(data).returning();
+    return notification;
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<Notification | undefined> {
+    const [notification] = await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
+    return notification;
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  }
+
+  async deleteNotification(id: string, userId: string): Promise<void> {
+    await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
   }
 }
 
