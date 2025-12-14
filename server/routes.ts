@@ -650,9 +650,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       // Check if user has enough balance (for market orders that execute immediately)
+      // With leverage, you only need margin = position_value / leverage
       if (isMarketOrder) {
-        const cost = data.quantity * data.entryPrice;
-        if ((user.simulatorBalance ?? 5000) < cost) {
+        const positionValue = data.quantity * data.entryPrice;
+        const leverageMultiplier = data.leverage ?? 1;
+        const requiredMargin = positionValue / leverageMultiplier;
+        if ((user.simulatorBalance ?? 5000) < requiredMargin) {
           return res.status(400).json({ message: "Insufficient balance" });
         }
       }

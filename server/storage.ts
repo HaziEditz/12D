@@ -299,9 +299,11 @@ export class DatabaseStorage implements IStorage {
     const [trade] = await db.select().from(trades).where(eq(trades.id, id)).limit(1);
     if (!trade) return undefined;
 
-    const profit = trade.type === "buy" 
+    const leverage = trade.leverage ?? 1;
+    const baseProfit = trade.type === "buy" 
       ? (exitPrice - trade.entryPrice) * trade.quantity
       : (trade.entryPrice - exitPrice) * trade.quantity;
+    const profit = baseProfit * leverage;
 
     const [updatedTrade] = await db.update(trades)
       .set({ 

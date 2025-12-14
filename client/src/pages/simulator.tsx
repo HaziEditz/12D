@@ -163,6 +163,7 @@ export default function SimulatorPage() {
   const [stopLossPrice, setStopLossPrice] = useState("");
   const [takeProfitPrice, setTakeProfitPrice] = useState("");
   const [trailingPercent, setTrailingPercent] = useState("5");
+  const [leverage, setLeverage] = useState("1");
 
   const { data: openTrades, refetch: refetchTrades } = useQuery<Trade[]>({
     queryKey: ["/api/trades?open=true"],
@@ -183,6 +184,7 @@ export default function SimulatorPage() {
       stopLossPrice?: number;
       takeProfitPrice?: number;
       trailingPercent?: number;
+      leverage?: number;
     }) => apiRequest("POST", "/api/trades", data),
     onSuccess: (_, variables) => {
       refetchTrades();
@@ -437,6 +439,8 @@ export default function SimulatorPage() {
       return null;
     }
 
+    const leverageValue = parseFloat(leverage) || 1;
+
     const payload: {
       symbol: string;
       type: string;
@@ -447,12 +451,14 @@ export default function SimulatorPage() {
       stopLossPrice?: number;
       takeProfitPrice?: number;
       trailingPercent?: number;
+      leverage?: number;
     } = {
       symbol: selectedSymbol,
       type,
       quantity: qty,
       entryPrice: currentPrice,
       orderType,
+      leverage: leverageValue,
     };
 
     if (orderType === "limit" || orderType === "stop") {
@@ -529,6 +535,7 @@ export default function SimulatorPage() {
     setStopLossPrice("");
     setTakeProfitPrice("");
     setTrailingPercent("5");
+    setLeverage("1");
   };
 
   // Only calculate profit for trades of the currently selected symbol
@@ -537,9 +544,10 @@ export default function SimulatorPage() {
     if (trade.status === "pending") return sum;
     // Only include trades for the currently selected symbol
     if (trade.symbol !== selectedSymbol) return sum;
+    const leverage = trade.leverage ?? 1;
     const pnl = trade.type === "buy" 
-      ? (currentPrice - trade.entryPrice) * trade.quantity
-      : (trade.entryPrice - currentPrice) * trade.quantity;
+      ? (currentPrice - trade.entryPrice) * trade.quantity * leverage
+      : (trade.entryPrice - currentPrice) * trade.quantity * leverage;
     return sum + pnl;
   }, 0) ?? 0;
 
@@ -852,8 +860,32 @@ export default function SimulatorPage() {
               </div>
             )}
 
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Leverage</Label>
+              <Select value={leverage} onValueChange={setLeverage}>
+                <SelectTrigger data-testid="select-leverage">
+                  <SelectValue placeholder="Select leverage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1x (No leverage)</SelectItem>
+                  <SelectItem value="2">2x</SelectItem>
+                  <SelectItem value="3">3x</SelectItem>
+                  <SelectItem value="5">5x</SelectItem>
+                  <SelectItem value="10">10x</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Higher leverage = higher risk and potential reward
+              </p>
+            </div>
+
             <div className="text-sm text-muted-foreground text-center">
-              Total: ${(parseFloat(quantity || "0") * currentPrice).toFixed(2)}
+              <div>Total: ${(parseFloat(quantity || "0") * currentPrice).toFixed(2)}</div>
+              {parseFloat(leverage) > 1 && (
+                <div className="text-xs text-amber-500">
+                  Position size with {leverage}x leverage: ${(parseFloat(quantity || "0") * currentPrice * parseFloat(leverage)).toFixed(2)}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Button 
@@ -903,9 +935,10 @@ export default function SimulatorPage() {
                 const tradePrice = trade.symbol === selectedSymbol 
                   ? currentPrice 
                   : (pricesRef.current[trade.symbol] || trade.entryPrice);
+                const tradeLeverage = trade.leverage ?? 1;
                 const pnl = trade.type === "buy"
-                  ? (tradePrice - trade.entryPrice) * trade.quantity
-                  : (trade.entryPrice - tradePrice) * trade.quantity;
+                  ? (tradePrice - trade.entryPrice) * trade.quantity * tradeLeverage
+                  : (trade.entryPrice - tradePrice) * trade.quantity * tradeLeverage;
                 const orderTypeLabel = trade.orderType ? ORDER_TYPE_INFO[trade.orderType as OrderType]?.label || trade.orderType : "Market";
                 
                 return (
@@ -930,10 +963,15 @@ export default function SimulatorPage() {
                             Pending
                           </Badge>
                         )}
+                        {tradeLeverage > 1 && (
+                          <Badge variant="outline" className="text-xs">
+                            {tradeLeverage}x
+                          </Badge>
+                        )}
                       </div>
                       <span className="font-medium text-sm block mt-1">{trade.symbol}</span>
                       <p className="text-xs text-muted-foreground">
-                        {trade.quantity} @ ${trade.entryPrice.toFixed(2)}
+                        {trade.quantity} @ ${trade.entryPrice.toFixed(2)}{tradeLeverage > 1 ? ` (${tradeLeverage}x leverage)` : ''}
                       </p>
                       {isPending && (
                         <p className="text-xs text-muted-foreground">

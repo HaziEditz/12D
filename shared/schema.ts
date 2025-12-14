@@ -66,6 +66,7 @@ export const trades = pgTable("trades", {
   trailingPercent: real("trailing_percent"),
   trailingHighPrice: real("trailing_high_price"),
   linkedTradeId: varchar("linked_trade_id"),
+  leverage: real("leverage").default(1),
   profit: real("profit"),
   status: text("status").notNull().default("open"),
   openedAt: timestamp("opened_at").defaultNow(),
