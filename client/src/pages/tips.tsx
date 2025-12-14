@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessPremiumContent } from "@/lib/subscription";
 import type { TradingTip, MarketInsight } from "@shared/schema";
 import { 
   Lightbulb,
@@ -97,7 +98,7 @@ function getTimeSince(date: Date): string {
 }
 
 export default function TipsPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const { data: tips = [], isLoading: tipsLoading } = useQuery<TradingTip[]>({
@@ -333,18 +334,20 @@ export default function TipsPage() {
             ))}
           </div>
 
-          <Card className="mt-6">
-            <CardContent className="py-8 text-center">
-              <TrendingUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-              <h3 className="font-semibold mb-1">Want More Insights?</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upgrade to Premium for real-time news feed and market analysis
-              </p>
-              <Link href="/pricing">
-                <Button data-testid="button-view-premium">View Premium</Button>
-              </Link>
-            </CardContent>
-          </Card>
+          {!canAccessPremiumContent(user) && (
+            <Card className="mt-6">
+              <CardContent className="py-8 text-center">
+                <TrendingUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <h3 className="font-semibold mb-1">Want More Insights?</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upgrade to Premium for real-time news feed and market analysis
+                </p>
+                <Link href="/pricing">
+                  <Button data-testid="button-view-premium">View Premium</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
