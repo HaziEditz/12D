@@ -2,12 +2,13 @@ import { db } from "./db";
 import { eq, desc, and, isNull, ilike, or } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
-  schools, classes, classStudents, achievements, userAchievements,
+  schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
   type Class, type InsertClass, type ClassStudent, type InsertClassStudent,
-  type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement
+  type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement,
+  type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -85,6 +86,22 @@ export interface IStorage {
   updateAchievementProgress(userId: string, achievementId: string, progress: number): Promise<void>;
   createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement>;
   updateUserAchievement(id: string, updates: Partial<UserAchievement>): Promise<UserAchievement | undefined>;
+  
+  // Trading Tips
+  createTradingTip(data: InsertTradingTip): Promise<TradingTip>;
+  getTradingTips(): Promise<TradingTip[]>;
+  getAllTradingTips(): Promise<TradingTip[]>;
+  getTradingTipById(id: string): Promise<TradingTip | undefined>;
+  updateTradingTip(id: string, data: Partial<TradingTip>): Promise<TradingTip | undefined>;
+  deleteTradingTip(id: string): Promise<void>;
+  
+  // Market Insights
+  createMarketInsight(data: InsertMarketInsight): Promise<MarketInsight>;
+  getMarketInsights(): Promise<MarketInsight[]>;
+  getAllMarketInsights(): Promise<MarketInsight[]>;
+  getMarketInsightById(id: string): Promise<MarketInsight | undefined>;
+  updateMarketInsight(id: string, data: Partial<MarketInsight>): Promise<MarketInsight | undefined>;
+  deleteMarketInsight(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -473,6 +490,62 @@ export class DatabaseStorage implements IStorage {
     
     // Finally delete the user
     await db.delete(users).where(eq(users.id, userId));
+  }
+
+  // Trading Tips
+  async createTradingTip(data: InsertTradingTip): Promise<TradingTip> {
+    const [tip] = await db.insert(tradingTips).values(data).returning();
+    return tip;
+  }
+
+  async getTradingTips(): Promise<TradingTip[]> {
+    return db.select().from(tradingTips).where(eq(tradingTips.isPublished, true)).orderBy(desc(tradingTips.createdAt));
+  }
+
+  async getAllTradingTips(): Promise<TradingTip[]> {
+    return db.select().from(tradingTips).orderBy(desc(tradingTips.createdAt));
+  }
+
+  async getTradingTipById(id: string): Promise<TradingTip | undefined> {
+    const [tip] = await db.select().from(tradingTips).where(eq(tradingTips.id, id)).limit(1);
+    return tip;
+  }
+
+  async updateTradingTip(id: string, data: Partial<TradingTip>): Promise<TradingTip | undefined> {
+    const [tip] = await db.update(tradingTips).set(data).where(eq(tradingTips.id, id)).returning();
+    return tip;
+  }
+
+  async deleteTradingTip(id: string): Promise<void> {
+    await db.delete(tradingTips).where(eq(tradingTips.id, id));
+  }
+
+  // Market Insights
+  async createMarketInsight(data: InsertMarketInsight): Promise<MarketInsight> {
+    const [insight] = await db.insert(marketInsights).values(data).returning();
+    return insight;
+  }
+
+  async getMarketInsights(): Promise<MarketInsight[]> {
+    return db.select().from(marketInsights).where(eq(marketInsights.isPublished, true)).orderBy(desc(marketInsights.createdAt));
+  }
+
+  async getAllMarketInsights(): Promise<MarketInsight[]> {
+    return db.select().from(marketInsights).orderBy(desc(marketInsights.createdAt));
+  }
+
+  async getMarketInsightById(id: string): Promise<MarketInsight | undefined> {
+    const [insight] = await db.select().from(marketInsights).where(eq(marketInsights.id, id)).limit(1);
+    return insight;
+  }
+
+  async updateMarketInsight(id: string, data: Partial<MarketInsight>): Promise<MarketInsight | undefined> {
+    const [insight] = await db.update(marketInsights).set(data).where(eq(marketInsights.id, id)).returning();
+    return insight;
+  }
+
+  async deleteMarketInsight(id: string): Promise<void> {
+    await db.delete(marketInsights).where(eq(marketInsights.id, id));
   }
 }
 

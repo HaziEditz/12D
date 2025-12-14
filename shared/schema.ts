@@ -162,6 +162,27 @@ export const userAchievements = pgTable("user_achievements", {
   progress: integer("progress").default(0),
 });
 
+export const tradingTips = pgTable("trading_tips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull(),
+  difficulty: text("difficulty").notNull(),
+  iconName: text("icon_name").notNull().default("Lightbulb"),
+  isPublished: boolean("is_published").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const marketInsights = pgTable("market_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  summary: text("summary").notNull(),
+  sentiment: text("sentiment").notNull(),
+  sector: text("sector").notNull(),
+  isPublished: boolean("is_published").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -176,6 +197,8 @@ export const insertClassSchema = createInsertSchema(classes).omit({ id: true, cr
 export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, joinedAt: true });
 export const insertAchievementSchema = createInsertSchema(achievements);
 export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true });
+export const insertTradingTipSchema = createInsertSchema(tradingTips).omit({ id: true, createdAt: true });
+export const insertMarketInsightSchema = createInsertSchema(marketInsights).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -205,6 +228,10 @@ export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
 export type Achievement = typeof achievements.$inferSelect;
 export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
 export type UserAchievement = typeof userAchievements.$inferSelect;
+export type InsertTradingTip = z.infer<typeof insertTradingTipSchema>;
+export type TradingTip = typeof tradingTips.$inferSelect;
+export type InsertMarketInsight = z.infer<typeof insertMarketInsightSchema>;
+export type MarketInsight = typeof marketInsights.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
