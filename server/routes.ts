@@ -1303,4 +1303,103 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Public Tips & Insights routes (for regular users)
+  app.get("/api/tips", async (req, res) => {
+    try {
+      const tips = await storage.getTradingTips();
+      res.json(tips);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/insights", async (req, res) => {
+    try {
+      const insights = await storage.getMarketInsights();
+      res.json(insights);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Admin Tips management routes
+  app.get("/api/admin/tips", requireAdmin, async (req, res) => {
+    try {
+      const tips = await storage.getAllTradingTips();
+      res.json(tips);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/tips", requireAdmin, async (req, res) => {
+    try {
+      const tip = await storage.createTradingTip(req.body);
+      res.json(tip);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/tips/:id", requireAdmin, async (req, res) => {
+    try {
+      const tip = await storage.updateTradingTip(req.params.id, req.body);
+      if (!tip) {
+        return res.status(404).json({ message: "Tip not found" });
+      }
+      res.json(tip);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/tips/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteTradingTip(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Admin Insights management routes
+  app.get("/api/admin/insights", requireAdmin, async (req, res) => {
+    try {
+      const insights = await storage.getAllMarketInsights();
+      res.json(insights);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/insights", requireAdmin, async (req, res) => {
+    try {
+      const insight = await storage.createMarketInsight(req.body);
+      res.json(insight);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/insights/:id", requireAdmin, async (req, res) => {
+    try {
+      const insight = await storage.updateMarketInsight(req.params.id, req.body);
+      if (!insight) {
+        return res.status(404).json({ message: "Insight not found" });
+      }
+      res.json(insight);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/insights/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteMarketInsight(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }
