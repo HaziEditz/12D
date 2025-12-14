@@ -190,6 +190,24 @@ async function seedAchievements() {
   console.log("Synced 130 achievements");
 }
 
+// Helper function to calculate max consecutive profitable trades
+function calculateMaxWinningStreak(trades: Trade[]): number {
+  const sortedTrades = [...trades].sort((a, b) => 
+    new Date(a.executedAt ?? 0).getTime() - new Date(b.executedAt ?? 0).getTime()
+  );
+  let maxStreak = 0;
+  let currentStreak = 0;
+  for (const trade of sortedTrades) {
+    if (trade.profit && trade.profit > 0) {
+      currentStreak++;
+      maxStreak = Math.max(maxStreak, currentStreak);
+    } else {
+      currentStreak = 0;
+    }
+  }
+  return maxStreak;
+}
+
 // Retroactive achievement check - awards achievements based on current user stats
 async function checkAndAwardAchievements(userId: string): Promise<void> {
   const user = await storage.getUserById(userId);
@@ -201,6 +219,11 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
   const balance = user.simulatorBalance ?? 10000;
   const totalProfit = user.totalProfit ?? 0;
   const profitableTrades = trades.filter(t => t.profit && t.profit > 0);
+  
+  const totalLessonsCount = await storage.getLessonsCount();
+  const leaderboard = await storage.getLeaderboard();
+  const userRank = leaderboard.findIndex(u => u.id === userId) + 1;
+  const maxWinningStreak = calculateMaxWinningStreak(trades);
 
   const achievements = await storage.getAchievements();
   const userAchievements = await storage.getUserAchievements(userId);
@@ -232,6 +255,8 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
           currentProgress = Math.min(100, (totalProfit / 5000) * 100);
         } else if (achievement.id === "mogul") {
           currentProgress = Math.min(100, (totalProfit / 10000) * 100);
+        } else if (achievement.id === "winning-streak") {
+          currentProgress = Math.min(100, (maxWinningStreak / 5) * 100);
         }
         break;
 
@@ -244,6 +269,12 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
           currentProgress = Math.min(100, (completedLessons / 10) * 100);
         } else if (achievement.id === "professor") {
           currentProgress = Math.min(100, (completedLessons / 25) * 100);
+        } else if (achievement.id === "valedictorian") {
+          if (totalLessonsCount > 0 && completedLessons >= totalLessonsCount) {
+            currentProgress = 100;
+          } else if (totalLessonsCount > 0) {
+            currentProgress = Math.min(99, (completedLessons / totalLessonsCount) * 100);
+          }
         }
         break;
 
@@ -266,6 +297,12 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
           currentProgress = user.bio ? 100 : 0;
         } else if (achievement.id === "picture-perfect") {
           currentProgress = user.avatarUrl ? 100 : 0;
+        } else if (achievement.id === "top-100") {
+          currentProgress = (userRank > 0 && userRank <= 100) ? 100 : 0;
+        } else if (achievement.id === "top-50") {
+          currentProgress = (userRank > 0 && userRank <= 50) ? 100 : 0;
+        } else if (achievement.id === "top-25") {
+          currentProgress = (userRank > 0 && userRank <= 25) ? 100 : 0;
         }
         break;
 
@@ -274,6 +311,8 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
           currentProgress = 100;
         } else if (achievement.id === "premium-member") {
           currentProgress = user.subscriptionId ? 100 : 0;
+        } else if (achievement.id === "top-10") {
+          currentProgress = (userRank > 0 && userRank <= 10) ? 100 : 0;
         }
         break;
     }

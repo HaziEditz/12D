@@ -191,7 +191,7 @@ export default function LessonsPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge 
                         variant="secondary" 
-                        className={getDifficultyColor(lesson.difficulty)}
+                        className={`capitalize ${getDifficultyColor(lesson.difficulty)}`}
                       >
                         {lesson.difficulty}
                       </Badge>
@@ -216,7 +216,7 @@ export default function LessonsPage() {
                       <Clock className="h-4 w-4" />
                       {lesson.duration} min
                     </div>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs capitalize">
                       {lesson.category}
                     </Badge>
                   </div>

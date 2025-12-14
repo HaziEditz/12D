@@ -228,10 +228,10 @@ export default function TipsPage() {
             <h3 className="text-xl font-semibold mb-2" data-testid="text-daily-tip-title">{dailyTip.title}</h3>
             <p className="text-muted-foreground mb-4" data-testid="text-daily-tip-content">{dailyTip.content}</p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline" className={getDifficultyColor(dailyTip.difficulty)}>
+              <Badge variant="outline" className={`capitalize ${getDifficultyColor(dailyTip.difficulty)}`}>
                 {dailyTip.difficulty}
               </Badge>
-              <Badge variant="outline" className={getCategoryColor(dailyTip.category)}>
+              <Badge variant="outline" className={`capitalize ${getCategoryColor(dailyTip.category)}`}>
                 {dailyTip.category}
               </Badge>
             </div>
@@ -275,10 +275,10 @@ export default function TipsPage() {
                         <h3 className="font-semibold mb-2">{tip.title}</h3>
                         <p className="text-sm text-muted-foreground mb-3 line-clamp-3">{tip.content}</p>
                         <div className="flex gap-2 flex-wrap">
-                          <Badge variant="outline" className={getDifficultyColor(tip.difficulty)}>
+                          <Badge variant="outline" className={`capitalize ${getDifficultyColor(tip.difficulty)}`}>
                             {tip.difficulty}
                           </Badge>
-                          <Badge variant="outline" className={getCategoryColor(tip.category)}>
+                          <Badge variant="outline" className={`capitalize ${getCategoryColor(tip.category)}`}>
                             {tip.category}
                           </Badge>
                         </div>
