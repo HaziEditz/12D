@@ -77,6 +77,27 @@ Preferred communication style: Simple, everyday language.
 - **Connection**: Via `DATABASE_URL` environment variable
 - **ORM**: Drizzle ORM with node-postgres driver
 
+### Object Storage (S3-Compatible)
+- **Purpose**: User avatar uploads and file storage
+- **Configuration**: Works with AWS S3, Cloudflare R2, DigitalOcean Spaces, or any S3-compatible service
+- **Required Environment Variables**:
+  - `S3_BUCKET` - Bucket name
+  - `S3_REGION` - AWS region (default: us-east-1)
+  - `S3_ACCESS_KEY_ID` - Access key
+  - `S3_SECRET_ACCESS_KEY` - Secret key
+  - `S3_ENDPOINT` - (Optional) Custom endpoint for non-AWS S3 services
+
+### Stock Market Data
+- **Finnhub API**: Real-time stock quotes and market data
+- **Configuration**: Requires `FINNHUB_API_KEY` environment variable
+
+### Firebase Authentication (Optional)
+- **Purpose**: Google sign-in authentication
+- **Required Environment Variables**:
+  - `VITE_FIREBASE_API_KEY`
+  - `VITE_FIREBASE_PROJECT_ID`
+  - `VITE_FIREBASE_APP_ID`
+
 ### Third-Party UI Libraries
 - **Radix UI**: Accessible component primitives (dialogs, dropdowns, tabs, etc.)
 - **Recharts**: Data visualization for dashboard performance tracking
