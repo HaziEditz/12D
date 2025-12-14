@@ -1499,6 +1499,56 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Public strategies route
+  app.get("/api/strategies", async (req, res) => {
+    try {
+      const strategies = await storage.getStrategies();
+      res.json(strategies);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Admin Strategies management routes
+  app.get("/api/admin/strategies", requireAdmin, async (req, res) => {
+    try {
+      const strategies = await storage.getAllStrategies();
+      res.json(strategies);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/strategies", requireAdmin, async (req, res) => {
+    try {
+      const strategy = await storage.createStrategy(req.body);
+      res.json(strategy);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/strategies/:id", requireAdmin, async (req, res) => {
+    try {
+      const strategy = await storage.updateStrategy(req.params.id, req.body);
+      if (!strategy) {
+        return res.status(404).json({ message: "Strategy not found" });
+      }
+      res.json(strategy);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/strategies/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteStrategy(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Friends routes - require paid membership (includes trial access)
   const requirePaidMembership = (req: Request, res: Response, next: NextFunction) => {
     const user = req.user as User;

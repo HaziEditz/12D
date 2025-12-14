@@ -37,7 +37,8 @@ import {
   Lightbulb,
   TrendingUp
 } from "lucide-react";
-import type { Lesson, TradingTip, MarketInsight } from "@shared/schema";
+import type { Lesson, TradingTip, MarketInsight, Strategy } from "@shared/schema";
+import { Target } from "lucide-react";
 
 const lessonSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -67,9 +68,19 @@ const insightSchema = z.object({
   isPublished: z.boolean().default(true),
 });
 
+const strategySchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  content: z.string().min(1, "Content is required"),
+  category: z.string().min(1, "Category is required"),
+  difficulty: z.string().min(1, "Difficulty is required"),
+  isPublished: z.boolean().default(true),
+});
+
 type LessonFormData = z.infer<typeof lessonSchema>;
 type TipFormData = z.infer<typeof tipSchema>;
 type InsightFormData = z.infer<typeof insightSchema>;
+type StrategyFormData = z.infer<typeof strategySchema>;
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -78,9 +89,11 @@ export default function AdminPage() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [selectedTip, setSelectedTip] = useState<TradingTip | null>(null);
   const [selectedInsight, setSelectedInsight] = useState<MarketInsight | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [isCreatingLesson, setIsCreatingLesson] = useState(false);
   const [isCreatingTip, setIsCreatingTip] = useState(false);
   const [isCreatingInsight, setIsCreatingInsight] = useState(false);
+  const [isCreatingStrategy, setIsCreatingStrategy] = useState(false);
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/admin/lessons"],
@@ -92,6 +105,10 @@ export default function AdminPage() {
 
   const { data: insights, isLoading: insightsLoading } = useQuery<MarketInsight[]>({
     queryKey: ["/api/admin/insights"],
+  });
+
+  const { data: strategies, isLoading: strategiesLoading } = useQuery<Strategy[]>({
+    queryKey: ["/api/admin/strategies"],
   });
 
   const { data: stats } = useQuery<{ users: number; lessons: number; trades: number }>({
@@ -131,6 +148,18 @@ export default function AdminPage() {
       summary: "",
       sentiment: "neutral",
       sector: "Technology",
+      isPublished: true,
+    },
+  });
+
+  const strategyForm = useForm<StrategyFormData>({
+    resolver: zodResolver(strategySchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      content: "",
+      category: "trend",
+      difficulty: "beginner",
       isPublished: true,
     },
   });
@@ -261,6 +290,48 @@ export default function AdminPage() {
     },
   });
 
+  const createStrategyMutation = useMutation({
+    mutationFn: (data: StrategyFormData) => apiRequest("POST", "/api/admin/strategies", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/strategies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/strategies"] });
+      toast({ title: "Strategy created successfully" });
+      setIsCreatingStrategy(false);
+      setSelectedStrategy(null);
+      strategyForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Failed to create strategy", variant: "destructive" });
+    },
+  });
+
+  const updateStrategyMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: StrategyFormData }) =>
+      apiRequest("PATCH", `/api/admin/strategies/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/strategies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/strategies"] });
+      toast({ title: "Strategy updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update strategy", variant: "destructive" });
+    },
+  });
+
+  const deleteStrategyMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/strategies/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/strategies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/strategies"] });
+      toast({ title: "Strategy deleted" });
+      setSelectedStrategy(null);
+      setIsCreatingStrategy(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete strategy", variant: "destructive" });
+    },
+  });
+
   const onSubmitLesson = (data: LessonFormData) => {
     if (selectedLesson && !isCreatingLesson) {
       updateLessonMutation.mutate({ id: selectedLesson.id, data });
@@ -282,6 +353,14 @@ export default function AdminPage() {
       updateInsightMutation.mutate({ id: selectedInsight.id, data });
     } else {
       createInsightMutation.mutate(data);
+    }
+  };
+
+  const onSubmitStrategy = (data: StrategyFormData) => {
+    if (selectedStrategy && !isCreatingStrategy) {
+      updateStrategyMutation.mutate({ id: selectedStrategy.id, data });
+    } else {
+      createStrategyMutation.mutate(data);
     }
   };
 
@@ -325,6 +404,19 @@ export default function AdminPage() {
     });
   };
 
+  const handleSelectStrategy = (strategy: Strategy) => {
+    setIsCreatingStrategy(false);
+    setSelectedStrategy(strategy);
+    strategyForm.reset({
+      title: strategy.title,
+      description: strategy.description,
+      content: strategy.content,
+      category: strategy.category,
+      difficulty: strategy.difficulty,
+      isPublished: strategy.isPublished ?? true,
+    });
+  };
+
   const handleCreateNewLesson = () => {
     setSelectedLesson(null);
     setIsCreatingLesson(true);
@@ -365,6 +457,19 @@ export default function AdminPage() {
     });
   };
 
+  const handleCreateNewStrategy = () => {
+    setSelectedStrategy(null);
+    setIsCreatingStrategy(true);
+    strategyForm.reset({
+      title: "",
+      description: "",
+      content: "",
+      category: "trend",
+      difficulty: "beginner",
+      isPublished: true,
+    });
+  };
+
   const handleBackLesson = () => {
     setSelectedLesson(null);
     setIsCreatingLesson(false);
@@ -381,6 +486,12 @@ export default function AdminPage() {
     setSelectedInsight(null);
     setIsCreatingInsight(false);
     insightForm.reset();
+  };
+
+  const handleBackStrategy = () => {
+    setSelectedStrategy(null);
+    setIsCreatingStrategy(false);
+    strategyForm.reset();
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -487,6 +598,10 @@ export default function AdminPage() {
             <TabsTrigger value="insights" className="gap-2" data-testid="tab-insights">
               <TrendingUp className="h-4 w-4" />
               Market Insights
+            </TabsTrigger>
+            <TabsTrigger value="strategies" className="gap-2" data-testid="tab-strategies">
+              <Target className="h-4 w-4" />
+              Strategies
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1270,6 +1385,252 @@ export default function AdminPage() {
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="switch-insight-published"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </form>
+                  </Form>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="strategies" className="flex-1 flex overflow-hidden m-0">
+          <div className="w-72 border-r flex flex-col bg-muted/30">
+            <div className="p-3 border-b">
+              <Button onClick={handleCreateNewStrategy} className="w-full gap-2" data-testid="button-create-strategy">
+                <Plus className="h-4 w-4" />
+                New Strategy
+              </Button>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {strategiesLoading ? (
+                  <div className="space-y-2 p-2">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                  </div>
+                ) : (!strategies || strategies.length === 0) ? (
+                  <div className="text-center py-8 px-4" data-testid="empty-strategies">
+                    <Target className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No strategies yet</p>
+                    <p className="text-xs text-muted-foreground">Create your first strategy</p>
+                  </div>
+                ) : (
+                  strategies.map((strategy) => (
+                    <div
+                      key={strategy.id}
+                      onClick={() => handleSelectStrategy(strategy)}
+                      className={`p-3 rounded-lg cursor-pointer hover-elevate ${
+                        selectedStrategy?.id === strategy.id && !isCreatingStrategy ? "bg-accent" : "bg-background"
+                      }`}
+                      data-testid={`strategy-item-${strategy.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {!strategy.isPublished && (
+                              <EyeOff className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          <p className="font-medium truncate" data-testid={`text-strategy-title-${strategy.id}`}>{strategy.title}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="secondary" className={`text-xs ${getDifficultyColor(strategy.difficulty)}`}>
+                              {strategy.difficulty}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {strategy.category}
+                            </Badge>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            {!selectedStrategy && !isCreatingStrategy ? (
+              <div className="h-full flex items-center justify-center" data-testid="no-strategy-selected">
+                <div className="text-center">
+                  <Target className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">Strategy Editor</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Select a strategy from the sidebar or create a new one
+                  </p>
+                  <Button onClick={handleCreateNewStrategy} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create New Strategy
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between gap-4 p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="icon" onClick={handleBackStrategy} data-testid="button-back-strategy">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <h2 className="text-lg font-semibold" data-testid="text-strategy-editor-title">
+                      {isCreatingStrategy ? "Create New Strategy" : "Edit Strategy"}
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isCreatingStrategy && selectedStrategy && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteStrategyMutation.mutate(selectedStrategy.id)}
+                        disabled={deleteStrategyMutation.isPending}
+                        className="gap-2 text-destructive"
+                        data-testid="button-delete-strategy"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={strategyForm.handleSubmit(onSubmitStrategy)}
+                      disabled={createStrategyMutation.isPending || updateStrategyMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-save-strategy"
+                    >
+                      {(createStrategyMutation.isPending || updateStrategyMutation.isPending) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <Form {...strategyForm}>
+                    <form className="p-4 space-y-4">
+                      <FormField
+                        control={strategyForm.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Title</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Strategy title" {...field} data-testid="input-strategy-title" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={strategyForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Brief description of the strategy" 
+                                {...field} 
+                                data-testid="textarea-strategy-description"
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={strategyForm.control}
+                        name="content"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Content</FormLabel>
+                            <FormControl>
+                              <RichTextEditor
+                                content={field.value}
+                                onChange={field.onChange}
+                                data-testid="editor-strategy-content"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={strategyForm.control}
+                          name="category"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Category</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-strategy-category">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="trend">Trend Following</SelectItem>
+                                  <SelectItem value="scalping">Scalping</SelectItem>
+                                  <SelectItem value="swing">Swing Trading</SelectItem>
+                                  <SelectItem value="position">Position Trading</SelectItem>
+                                  <SelectItem value="momentum">Momentum</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={strategyForm.control}
+                          name="difficulty"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Difficulty</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-strategy-difficulty">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="beginner">Beginner</SelectItem>
+                                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                                  <SelectItem value="advanced">Advanced</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={strategyForm.control}
+                        name="isPublished"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                            <div className="flex items-center gap-2">
+                              {field.value ? (
+                                <Eye className="h-4 w-4 text-success" />
+                              ) : (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <div>
+                                <FormLabel className="mb-0">Published</FormLabel>
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-strategy-published"
                               />
                             </FormControl>
                           </FormItem>

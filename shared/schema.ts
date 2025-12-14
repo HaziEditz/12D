@@ -115,6 +115,8 @@ export const strategies = pgTable("strategies", {
   content: text("content").notNull(),
   category: text("category").notNull(),
   difficulty: text("difficulty").notNull(),
+  isPublished: boolean("is_published").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const schools = pgTable("schools", {

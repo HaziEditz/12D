@@ -10,7 +10,7 @@ import {
   type Class, type InsertClass, type ClassStudent, type InsertClassStudent,
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement,
   type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
-  type Friendship, type InsertFriendship
+  type Friendship, type InsertFriendship, type Strategy, type InsertStrategy
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -104,6 +104,14 @@ export interface IStorage {
   getMarketInsightById(id: string): Promise<MarketInsight | undefined>;
   updateMarketInsight(id: string, data: Partial<MarketInsight>): Promise<MarketInsight | undefined>;
   deleteMarketInsight(id: string): Promise<void>;
+  
+  // Strategies
+  createStrategy(data: InsertStrategy): Promise<Strategy>;
+  getStrategies(): Promise<Strategy[]>;
+  getAllStrategies(): Promise<Strategy[]>;
+  getStrategyById(id: string): Promise<Strategy | undefined>;
+  updateStrategy(id: string, data: Partial<Strategy>): Promise<Strategy | undefined>;
+  deleteStrategy(id: string): Promise<void>;
   
   // Friends
   getFriends(userId: string): Promise<{friendship: Friendship, friend: User}[]>;
@@ -558,6 +566,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMarketInsight(id: string): Promise<void> {
     await db.delete(marketInsights).where(eq(marketInsights.id, id));
+  }
+
+  // Strategies
+  async createStrategy(data: InsertStrategy): Promise<Strategy> {
+    const [strategy] = await db.insert(strategies).values(data).returning();
+    return strategy;
+  }
+
+  async getStrategies(): Promise<Strategy[]> {
+    return db.select().from(strategies).where(eq(strategies.isPublished, true)).orderBy(desc(strategies.createdAt));
+  }
+
+  async getAllStrategies(): Promise<Strategy[]> {
+    return db.select().from(strategies).orderBy(desc(strategies.createdAt));
+  }
+
+  async getStrategyById(id: string): Promise<Strategy | undefined> {
+    const [strategy] = await db.select().from(strategies).where(eq(strategies.id, id)).limit(1);
+    return strategy;
+  }
+
+  async updateStrategy(id: string, data: Partial<Strategy>): Promise<Strategy | undefined> {
+    const [strategy] = await db.update(strategies).set(data).where(eq(strategies.id, id)).returning();
+    return strategy;
+  }
+
+  async deleteStrategy(id: string): Promise<void> {
+    await db.delete(strategies).where(eq(strategies.id, id));
   }
 
   // Friends
