@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Star, 
   Plus, 
@@ -12,7 +14,10 @@ import {
   TrendingUp, 
   TrendingDown,
   Search,
-  RefreshCw
+  RefreshCw,
+  Loader2,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 interface WatchlistItem {
@@ -21,57 +26,142 @@ interface WatchlistItem {
   price: number;
   change: number;
   changePercent: number;
+  isLoading?: boolean;
+  hasError?: boolean;
 }
 
-const MOCK_STOCKS: Record<string, { name: string; basePrice: number }> = {
-  AAPL: { name: "Apple Inc.", basePrice: 178.50 },
-  GOOGL: { name: "Alphabet Inc.", basePrice: 141.80 },
-  MSFT: { name: "Microsoft Corp.", basePrice: 378.90 },
-  AMZN: { name: "Amazon.com Inc.", basePrice: 178.25 },
-  TSLA: { name: "Tesla Inc.", basePrice: 248.50 },
-  NVDA: { name: "NVIDIA Corp.", basePrice: 495.20 },
-  META: { name: "Meta Platforms", basePrice: 505.75 },
-  JPM: { name: "JPMorgan Chase", basePrice: 195.30 },
-  V: { name: "Visa Inc.", basePrice: 278.45 },
-  JNJ: { name: "Johnson & Johnson", basePrice: 156.80 },
-  WMT: { name: "Walmart Inc.", basePrice: 165.20 },
-  PG: { name: "Procter & Gamble", basePrice: 152.40 },
-  DIS: { name: "Walt Disney Co.", basePrice: 112.35 },
-  NFLX: { name: "Netflix Inc.", basePrice: 485.60 },
-  AMD: { name: "AMD Inc.", basePrice: 142.80 },
+interface StockQuote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  error?: boolean;
+}
+
+const AVAILABLE_STOCKS: Record<string, { name: string }> = {
+  AAPL: { name: "Apple Inc." },
+  GOOGL: { name: "Alphabet Inc." },
+  MSFT: { name: "Microsoft Corp." },
+  AMZN: { name: "Amazon.com Inc." },
+  TSLA: { name: "Tesla Inc." },
+  NVDA: { name: "NVIDIA Corp." },
+  META: { name: "Meta Platforms" },
+  JPM: { name: "JPMorgan Chase" },
+  V: { name: "Visa Inc." },
+  JNJ: { name: "Johnson & Johnson" },
+  WMT: { name: "Walmart Inc." },
+  PG: { name: "Procter & Gamble" },
+  DIS: { name: "Walt Disney Co." },
+  NFLX: { name: "Netflix Inc." },
+  AMD: { name: "AMD Inc." },
 };
-
-function generatePrice(basePrice: number): { price: number; change: number; changePercent: number } {
-  const changePercent = (Math.random() - 0.5) * 6;
-  const change = basePrice * (changePercent / 100);
-  const price = basePrice + change;
-  return { price, change, changePercent };
-}
 
 export default function WatchlistPage() {
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([
-    { symbol: "AAPL", name: "Apple Inc.", ...generatePrice(178.50) },
-    { symbol: "GOOGL", name: "Alphabet Inc.", ...generatePrice(141.80) },
-    { symbol: "MSFT", name: "Microsoft Corp.", ...generatePrice(378.90) },
+    { symbol: "AAPL", name: "Apple Inc.", price: 0, change: 0, changePercent: 0, isLoading: true },
+    { symbol: "GOOGL", name: "Alphabet Inc.", price: 0, change: 0, changePercent: 0, isLoading: true },
+    { symbol: "MSFT", name: "Microsoft Corp.", price: 0, change: 0, changePercent: 0, isLoading: true },
   ]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const filteredStocks = Object.entries(MOCK_STOCKS)
+  const fetchQuotes = useCallback(async (symbols: string[]) => {
+    if (symbols.length === 0) return;
+    
+    try {
+      const response = await apiRequest("POST", "/api/stocks/quotes", { symbols });
+      const quotes: StockQuote[] = await response.json();
+      
+      setWatchlist(prev => prev.map(item => {
+        const quote = quotes.find(q => q.symbol === item.symbol);
+        if (quote && !quote.error) {
+          return {
+            ...item,
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            isLoading: false,
+            hasError: false,
+          };
+        } else if (quote?.error) {
+          return { ...item, isLoading: false, hasError: true };
+        }
+        return item;
+      }));
+      
+      setLastUpdated(new Date());
+    } catch (error) {
+      setWatchlist(prev => prev.map(item => ({
+        ...item,
+        isLoading: false,
+        hasError: true
+      })));
+      toast({
+        title: "Failed to fetch stock prices",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (isAuthenticated && watchlist.length > 0) {
+      const symbols = watchlist.map(w => w.symbol);
+      fetchQuotes(symbols);
+    }
+  }, [isAuthenticated]);
+
+  const filteredStocks = Object.entries(AVAILABLE_STOCKS)
     .filter(([symbol, data]) => 
       !watchlist.some(w => w.symbol === symbol) &&
       (symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
        data.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-  const addToWatchlist = (symbol: string) => {
-    const stock = MOCK_STOCKS[symbol];
+  const addToWatchlist = async (symbol: string) => {
+    const stock = AVAILABLE_STOCKS[symbol];
     if (stock) {
-      const priceData = generatePrice(stock.basePrice);
-      setWatchlist([...watchlist, { symbol, name: stock.name, ...priceData }]);
+      const newItem: WatchlistItem = { 
+        symbol, 
+        name: stock.name, 
+        price: 0, 
+        change: 0, 
+        changePercent: 0,
+        isLoading: true 
+      };
+      setWatchlist(prev => [...prev, newItem]);
       setSearchTerm("");
       setShowSearch(false);
+      
+      try {
+        const response = await apiRequest("POST", "/api/stocks/quotes", { symbols: [symbol] });
+        const quotes: StockQuote[] = await response.json();
+        const quote = quotes[0];
+        
+        if (quote && !quote.error) {
+          setWatchlist(prev => prev.map(item => 
+            item.symbol === symbol
+              ? { ...item, price: quote.price, change: quote.change, changePercent: quote.changePercent, isLoading: false }
+              : item
+          ));
+        } else {
+          setWatchlist(prev => prev.map(item => 
+            item.symbol === symbol
+              ? { ...item, isLoading: false, hasError: true }
+              : item
+          ));
+        }
+      } catch {
+        setWatchlist(prev => prev.map(item => 
+          item.symbol === symbol
+            ? { ...item, isLoading: false, hasError: true }
+            : item
+        ));
+      }
     }
   };
 
@@ -79,14 +169,15 @@ export default function WatchlistPage() {
     setWatchlist(watchlist.filter(w => w.symbol !== symbol));
   };
 
-  const refreshPrices = () => {
-    setWatchlist(watchlist.map(item => {
-      const stock = MOCK_STOCKS[item.symbol];
-      if (stock) {
-        return { ...item, ...generatePrice(stock.basePrice) };
-      }
-      return item;
-    }));
+  const refreshPrices = async () => {
+    setIsRefreshing(true);
+    setWatchlist(prev => prev.map(item => ({ ...item, isLoading: true })));
+    
+    const symbols = watchlist.map(w => w.symbol);
+    await fetchQuotes(symbols);
+    
+    setIsRefreshing(false);
+    toast({ title: "Prices refreshed" });
   };
 
   if (!isAuthenticated) {
@@ -110,11 +201,24 @@ export default function WatchlistPage() {
             <Star className="h-8 w-8 text-amber-500" />
             My Watchlist
           </h1>
-          <p className="text-muted-foreground mt-1">Track your favorite stocks and monitor price movements</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground">Real-time stock prices</p>
+            {lastUpdated && (
+              <Badge variant="outline" className="text-xs">
+                <Wifi className="h-3 w-3 mr-1 text-success" />
+                Updated {lastUpdated.toLocaleTimeString()}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={refreshPrices} data-testid="button-refresh-prices">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button 
+            variant="outline" 
+            onClick={refreshPrices} 
+            disabled={isRefreshing}
+            data-testid="button-refresh-prices"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button onClick={() => setShowSearch(!showSearch)} data-testid="button-add-stock">
@@ -198,22 +302,36 @@ export default function WatchlistPage() {
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="text-xl font-bold" data-testid={`text-price-${item.symbol.toLowerCase()}`}>
-                        ${item.price.toFixed(2)}
-                      </p>
-                      <div className="flex items-center gap-1 justify-end">
-                        {item.change >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-success" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-destructive" />
-                        )}
-                        <Badge 
-                          variant="outline" 
-                          className={item.change >= 0 ? "text-success border-success" : "text-destructive border-destructive"}
-                        >
-                          {item.change >= 0 ? "+" : ""}{item.changePercent.toFixed(2)}%
-                        </Badge>
-                      </div>
+                      {item.isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <span className="text-muted-foreground">Loading...</span>
+                        </div>
+                      ) : item.hasError ? (
+                        <div className="flex items-center gap-2">
+                          <WifiOff className="h-4 w-4 text-destructive" />
+                          <span className="text-muted-foreground text-sm">Unavailable</span>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xl font-bold" data-testid={`text-price-${item.symbol.toLowerCase()}`}>
+                            ${item.price.toFixed(2)}
+                          </p>
+                          <div className="flex items-center gap-1 justify-end">
+                            {item.change >= 0 ? (
+                              <TrendingUp className="h-4 w-4 text-success" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 text-destructive" />
+                            )}
+                            <Badge 
+                              variant="outline" 
+                              className={item.change >= 0 ? "text-success border-success" : "text-destructive border-destructive"}
+                            >
+                              {item.change >= 0 ? "+" : ""}{item.changePercent.toFixed(2)}%
+                            </Badge>
+                          </div>
+                        </>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
@@ -238,7 +356,7 @@ export default function WatchlistPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {Object.entries(MOCK_STOCKS)
+            {Object.entries(AVAILABLE_STOCKS)
               .filter(([symbol]) => !watchlist.some(w => w.symbol === symbol))
               .slice(0, 8)
               .map(([symbol]) => (

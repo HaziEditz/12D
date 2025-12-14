@@ -752,6 +752,102 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(safeLeaderboard);
   });
 
+  // Stock quotes using Finnhub API
+  app.get("/api/stocks/quote/:symbol", async (req, res) => {
+    try {
+      const { symbol } = req.params;
+      const apiKey = process.env.FINNHUB_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "Finnhub API key not configured" });
+      }
+
+      const response = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Finnhub API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Finnhub returns: c (current), d (change), dp (percent change), h (high), l (low), o (open), pc (prev close)
+      if (data.c === 0 && data.d === null) {
+        return res.status(404).json({ message: "Symbol not found or no data available" });
+      }
+
+      res.json({
+        symbol,
+        price: data.c,
+        change: data.d,
+        changePercent: data.dp,
+        high: data.h,
+        low: data.l,
+        open: data.o,
+        previousClose: data.pc,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch stock quote" });
+    }
+  });
+
+  // Batch stock quotes for multiple symbols
+  app.post("/api/stocks/quotes", async (req, res) => {
+    try {
+      const { symbols } = req.body;
+      const apiKey = process.env.FINNHUB_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(500).json({ message: "Finnhub API key not configured" });
+      }
+
+      if (!Array.isArray(symbols) || symbols.length === 0) {
+        return res.status(400).json({ message: "symbols array is required" });
+      }
+
+      // Limit to prevent abuse
+      const limitedSymbols = symbols.slice(0, 15);
+      
+      const quotes = await Promise.all(
+        limitedSymbols.map(async (symbol: string) => {
+          try {
+            const response = await fetch(
+              `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`
+            );
+            
+            if (!response.ok) {
+              return { symbol, error: true };
+            }
+
+            const data = await response.json();
+            
+            if (data.c === 0 && data.d === null) {
+              return { symbol, error: true };
+            }
+
+            return {
+              symbol,
+              price: data.c,
+              change: data.d,
+              changePercent: data.dp,
+              high: data.h,
+              low: data.l,
+              open: data.o,
+              previousClose: data.pc,
+            };
+          } catch {
+            return { symbol, error: true };
+          }
+        })
+      );
+
+      res.json(quotes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch stock quotes" });
+    }
+  });
+
   // Admin routes
   app.get("/api/admin/lessons", requireAdmin, async (req, res) => {
     const allLessons = await storage.getLessons();
