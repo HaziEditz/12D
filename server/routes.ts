@@ -40,13 +40,10 @@ async function ensureAdminUser() {
   }
 }
 
-// Seed achievements
+// Seed achievements (idempotent - will insert or update)
 async function seedAchievements() {
-  const existingAchievements = await storage.getAchievements();
-  if (existingAchievements.length > 0) return;
-
   const achievementsList = [
-    // Trading (1-10)
+    // ===== TRADING ACHIEVEMENTS (30) =====
     { id: "first-trade", name: "First Trade", description: "Execute your first trade", icon: "TrendingUp", category: "trading", requirement: 1, xpReward: 10 },
     { id: "day-trader", name: "Day Trader", description: "Complete 10 trades", icon: "TrendingUp", category: "trading", requirement: 10, xpReward: 25 },
     { id: "active-trader", name: "Active Trader", description: "Complete 50 trades", icon: "TrendingUp", category: "trading", requirement: 50, xpReward: 50 },
@@ -57,36 +54,140 @@ async function seedAchievements() {
     { id: "double-down", name: "Double Down", description: "Make $1,000 total profit", icon: "DollarSign", category: "trading", requirement: 1000, xpReward: 75 },
     { id: "high-roller", name: "High Roller", description: "Make $5,000 total profit", icon: "DollarSign", category: "trading", requirement: 5000, xpReward: 150 },
     { id: "mogul", name: "Mogul", description: "Make $10,000 total profit", icon: "Award", category: "trading", requirement: 10000, xpReward: 300 },
-    // Learning (11-15)
+    { id: "trade-200", name: "Seasoned Trader", description: "Complete 200 trades", icon: "TrendingUp", category: "trading", requirement: 200, xpReward: 150 },
+    { id: "trade-1000", name: "Market Veteran", description: "Complete 1,000 trades", icon: "Trophy", category: "trading", requirement: 1000, xpReward: 500 },
+    { id: "profit-25k", name: "Quarter Million", description: "Make $25,000 total profit", icon: "DollarSign", category: "trading", requirement: 25000, xpReward: 400 },
+    { id: "profit-50k", name: "Fifty Grand", description: "Make $50,000 total profit", icon: "Crown", category: "trading", requirement: 50000, xpReward: 600 },
+    { id: "profit-100k", name: "Six Figures", description: "Make $100,000 total profit", icon: "Award", category: "trading", requirement: 100000, xpReward: 1000 },
+    { id: "buy-specialist", name: "Bull Master", description: "Complete 50 buy orders", icon: "ArrowUp", category: "trading", requirement: 50, xpReward: 75 },
+    { id: "sell-specialist", name: "Bear Master", description: "Complete 50 sell orders", icon: "ArrowDown", category: "trading", requirement: 50, xpReward: 75 },
+    { id: "quick-flip", name: "Quick Flip", description: "Close a trade within 5 minutes of opening", icon: "Clock", category: "trading", requirement: 1, xpReward: 25 },
+    { id: "patient-trader", name: "Patient Trader", description: "Hold a position for over 24 hours", icon: "Timer", category: "trading", requirement: 1, xpReward: 30 },
+    { id: "tech-trader", name: "Tech Trader", description: "Trade 10 different tech stocks", icon: "Cpu", category: "trading", requirement: 10, xpReward: 60 },
+    { id: "diversifier", name: "Diversifier", description: "Trade 20 different stocks", icon: "Layers", category: "trading", requirement: 20, xpReward: 80 },
+    { id: "portfolio-builder", name: "Portfolio Builder", description: "Trade 50 different stocks", icon: "Grid", category: "trading", requirement: 50, xpReward: 150 },
+    { id: "limit-order-pro", name: "Limit Order Pro", description: "Execute 10 limit orders", icon: "Target", category: "trading", requirement: 10, xpReward: 50 },
+    { id: "stop-loss-master", name: "Stop Loss Master", description: "Use stop loss on 20 trades", icon: "Shield", category: "trading", requirement: 20, xpReward: 60 },
+    { id: "risk-manager", name: "Risk Manager", description: "Use take profit on 20 trades", icon: "ShieldCheck", category: "trading", requirement: 20, xpReward: 60 },
+    { id: "comeback-kid", name: "Comeback Kid", description: "Recover from a 20% portfolio loss", icon: "RefreshCw", category: "trading", requirement: 1, xpReward: 100 },
+    { id: "no-loss-day", name: "Perfect Day", description: "Complete 5 trades in one day with no losses", icon: "CheckCircle", category: "trading", requirement: 5, xpReward: 75 },
+    { id: "morning-trader", name: "Early Market", description: "Execute a trade before 10 AM", icon: "Sunrise", category: "trading", requirement: 1, xpReward: 15 },
+    { id: "after-hours", name: "After Hours", description: "Execute a trade after 4 PM", icon: "Moon", category: "trading", requirement: 1, xpReward: 15 },
+    { id: "big-position", name: "Big Position", description: "Open a position worth over $10,000", icon: "Scale", category: "trading", requirement: 10000, xpReward: 50 },
+
+    // ===== LEARNING ACHIEVEMENTS (25) =====
     { id: "student", name: "Student", description: "Complete your first lesson", icon: "BookOpen", category: "learning", requirement: 1, xpReward: 10 },
     { id: "scholar", name: "Scholar", description: "Complete 5 lessons", icon: "BookOpen", category: "learning", requirement: 5, xpReward: 30 },
     { id: "graduate", name: "Graduate", description: "Complete 10 lessons", icon: "GraduationCap", category: "learning", requirement: 10, xpReward: 60 },
     { id: "professor", name: "Professor", description: "Complete 25 lessons", icon: "GraduationCap", category: "learning", requirement: 25, xpReward: 125 },
     { id: "valedictorian", name: "Valedictorian", description: "Complete all available lessons", icon: "Award", category: "learning", requirement: 100, xpReward: 500 },
-    // Balance (16-20)
+    { id: "lesson-15", name: "Knowledge Seeker", description: "Complete 15 lessons", icon: "Search", category: "learning", requirement: 15, xpReward: 80 },
+    { id: "lesson-50", name: "Expert Learner", description: "Complete 50 lessons", icon: "Brain", category: "learning", requirement: 50, xpReward: 200 },
+    { id: "lesson-75", name: "Almost There", description: "Complete 75 lessons", icon: "Target", category: "learning", requirement: 75, xpReward: 350 },
+    { id: "first-quiz", name: "Quiz Taker", description: "Complete your first quiz", icon: "HelpCircle", category: "learning", requirement: 1, xpReward: 15 },
+    { id: "quiz-master", name: "Quiz Master", description: "Score 100% on 5 quizzes", icon: "CheckSquare", category: "learning", requirement: 5, xpReward: 75 },
+    { id: "perfect-score", name: "Perfect Score", description: "Score 100% on 10 quizzes", icon: "Award", category: "learning", requirement: 10, xpReward: 150 },
+    { id: "basics-complete", name: "Fundamentals", description: "Complete all beginner lessons", icon: "BookMarked", category: "learning", requirement: 1, xpReward: 50 },
+    { id: "advanced-learner", name: "Advanced Learner", description: "Complete all advanced lessons", icon: "Rocket", category: "learning", requirement: 1, xpReward: 200 },
+    { id: "strategy-student", name: "Strategy Student", description: "Learn 5 trading strategies", icon: "Lightbulb", category: "learning", requirement: 5, xpReward: 100 },
+    { id: "chart-reader", name: "Chart Reader", description: "Complete all chart analysis lessons", icon: "BarChart2", category: "learning", requirement: 1, xpReward: 75 },
+    { id: "technical-analyst", name: "Technical Analyst", description: "Complete all technical analysis lessons", icon: "Activity", category: "learning", requirement: 1, xpReward: 100 },
+    { id: "fundamental-analyst", name: "Fundamental Analyst", description: "Complete all fundamental analysis lessons", icon: "FileText", category: "learning", requirement: 1, xpReward: 100 },
+    { id: "options-student", name: "Options Student", description: "Complete options trading lessons", icon: "Shuffle", category: "learning", requirement: 1, xpReward: 80 },
+    { id: "crypto-curious", name: "Crypto Curious", description: "Complete cryptocurrency lessons", icon: "Coins", category: "learning", requirement: 1, xpReward: 80 },
+    { id: "forex-learner", name: "Forex Learner", description: "Complete forex trading lessons", icon: "Globe", category: "learning", requirement: 1, xpReward: 80 },
+    { id: "study-streak-3", name: "Study Streak", description: "Study for 3 days in a row", icon: "Flame", category: "learning", requirement: 3, xpReward: 30 },
+    { id: "study-streak-7", name: "Week of Learning", description: "Study for 7 days in a row", icon: "Flame", category: "learning", requirement: 7, xpReward: 70 },
+    { id: "study-streak-30", name: "Month of Learning", description: "Study for 30 days in a row", icon: "Flame", category: "learning", requirement: 30, xpReward: 300 },
+    { id: "note-taker", name: "Note Taker", description: "Take notes on 10 lessons", icon: "Edit", category: "learning", requirement: 10, xpReward: 40 },
+    { id: "bookmarker", name: "Bookmarker", description: "Bookmark 5 lessons for later", icon: "Bookmark", category: "learning", requirement: 5, xpReward: 20 },
+
+    // ===== BALANCE ACHIEVEMENTS (20) =====
     { id: "starter", name: "Starter", description: "Reach $6,000 balance", icon: "Wallet", category: "balance", requirement: 6000, xpReward: 20 },
     { id: "growing", name: "Growing", description: "Reach $10,000 balance", icon: "Wallet", category: "balance", requirement: 10000, xpReward: 50 },
     { id: "wealthy", name: "Wealthy", description: "Reach $15,000 balance", icon: "CreditCard", category: "balance", requirement: 15000, xpReward: 100 },
     { id: "rich", name: "Rich", description: "Reach $25,000 balance", icon: "DollarSign", category: "balance", requirement: 25000, xpReward: 200 },
     { id: "elite", name: "Elite", description: "Reach $50,000 balance", icon: "Crown", category: "balance", requirement: 50000, xpReward: 500 },
-    // Social (21-25)
+    { id: "balance-75k", name: "75K Club", description: "Reach $75,000 balance", icon: "Crown", category: "balance", requirement: 75000, xpReward: 750 },
+    { id: "balance-100k", name: "100K Club", description: "Reach $100,000 balance", icon: "Trophy", category: "balance", requirement: 100000, xpReward: 1000 },
+    { id: "balance-150k", name: "150K Milestone", description: "Reach $150,000 balance", icon: "Star", category: "balance", requirement: 150000, xpReward: 1250 },
+    { id: "balance-200k", name: "200K Legend", description: "Reach $200,000 balance", icon: "Award", category: "balance", requirement: 200000, xpReward: 1500 },
+    { id: "balance-500k", name: "Half Millionaire", description: "Reach $500,000 balance", icon: "Gem", category: "balance", requirement: 500000, xpReward: 2500 },
+    { id: "balance-1m", name: "Millionaire", description: "Reach $1,000,000 balance", icon: "Crown", category: "balance", requirement: 1000000, xpReward: 5000 },
+    { id: "double-up", name: "Double Up", description: "Double your starting balance", icon: "ArrowUpCircle", category: "balance", requirement: 10000, xpReward: 100 },
+    { id: "triple-threat", name: "Triple Threat", description: "Triple your starting balance", icon: "ArrowUpCircle", category: "balance", requirement: 15000, xpReward: 200 },
+    { id: "five-bagger", name: "Five Bagger", description: "5x your starting balance", icon: "Rocket", category: "balance", requirement: 25000, xpReward: 400 },
+    { id: "ten-bagger", name: "Ten Bagger", description: "10x your starting balance", icon: "Rocket", category: "balance", requirement: 50000, xpReward: 750 },
+    { id: "recovery-pro", name: "Recovery Pro", description: "Return to profit after a drawdown", icon: "TrendingUp", category: "balance", requirement: 1, xpReward: 50 },
+    { id: "consistent-gains", name: "Consistent Gains", description: "Gain balance 5 days in a row", icon: "BarChart", category: "balance", requirement: 5, xpReward: 100 },
+    { id: "monthly-growth", name: "Monthly Growth", description: "Grow balance every week for a month", icon: "Calendar", category: "balance", requirement: 4, xpReward: 200 },
+    { id: "profit-margin", name: "High Margin", description: "Achieve 50% profit margin", icon: "Percent", category: "balance", requirement: 50, xpReward: 150 },
+    { id: "cash-reserve", name: "Cash Reserve", description: "Maintain $5,000 cash while invested", icon: "PiggyBank", category: "balance", requirement: 5000, xpReward: 60 },
+
+    // ===== SOCIAL ACHIEVEMENTS (25) =====
     { id: "public-profile", name: "Public Profile", description: "Add a bio to your profile", icon: "User", category: "social", requirement: 1, xpReward: 10 },
     { id: "picture-perfect", name: "Picture Perfect", description: "Add an avatar to your profile", icon: "Image", category: "social", requirement: 1, xpReward: 10 },
     { id: "networker", name: "Networker", description: "Add your first friend", icon: "UserPlus", category: "social", requirement: 1, xpReward: 15 },
     { id: "popular", name: "Popular", description: "Have 10 friends", icon: "Users", category: "social", requirement: 10, xpReward: 50 },
     { id: "influencer", name: "Influencer", description: "Have 25 friends", icon: "Heart", category: "social", requirement: 25, xpReward: 100 },
-    // Milestones (26-30)
+    { id: "social-butterfly", name: "Social Butterfly", description: "Have 50 friends", icon: "Users", category: "social", requirement: 50, xpReward: 200 },
+    { id: "community-leader", name: "Community Leader", description: "Have 100 friends", icon: "Crown", category: "social", requirement: 100, xpReward: 400 },
+    { id: "first-chat", name: "First Chat", description: "Send your first chat message", icon: "MessageCircle", category: "social", requirement: 1, xpReward: 10 },
+    { id: "chatty", name: "Chatty", description: "Send 50 chat messages", icon: "MessageCircle", category: "social", requirement: 50, xpReward: 40 },
+    { id: "conversationalist", name: "Conversationalist", description: "Send 200 chat messages", icon: "MessageSquare", category: "social", requirement: 200, xpReward: 100 },
+    { id: "messenger", name: "Messenger", description: "Send 500 chat messages", icon: "Mail", category: "social", requirement: 500, xpReward: 200 },
+    { id: "profile-complete", name: "Complete Profile", description: "Fill out all profile fields", icon: "CheckCircle", category: "social", requirement: 1, xpReward: 25 },
+    { id: "share-strategy", name: "Strategy Sharer", description: "Share a trading strategy", icon: "Share2", category: "social", requirement: 1, xpReward: 30 },
+    { id: "strategy-creator", name: "Strategy Creator", description: "Create 5 trading strategies", icon: "Lightbulb", category: "social", requirement: 5, xpReward: 100 },
+    { id: "helpful-trader", name: "Helpful Trader", description: "Help 5 friends with trades", icon: "HelpingHand", category: "social", requirement: 5, xpReward: 75 },
+    { id: "mentor", name: "Mentor", description: "Mentor 10 new traders", icon: "Users", category: "social", requirement: 10, xpReward: 150 },
+    { id: "team-player", name: "Team Player", description: "Participate in a group challenge", icon: "Flag", category: "social", requirement: 1, xpReward: 50 },
+    { id: "challenge-winner", name: "Challenge Winner", description: "Win a trading challenge", icon: "Trophy", category: "social", requirement: 1, xpReward: 200 },
+    { id: "leaderboard-climber", name: "Leaderboard Climber", description: "Improve your leaderboard rank by 10 positions", icon: "ArrowUp", category: "social", requirement: 10, xpReward: 75 },
+    { id: "top-100", name: "Top 100", description: "Reach top 100 on the leaderboard", icon: "Medal", category: "social", requirement: 1, xpReward: 100 },
+    { id: "top-50", name: "Top 50", description: "Reach top 50 on the leaderboard", icon: "Medal", category: "social", requirement: 1, xpReward: 150 },
+    { id: "top-25", name: "Top 25", description: "Reach top 25 on the leaderboard", icon: "Medal", category: "social", requirement: 1, xpReward: 175 },
+    { id: "referral-1", name: "Recruiter", description: "Refer 1 new user", icon: "UserPlus", category: "social", requirement: 1, xpReward: 50 },
+    { id: "referral-5", name: "Ambassador", description: "Refer 5 new users", icon: "UserPlus", category: "social", requirement: 5, xpReward: 200 },
+    { id: "referral-10", name: "Super Ambassador", description: "Refer 10 new users", icon: "Star", category: "social", requirement: 10, xpReward: 400 },
+
+    // ===== MILESTONE ACHIEVEMENTS (30) =====
     { id: "early-bird", name: "Early Bird", description: "Log in for the first time", icon: "Star", category: "milestone", requirement: 1, xpReward: 5 },
     { id: "dedicated", name: "Dedicated", description: "Log in for 7 days", icon: "Star", category: "milestone", requirement: 7, xpReward: 35 },
     { id: "committed", name: "Committed", description: "Log in for 30 days", icon: "Trophy", category: "milestone", requirement: 30, xpReward: 150 },
     { id: "premium-member", name: "Premium Member", description: "Subscribe to a premium plan", icon: "Crown", category: "milestone", requirement: 1, xpReward: 50 },
     { id: "top-10", name: "Top 10", description: "Reach top 10 on the leaderboard", icon: "Trophy", category: "milestone", requirement: 1, xpReward: 200 },
+    { id: "login-14", name: "Two Weeks In", description: "Log in for 14 days", icon: "Calendar", category: "milestone", requirement: 14, xpReward: 70 },
+    { id: "login-60", name: "Two Months Strong", description: "Log in for 60 days", icon: "Calendar", category: "milestone", requirement: 60, xpReward: 300 },
+    { id: "login-90", name: "Quarter Year", description: "Log in for 90 days", icon: "Calendar", category: "milestone", requirement: 90, xpReward: 450 },
+    { id: "login-180", name: "Half Year", description: "Log in for 180 days", icon: "Calendar", category: "milestone", requirement: 180, xpReward: 900 },
+    { id: "login-365", name: "One Year", description: "Log in for 365 days", icon: "Award", category: "milestone", requirement: 365, xpReward: 1825 },
+    { id: "xp-100", name: "XP Collector", description: "Earn 100 XP", icon: "Zap", category: "milestone", requirement: 100, xpReward: 10 },
+    { id: "xp-500", name: "XP Hunter", description: "Earn 500 XP", icon: "Zap", category: "milestone", requirement: 500, xpReward: 50 },
+    { id: "xp-1000", name: "XP Master", description: "Earn 1,000 XP", icon: "Zap", category: "milestone", requirement: 1000, xpReward: 100 },
+    { id: "xp-5000", name: "XP Legend", description: "Earn 5,000 XP", icon: "Crown", category: "milestone", requirement: 5000, xpReward: 500 },
+    { id: "xp-10000", name: "XP Champion", description: "Earn 10,000 XP", icon: "Trophy", category: "milestone", requirement: 10000, xpReward: 1000 },
+    { id: "level-5", name: "Level 5", description: "Reach level 5", icon: "ArrowUp", category: "milestone", requirement: 5, xpReward: 25 },
+    { id: "level-10", name: "Level 10", description: "Reach level 10", icon: "ArrowUp", category: "milestone", requirement: 10, xpReward: 50 },
+    { id: "level-25", name: "Level 25", description: "Reach level 25", icon: "ArrowUp", category: "milestone", requirement: 25, xpReward: 125 },
+    { id: "level-50", name: "Level 50", description: "Reach level 50", icon: "Star", category: "milestone", requirement: 50, xpReward: 250 },
+    { id: "level-100", name: "Level 100", description: "Reach level 100", icon: "Crown", category: "milestone", requirement: 100, xpReward: 500 },
+    { id: "achievement-10", name: "Achiever", description: "Unlock 10 achievements", icon: "Award", category: "milestone", requirement: 10, xpReward: 50 },
+    { id: "achievement-25", name: "Trophy Hunter", description: "Unlock 25 achievements", icon: "Award", category: "milestone", requirement: 25, xpReward: 125 },
+    { id: "achievement-50", name: "Collector", description: "Unlock 50 achievements", icon: "Award", category: "milestone", requirement: 50, xpReward: 250 },
+    { id: "achievement-100", name: "Completionist", description: "Unlock 100 achievements", icon: "Crown", category: "milestone", requirement: 100, xpReward: 500 },
+    { id: "first-week", name: "First Week", description: "Complete your first week of trading", icon: "Calendar", category: "milestone", requirement: 7, xpReward: 35 },
+    { id: "first-month", name: "First Month", description: "Complete your first month of trading", icon: "Calendar", category: "milestone", requirement: 30, xpReward: 150 },
+    { id: "simulator-pro", name: "Simulator Pro", description: "Use the simulator for 10 hours", icon: "Clock", category: "milestone", requirement: 10, xpReward: 100 },
+    { id: "command-center", name: "Command Center", description: "Access the command center terminal", icon: "Terminal", category: "milestone", requirement: 1, xpReward: 25 },
+    { id: "analytics-user", name: "Data Driven", description: "View analytics 10 times", icon: "BarChart2", category: "milestone", requirement: 10, xpReward: 40 },
+    { id: "watchlist-pro", name: "Watchlist Pro", description: "Add 20 stocks to your watchlist", icon: "Eye", category: "milestone", requirement: 20, xpReward: 60 },
   ];
 
   for (const achievement of achievementsList) {
-    await storage.createAchievement(achievement);
+    await storage.upsertAchievement(achievement);
   }
-  console.log("Seeded 30 achievements");
+  console.log("Synced 130 achievements");
 }
 
 // Retroactive achievement check - awards achievements based on current user stats
@@ -1288,6 +1389,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const allAchievements = await storage.getAchievements();
       res.json(allAchievements);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/achievements/stats", async (req, res) => {
+    try {
+      const stats = await storage.getAchievementStats();
+      res.json(stats);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

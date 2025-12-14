@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Check, X, UserMinus, Loader2 } from "lucide-react";
+import { Users, UserPlus, Search, Check, X, UserMinus, Loader2, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
 import type { User, Friendship } from "@shared/schema";
+import { FriendChat } from "@/components/friend-chat";
 
 interface FriendResult {
   friendship: Friendship;
@@ -33,6 +34,13 @@ export default function FriendsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<User | null>(null);
+
+  const openChat = (friend: User) => {
+    setSelectedFriend(friend);
+    setChatOpen(true);
+  };
 
   // Check access: admin, active subscription, or within trial period
   const isInTrial = () => {
@@ -292,15 +300,25 @@ export default function FriendsPage() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeMutation.mutate(f.friendship.id)}
-                        disabled={removeMutation.isPending}
-                        data-testid={`button-remove-${f.friendship.id}`}
-                      >
-                        <UserMinus className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openChat(f.friend)}
+                          data-testid={`button-chat-${f.friendship.id}`}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeMutation.mutate(f.friendship.id)}
+                          disabled={removeMutation.isPending}
+                          data-testid={`button-remove-${f.friendship.id}`}
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -308,6 +326,12 @@ export default function FriendsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <FriendChat
+          friend={selectedFriend}
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+        />
       </div>
     </Paywall>
   );

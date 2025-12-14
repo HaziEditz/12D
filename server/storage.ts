@@ -82,6 +82,7 @@ export interface IStorage {
   
   // Achievements
   createAchievement(data: InsertAchievement): Promise<Achievement>;
+  upsertAchievement(data: InsertAchievement): Promise<Achievement>;
   getAchievements(): Promise<Achievement[]>;
   getAchievementById(id: string): Promise<Achievement | undefined>;
   getUserAchievements(userId: string): Promise<UserAchievement[]>;
@@ -89,6 +90,7 @@ export interface IStorage {
   updateAchievementProgress(userId: string, achievementId: string, progress: number): Promise<void>;
   createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement>;
   updateUserAchievement(id: string, updates: Partial<UserAchievement>): Promise<UserAchievement | undefined>;
+  getAchievementStats(): Promise<{achievementId: string, count: number, percentage: number}[]>;
   
   // Trading Tips
   createTradingTip(data: InsertTradingTip): Promise<TradingTip>;
@@ -437,6 +439,18 @@ export class DatabaseStorage implements IStorage {
     return achievement;
   }
 
+  async upsertAchievement(data: InsertAchievement): Promise<Achievement> {
+    const existing = await this.getAchievementById(data.id);
+    if (existing) {
+      const [updated] = await db.update(achievements)
+        .set(data)
+        .where(eq(achievements.id, data.id))
+        .returning();
+      return updated;
+    }
+    return this.createAchievement(data);
+  }
+
   async getAchievements(): Promise<Achievement[]> {
     return db.select().from(achievements);
   }
@@ -491,6 +505,22 @@ export class DatabaseStorage implements IStorage {
   async updateUserAchievement(id: string, updates: Partial<UserAchievement>): Promise<UserAchievement | undefined> {
     const [ua] = await db.update(userAchievements).set(updates).where(eq(userAchievements.id, id)).returning();
     return ua;
+  }
+
+  async getAchievementStats(): Promise<{achievementId: string, count: number, percentage: number}[]> {
+    const allTraders = await db.select().from(users).where(eq(users.role, "student"));
+    const traderCount = allTraders.length || 1;
+    const allUserAchievements = await db.select().from(userAchievements).where(eq(userAchievements.progress, 100));
+    const countMap = new Map<string, number>();
+    for (const ua of allUserAchievements) {
+      countMap.set(ua.achievementId, (countMap.get(ua.achievementId) || 0) + 1);
+    }
+    const allAchievements = await db.select().from(achievements);
+    return allAchievements.map(a => ({
+      achievementId: a.id,
+      count: countMap.get(a.id) || 0,
+      percentage: Math.round(((countMap.get(a.id) || 0) / traderCount) * 100)
+    }));
   }
 
   async deleteUserAccount(userId: string): Promise<void> {
