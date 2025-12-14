@@ -52,7 +52,7 @@ export function AvatarUploader({
         throw new Error("Failed to get upload URL");
       }
 
-      const { uploadURL } = await response.json();
+      const { uploadURL, objectPath } = await response.json();
 
       const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
@@ -70,7 +70,7 @@ export function AvatarUploader({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ avatarURL: uploadURL }),
+        body: JSON.stringify({ avatarURL: objectPath }),
       });
 
       if (avatarResponse.ok) {

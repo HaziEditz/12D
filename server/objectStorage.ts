@@ -93,7 +93,7 @@ export class ObjectStorageService {
     }
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(): Promise<{ uploadURL: string; objectPath: string }> {
     const bucket = this.getBucket();
     const client = getS3Client();
 
@@ -106,7 +106,10 @@ export class ObjectStorageService {
     });
 
     const signedUrl = await getSignedUrl(client, command, { expiresIn: 900 });
-    return signedUrl;
+    return {
+      uploadURL: signedUrl,
+      objectPath: `/objects/${objectKey}`,
+    };
   }
 
   async getObjectKey(objectPath: string): Promise<string> {
@@ -141,32 +144,23 @@ export class ObjectStorageService {
   }
 
   normalizeObjectEntityPath(rawPath: string): string {
-    const bucket = this.getBucket();
-
-    if (rawPath.includes(`.s3.`) || rawPath.includes(`s3.amazonaws.com`)) {
-      try {
-        const url = new URL(rawPath);
-        const pathParts = url.pathname.split("/").filter(Boolean);
-        if (pathParts.length >= 1) {
-          const objectKey = pathParts.join("/");
-          return `/objects/${objectKey}`;
-        }
-      } catch {
-        return rawPath;
-      }
-    }
-
-    if (rawPath.includes(bucket)) {
-      const idx = rawPath.indexOf(bucket);
-      const afterBucket = rawPath.slice(idx + bucket.length);
-      const objectKey = afterBucket.startsWith("/") ? afterBucket.slice(1) : afterBucket;
-      if (objectKey) {
-        return `/objects/${objectKey}`;
-      }
+    if (rawPath.startsWith("/objects/")) {
+      return rawPath;
     }
 
     if (rawPath.startsWith("uploads/")) {
       return `/objects/${rawPath}`;
+    }
+
+    try {
+      const url = new URL(rawPath);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      if (pathParts.length >= 1) {
+        const objectKey = pathParts.join("/");
+        return `/objects/${objectKey}`;
+      }
+    } catch {
+      // Not a URL, return as-is
     }
 
     return rawPath;
