@@ -227,11 +227,29 @@ export default function SimulatorPage() {
   // Check pending order triggers periodically
   useEffect(() => {
     const checkTriggers = async () => {
-      if (Object.keys(pricesRef.current).length === 0) return;
+      // Build price map for all symbols that have pending/open trades
+      // This ensures trigger checking works even when viewing a different symbol
+      const pricesToSend: Record<string, number> = { ...pricesRef.current };
+      
+      // For symbols with open trades but no stored price, simulate a price based on base prices
+      if (openTrades && openTrades.length > 0) {
+        for (const trade of openTrades) {
+          if (!pricesToSend[trade.symbol]) {
+            // Generate simulated price based on base price with small random variation
+            const basePrice = SYMBOL_BASE_PRICES[trade.symbol] || trade.entryPrice;
+            const variation = (Math.random() - 0.5) * 0.02 * basePrice;
+            pricesToSend[trade.symbol] = basePrice + variation;
+            // Store it for consistency
+            pricesRef.current[trade.symbol] = pricesToSend[trade.symbol];
+          }
+        }
+      }
+      
+      if (Object.keys(pricesToSend).length === 0) return;
       
       try {
         const res = await apiRequest("POST", "/api/trades/check-triggers", {
-          prices: pricesRef.current
+          prices: pricesToSend
         });
         const response = await res.json() as TriggerResponse;
         
@@ -268,7 +286,7 @@ export default function SimulatorPage() {
     // Check triggers every 2 seconds
     const interval = setInterval(checkTriggers, 2000);
     return () => clearInterval(interval);
-  }, [refetchTrades, refreshUser, toast]);
+  }, [refetchTrades, refreshUser, toast, openTrades]);
 
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [priceSource, setPriceSource] = useState<"live" | "simulated">("simulated");
