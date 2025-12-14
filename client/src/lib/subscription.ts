@@ -95,3 +95,27 @@ export function getStartingBalance(user: User | null): number {
 }
 
 export const DEMO_DAILY_TRADE_LIMIT = 5;
+
+export function getTierPriority(tier: string | null | undefined): number {
+  switch (tier) {
+    case "premium": return 3;
+    case "casual": return 2;
+    case "school": return 1;
+    default: return 0;
+  }
+}
+
+export function isDowngrade(currentTier: string | null | undefined, targetTier: string): boolean {
+  return getTierPriority(currentTier) > getTierPriority(targetTier);
+}
+
+export function canPurchasePlan(user: User | null, targetTier: string): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return false;
+  
+  // Users without active subscriptions (trial or expired) can purchase any plan
+  if (!hasActiveSubscription(user)) return true;
+  
+  // Users with active subscriptions can only upgrade, not downgrade
+  return !isDowngrade(user.membershipTier, targetTier);
+}

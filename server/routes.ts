@@ -1237,14 +1237,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ error: "Invalid promo code" });
       }
 
-      // Define tier hierarchy for upgrades
+      // Define tier hierarchy for upgrades (premium > casual > school based on pricing)
       const tierRank: Record<string, number> = {
-        "casual": 1,
-        "school": 2,
+        "school": 1,
+        "casual": 2,
         "premium": 3,
       };
 
-      const currentTierRank = tierRank[user.membershipTier || "casual"] || 0;
+      const currentTierRank = user.membershipTier ? (tierRank[user.membershipTier] || 0) : 0;
       const newTierRank = tierRank[promoConfig.tier] || 0;
 
       // Check if user already has the same or higher tier
@@ -1275,6 +1275,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const validTiers = ["school", "casual", "premium"];
       if (!tier || !validTiers.includes(tier)) {
         return res.status(400).json({ error: "Invalid subscription tier" });
+      }
+
+      // Define tier priorities to prevent downgrades
+      const tierPriority: Record<string, number> = { premium: 3, casual: 2, school: 1 };
+      const currentPriority = user.membershipTier ? (tierPriority[user.membershipTier] || 0) : 0;
+      const targetPriority = tierPriority[tier] || 0;
+
+      // Check if user already has an active subscription with higher or equal tier
+      if (user.membershipStatus === "active" && user.subscriptionId && currentPriority >= targetPriority) {
+        return res.status(400).json({ 
+          error: currentPriority === targetPriority 
+            ? "You already have this subscription tier" 
+            : "You cannot downgrade to a lower tier. Please cancel your current subscription first." 
+        });
       }
 
       // Update user's subscription status

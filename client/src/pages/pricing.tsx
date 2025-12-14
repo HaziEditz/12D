@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getSubscriptionStatus } from "@/lib/subscription";
+import { getSubscriptionStatus, canPurchasePlan } from "@/lib/subscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -142,6 +142,8 @@ export default function Pricing() {
           {plans.map((plan) => {
             const Icon = plan.icon;
             const isCurrentPlan = status.status === "active" && status.tier === plan.id;
+            const canPurchase = canPurchasePlan(user, plan.id);
+            const isDowngradeAttempt = user && !canPurchase && !isCurrentPlan;
             
             return (
               <Card
@@ -204,6 +206,16 @@ export default function Pricing() {
                     >
                       Get Started
                     </Button>
+                  ) : isDowngradeAttempt ? (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      size="lg"
+                      disabled
+                      data-testid={`button-subscribe-${plan.id}`}
+                    >
+                      You have a higher tier
+                    </Button>
                   ) : (
                     <SubscriptionPayPalButton
                       planId={plan.id}
@@ -212,7 +224,7 @@ export default function Pricing() {
                     />
                   )}
                   
-                  {plan.hasPromoCode && user && !isCurrentPlan && (
+                  {plan.hasPromoCode && user && !isCurrentPlan && !isDowngradeAttempt && (
                     <>
                       {!showPromoInput ? (
                         <Button
