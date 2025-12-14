@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
+import type { TradingTip, MarketInsight } from "@shared/schema";
 import { 
   Lightbulb,
   TrendingUp,
@@ -19,141 +22,122 @@ import {
   Sparkles
 } from "lucide-react";
 
-interface TradingTip {
-  id: number;
-  title: string;
-  content: string;
-  category: "strategy" | "psychology" | "risk" | "market";
-  difficulty: "beginner" | "intermediate" | "advanced";
-  icon: typeof Lightbulb;
-}
+const ICON_MAP: Record<string, typeof Lightbulb> = {
+  Lightbulb,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  BookOpen,
+  Target,
+  Shield,
+  AlertTriangle,
+};
 
-interface MarketInsight {
-  id: number;
-  title: string;
-  summary: string;
-  sentiment: "bullish" | "bearish" | "neutral";
-  timestamp: string;
-  sector: string;
-}
-
-const TRADING_TIPS: TradingTip[] = [
+const DEFAULT_TIPS: Omit<TradingTip, 'id' | 'createdAt'>[] = [
   {
-    id: 1,
     title: "Always Use Stop Losses",
     content: "Never enter a trade without a predetermined exit point. Stop losses protect your capital and remove emotional decision-making from your trading. Set your stop loss at a level that invalidates your trade thesis.",
     category: "risk",
     difficulty: "beginner",
-    icon: Shield
+    iconName: "Shield",
+    isPublished: true,
   },
   {
-    id: 2,
     title: "The 1% Rule",
     content: "Never risk more than 1% of your total trading capital on a single trade. This means if you have $10,000, your maximum loss on any trade should be $100. This ensures you can survive a string of losses.",
     category: "risk",
     difficulty: "beginner",
-    icon: Target
+    iconName: "Target",
+    isPublished: true,
   },
   {
-    id: 3,
     title: "Trade With the Trend",
     content: "The trend is your friend. Trading in the direction of the primary trend increases your probability of success. Use higher timeframes to identify the trend and lower timeframes for entry points.",
     category: "strategy",
     difficulty: "intermediate",
-    icon: TrendingUp
+    iconName: "TrendingUp",
+    isPublished: true,
   },
   {
-    id: 4,
     title: "Control Your Emotions",
     content: "Fear and greed are the two biggest enemies of traders. Stick to your trading plan regardless of how you feel. If you're feeling emotional, step away from the screen.",
     category: "psychology",
     difficulty: "beginner",
-    icon: AlertTriangle
+    iconName: "AlertTriangle",
+    isPublished: true,
   },
-  {
-    id: 5,
-    title: "Keep a Trading Journal",
-    content: "Document every trade you make including your reasoning, entry/exit points, and outcome. Review your journal regularly to identify patterns in your trading behavior and areas for improvement.",
-    category: "psychology",
-    difficulty: "beginner",
-    icon: BookOpen
-  },
-  {
-    id: 6,
-    title: "Wait for Confirmation",
-    content: "Don't jump into trades based on a single signal. Wait for multiple confirmations before entering. This could include price action patterns, volume confirmation, and indicator alignment.",
-    category: "strategy",
-    difficulty: "intermediate",
-    icon: Clock
-  },
-  {
-    id: 7,
-    title: "Understand Market Sessions",
-    content: "Different trading sessions have different characteristics. The London-New York overlap is typically the most volatile period for forex. Stock markets are most active during the first and last hours of trading.",
-    category: "market",
-    difficulty: "intermediate",
-    icon: TrendingUp
-  },
-  {
-    id: 8,
-    title: "Position Sizing Matters",
-    content: "Adjust your position size based on the volatility of the asset you're trading. More volatile assets require smaller positions to maintain consistent risk levels across your trades.",
-    category: "risk",
-    difficulty: "advanced",
-    icon: Target
-  }
 ];
 
-const MARKET_INSIGHTS: MarketInsight[] = [
+const DEFAULT_INSIGHTS: Omit<MarketInsight, 'id' | 'createdAt'>[] = [
   {
-    id: 1,
     title: "Tech Sector Shows Strength",
     summary: "Technology stocks continue to lead market gains as AI adoption accelerates across industries. Major tech companies report strong earnings guidance.",
     sentiment: "bullish",
-    timestamp: "2 hours ago",
-    sector: "Technology"
+    sector: "Technology",
+    isPublished: true,
   },
   {
-    id: 2,
     title: "Fed Rate Decision Impact",
     summary: "Markets await the Federal Reserve's next interest rate decision. Current expectations suggest rates will remain unchanged, providing stability.",
     sentiment: "neutral",
-    timestamp: "4 hours ago",
-    sector: "Macro"
+    sector: "Macro",
+    isPublished: true,
   },
-  {
-    id: 3,
-    title: "Energy Prices Volatile",
-    summary: "Oil prices fluctuate amid geopolitical tensions and supply concerns. Traders should exercise caution with energy sector positions.",
-    sentiment: "bearish",
-    timestamp: "6 hours ago",
-    sector: "Energy"
-  },
-  {
-    id: 4,
-    title: "Consumer Spending Strong",
-    summary: "Retail sales data exceeds expectations, indicating strong consumer confidence. This bodes well for discretionary spending stocks.",
-    sentiment: "bullish",
-    timestamp: "8 hours ago",
-    sector: "Consumer"
-  }
 ];
+
+function getTimeSince(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffHours < 1) return "Just now";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return "Yesterday";
+  return `${diffDays} days ago`;
+}
 
 export default function TipsPage() {
   const { isAuthenticated } = useAuth();
-  const [dailyTip, setDailyTip] = useState<TradingTip>(
-    TRADING_TIPS[Math.floor(Math.random() * TRADING_TIPS.length)]
-  );
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
+  const { data: tips = [], isLoading: tipsLoading } = useQuery<TradingTip[]>({
+    queryKey: ["/api/tips"],
+  });
+
+  const { data: insights = [], isLoading: insightsLoading } = useQuery<MarketInsight[]>({
+    queryKey: ["/api/insights"],
+  });
+
+  const displayTips = tips.length > 0 ? tips : DEFAULT_TIPS.map((tip, i) => ({
+    ...tip,
+    id: `default-${i}`,
+    createdAt: new Date(),
+  })) as TradingTip[];
+
+  const displayInsights = insights.length > 0 ? insights : DEFAULT_INSIGHTS.map((insight, i) => ({
+    ...insight,
+    id: `default-${i}`,
+    createdAt: new Date(),
+  })) as MarketInsight[];
+
+  const [dailyTip, setDailyTip] = useState<TradingTip | null>(null);
+
+  useEffect(() => {
+    if (displayTips.length > 0 && !dailyTip) {
+      setDailyTip(displayTips[Math.floor(Math.random() * displayTips.length)]);
+    }
+  }, [displayTips, dailyTip]);
+
   const refreshDailyTip = () => {
-    const newTip = TRADING_TIPS[Math.floor(Math.random() * TRADING_TIPS.length)];
-    setDailyTip(newTip);
+    if (displayTips.length > 0) {
+      const newTip = displayTips[Math.floor(Math.random() * displayTips.length)];
+      setDailyTip(newTip);
+    }
   };
 
   const filteredTips = selectedCategory === "all" 
-    ? TRADING_TIPS 
-    : TRADING_TIPS.filter(tip => tip.category === selectedCategory);
+    ? displayTips 
+    : displayTips.filter(tip => tip.category === selectedCategory);
 
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
@@ -182,6 +166,10 @@ export default function TipsPage() {
     }
   };
 
+  const getIcon = (iconName: string) => {
+    return ICON_MAP[iconName] || Lightbulb;
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
@@ -191,6 +179,20 @@ export default function TipsPage() {
         <Link href="/login">
           <Button data-testid="button-login-tips">Sign In</Button>
         </Link>
+      </div>
+    );
+  }
+
+  if (tipsLoading || insightsLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Skeleton className="h-10 w-64 mb-6" />
+        <Skeleton className="h-48 w-full mb-8" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -205,34 +207,36 @@ export default function TipsPage() {
         <p className="text-muted-foreground mt-1">Learn essential trading concepts and stay informed</p>
       </div>
 
-      <Card className="mb-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-lg bg-primary/20 flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-primary" />
+      {dailyTip && (
+        <Card className="mb-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-lg bg-primary/20 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Daily Trading Tip</CardTitle>
+                <p className="text-sm text-muted-foreground">Wisdom for today's trading session</p>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-lg">Daily Trading Tip</CardTitle>
-              <p className="text-sm text-muted-foreground">Wisdom for today's trading session</p>
+            <Button variant="ghost" size="icon" onClick={refreshDailyTip} data-testid="button-refresh-tip">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <h3 className="text-xl font-semibold mb-2" data-testid="text-daily-tip-title">{dailyTip.title}</h3>
+            <p className="text-muted-foreground mb-4" data-testid="text-daily-tip-content">{dailyTip.content}</p>
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant="outline" className={getDifficultyColor(dailyTip.difficulty)}>
+                {dailyTip.difficulty}
+              </Badge>
+              <Badge variant="outline" className={getCategoryColor(dailyTip.category)}>
+                {dailyTip.category}
+              </Badge>
             </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={refreshDailyTip} data-testid="button-refresh-tip">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <h3 className="text-xl font-semibold mb-2" data-testid="text-daily-tip-title">{dailyTip.title}</h3>
-          <p className="text-muted-foreground mb-4" data-testid="text-daily-tip-content">{dailyTip.content}</p>
-          <div className="flex gap-2 flex-wrap">
-            <Badge variant="outline" className={getDifficultyColor(dailyTip.difficulty)}>
-              {dailyTip.difficulty}
-            </Badge>
-            <Badge variant="outline" className={getCategoryColor(dailyTip.category)}>
-              {dailyTip.category}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="tips" className="space-y-6">
         <TabsList>
@@ -258,7 +262,7 @@ export default function TipsPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             {filteredTips.map((tip) => {
-              const Icon = tip.icon;
+              const Icon = getIcon(tip.iconName);
               return (
                 <Card key={tip.id} className="hover-elevate" data-testid={`card-tip-${tip.id}`}>
                   <CardContent className="pt-6">
@@ -288,14 +292,16 @@ export default function TipsPage() {
 
         <TabsContent value="insights">
           <div className="grid gap-4">
-            {MARKET_INSIGHTS.map((insight) => (
+            {displayInsights.map((insight) => (
               <Card key={insight.id} className="hover-elevate" data-testid={`card-insight-${insight.id}`}>
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="secondary">{insight.sector}</Badge>
-                        <span className="text-sm text-muted-foreground">{insight.timestamp}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {insight.createdAt ? getTimeSince(new Date(insight.createdAt)) : "Recently"}
+                        </span>
                       </div>
                       <h3 className="font-semibold mb-2" data-testid={`text-insight-title-${insight.id}`}>{insight.title}</h3>
                       <p className="text-sm text-muted-foreground">{insight.summary}</p>
