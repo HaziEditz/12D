@@ -15,10 +15,15 @@ import {
   Activity,
   Zap,
   Eye,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, IChartApi, CandlestickSeries } from "lightweight-charts";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const watchlistStocks = [
   { symbol: "AAPL", name: "Apple Inc.", price: 189.43, change: 2.34, changePercent: 1.25, volume: "52.3M" },
@@ -133,13 +138,56 @@ function MiniChart({ symbol, basePrice }: { symbol: string; basePrice: number })
 }
 
 function CommandCenterContent() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedSymbols, setSelectedSymbols] = useState(["AAPL", "MSFT", "NVDA", "TSLA"]);
   const [orderType, setOrderType] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("100");
   const [quickTradeSymbol, setQuickTradeSymbol] = useState("AAPL");
+  const [recentTrades, setRecentTrades] = useState<{type: string, symbol: string, qty: number, total: number}[]>([]);
 
   const selectedStocks = watchlistStocks.filter(s => selectedSymbols.includes(s.symbol));
+
+  const tradeMutation = useMutation({
+    mutationFn: async (tradeData: { symbol: string; type: "buy" | "sell"; quantity: number; price: number }) => {
+      const res = await apiRequest("POST", "/api/trades", tradeData);
+      return res.json();
+    },
+    onSuccess: (data, variables) => {
+      const total = variables.quantity * variables.price;
+      setRecentTrades(prev => [
+        { type: variables.type.toUpperCase(), symbol: variables.symbol, qty: variables.quantity, total },
+        ...prev.slice(0, 4)
+      ]);
+      toast({
+        title: `${variables.type === "buy" ? "Bought" : "Sold"} ${variables.symbol}`,
+        description: `${variables.quantity} shares at $${variables.price.toFixed(2)} = $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      refreshUser();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Trade Failed",
+        description: error.message || "Could not execute trade",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleExecuteTrade = () => {
+    const stock = watchlistStocks.find(s => s.symbol === quickTradeSymbol);
+    if (!stock || !quantity || parseInt(quantity) <= 0) return;
+    
+    tradeMutation.mutate({
+      symbol: quickTradeSymbol,
+      type: orderType,
+      quantity: parseInt(quantity),
+      price: stock.price,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -331,7 +379,12 @@ function CommandCenterContent() {
                   <Button 
                     className={`w-full ${orderType === "buy" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
                     data-testid="button-execute-trade"
+                    onClick={handleExecuteTrade}
+                    disabled={tradeMutation.isPending || !quantity || parseInt(quantity) <= 0}
                   >
+                    {tradeMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
                     {orderType === "buy" ? "Buy" : "Sell"} {quickTradeSymbol}
                   </Button>
                 </CardContent>
@@ -346,18 +399,21 @@ function CommandCenterContent() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="text-xs space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
-                      <span>BUY AAPL x50</span>
-                      <span className="text-green-500">+$9,471.50</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-red-500/10 rounded">
-                      <span>SELL TSLA x25</span>
-                      <span className="text-red-500">-$6,212.50</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
-                      <span>BUY NVDA x10</span>
-                      <span className="text-green-500">+$4,952.20</span>
-                    </div>
+                    {recentTrades.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-2">No recent trades</p>
+                    ) : (
+                      recentTrades.map((trade, i) => (
+                        <div 
+                          key={i} 
+                          className={`flex items-center justify-between p-2 rounded ${trade.type === "BUY" ? "bg-green-500/10" : "bg-red-500/10"}`}
+                        >
+                          <span>{trade.type} {trade.symbol} x{trade.qty}</span>
+                          <span className={trade.type === "BUY" ? "text-green-500" : "text-red-500"}>
+                            {trade.type === "BUY" ? "+" : "-"}${trade.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -2,6 +2,13 @@ import { PremiumPaywall } from "@/components/paywall";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -14,8 +21,10 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Crown
+  Crown,
+  CheckCircle2
 } from "lucide-react";
+import { useState } from "react";
 
 const strategies = [
   {
@@ -153,7 +162,11 @@ function getRiskColor(risk: string) {
   }
 }
 
+type Strategy = typeof strategies[number];
+
 function StrategyContent() {
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
+
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="container mx-auto max-w-6xl">
@@ -219,7 +232,13 @@ function StrategyContent() {
                     </ul>
                   </div>
 
-                  <Button variant="outline" className="w-full" size="sm" data-testid={`button-learn-${strategy.id}`}>
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    size="sm" 
+                    data-testid={`button-learn-${strategy.id}`}
+                    onClick={() => setSelectedStrategy(strategy)}
+                  >
                     Learn More
                   </Button>
                 </CardContent>
@@ -243,6 +262,86 @@ function StrategyContent() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedStrategy} onOpenChange={(open) => !open && setSelectedStrategy(null)}>
+        <DialogContent className="max-w-lg">
+          {selectedStrategy && (() => {
+            const Icon = selectedStrategy.icon;
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-12 h-12 rounded-lg ${selectedStrategy.bgColor} flex items-center justify-center`}>
+                      <Icon className={`w-6 h-6 ${selectedStrategy.color}`} />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-xl">{selectedStrategy.name}</DialogTitle>
+                      <Badge className={getDifficultyColor(selectedStrategy.difficulty)}>
+                        {selectedStrategy.difficulty}
+                      </Badge>
+                    </div>
+                  </div>
+                  <DialogDescription>{selectedStrategy.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Timeframe</p>
+                        <p className="text-sm font-medium">{selectedStrategy.timeframe}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className={`w-4 h-4 ${getRiskColor(selectedStrategy.riskLevel)}`} />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Risk Level</p>
+                        <p className={`text-sm font-medium ${getRiskColor(selectedStrategy.riskLevel)}`}>{selectedStrategy.riskLevel}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ArrowUpRight className="w-4 h-4 text-green-500" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Expected Return</p>
+                        <p className="text-sm font-medium">{selectedStrategy.expectedReturn}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Holding Period</p>
+                        <p className="text-sm font-medium">{selectedStrategy.holdingPeriod}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                      Key Strategy Points
+                    </h4>
+                    <ul className="space-y-2">
+                      {selectedStrategy.details.map((detail, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <span>{detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <Button className="w-full" onClick={() => setSelectedStrategy(null)} data-testid="button-close-strategy">
+                    Got It
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

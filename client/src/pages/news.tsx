@@ -27,6 +27,7 @@ interface NewsItem {
   sentiment: "bullish" | "bearish" | "neutral";
   category: string;
   symbols: string[];
+  url: string;
 }
 
 const mockNews: NewsItem[] = [
@@ -38,7 +39,8 @@ const mockNews: NewsItem[] = [
     time: "2 hours ago",
     sentiment: "bullish",
     category: "Earnings",
-    symbols: ["NVDA"]
+    symbols: ["NVDA"],
+    url: "https://www.reuters.com/technology/nvidia"
   },
   {
     id: 2,
@@ -48,7 +50,8 @@ const mockNews: NewsItem[] = [
     time: "3 hours ago",
     sentiment: "bullish",
     category: "Economic",
-    symbols: ["SPY", "QQQ"]
+    symbols: ["SPY", "QQQ"],
+    url: "https://www.bloomberg.com/markets"
   },
   {
     id: 3,
@@ -58,7 +61,8 @@ const mockNews: NewsItem[] = [
     time: "4 hours ago",
     sentiment: "bearish",
     category: "Regulatory",
-    symbols: ["AAPL"]
+    symbols: ["AAPL"],
+    url: "https://www.ft.com/technology"
   },
   {
     id: 4,
@@ -68,7 +72,8 @@ const mockNews: NewsItem[] = [
     time: "5 hours ago",
     sentiment: "bearish",
     category: "Earnings",
-    symbols: ["TSLA"]
+    symbols: ["TSLA"],
+    url: "https://www.cnbc.com/tesla"
   },
   {
     id: 5,
@@ -78,7 +83,8 @@ const mockNews: NewsItem[] = [
     time: "6 hours ago",
     sentiment: "bullish",
     category: "Earnings",
-    symbols: ["MSFT"]
+    symbols: ["MSFT"],
+    url: "https://www.wsj.com/tech"
   },
   {
     id: 6,
@@ -88,7 +94,8 @@ const mockNews: NewsItem[] = [
     time: "7 hours ago",
     sentiment: "neutral",
     category: "Commodities",
-    symbols: ["USO", "XLE"]
+    symbols: ["USO", "XLE"],
+    url: "https://www.marketwatch.com/commodities"
   },
   {
     id: 7,
@@ -98,7 +105,8 @@ const mockNews: NewsItem[] = [
     time: "8 hours ago",
     sentiment: "bullish",
     category: "Corporate",
-    symbols: ["AMZN"]
+    symbols: ["AMZN"],
+    url: "https://www.cnbc.com/amazon"
   },
   {
     id: 8,
@@ -108,7 +116,8 @@ const mockNews: NewsItem[] = [
     time: "9 hours ago",
     sentiment: "bearish",
     category: "Sector",
-    symbols: ["KRE", "XLF"]
+    symbols: ["KRE", "XLF"],
+    url: "https://www.bloomberg.com/finance"
   },
 ];
 
@@ -158,7 +167,16 @@ function NewsCard({ news }: { news: NewsItem }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className="font-semibold text-sm line-clamp-2">{news.title}</h3>
-              <Button variant="ghost" size="icon" className="flex-shrink-0 h-6 w-6" data-testid={`button-external-${news.id}`}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="flex-shrink-0 h-6 w-6" 
+                data-testid={`button-external-${news.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(news.url, '_blank', 'noopener,noreferrer');
+                }}
+              >
                 <ExternalLink className="w-3 h-3" />
               </Button>
             </div>
