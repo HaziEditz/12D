@@ -194,6 +194,32 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const watchlistItems = pgTable("watchlist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  name: text("name").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const journalEntries = pgTable("journal_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  tradeId: varchar("trade_id"),
+  symbol: text("symbol").notNull(),
+  type: text("type").notNull(),
+  entryPrice: real("entry_price").notNull(),
+  exitPrice: real("exit_price"),
+  quantity: real("quantity").notNull(),
+  pnl: real("pnl"),
+  notes: text("notes"),
+  strategy: text("strategy"),
+  emotions: text("emotions"),
+  lessons: text("lessons"),
+  date: text("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -211,6 +237,8 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 export const insertTradingTipSchema = createInsertSchema(tradingTips).omit({ id: true, createdAt: true });
 export const insertMarketInsightSchema = createInsertSchema(marketInsights).omit({ id: true, createdAt: true });
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).omit({ id: true, addedAt: true });
+export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -246,6 +274,10 @@ export type InsertMarketInsight = z.infer<typeof insertMarketInsightSchema>;
 export type MarketInsight = typeof marketInsights.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertWatchlistItem = z.infer<typeof insertWatchlistItemSchema>;
+export type WatchlistItem = typeof watchlistItems.$inferSelect;
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+export type JournalEntry = typeof journalEntries.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

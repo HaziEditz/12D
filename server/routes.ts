@@ -1846,4 +1846,95 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Watchlist API
+  app.get("/api/watchlist", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const items = await storage.getWatchlist(user.id);
+      res.json(items);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/watchlist", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { symbol, name } = req.body;
+      if (!symbol || !name) {
+        return res.status(400).json({ message: "Symbol and name are required" });
+      }
+      const item = await storage.addWatchlistItem({ userId: user.id, symbol, name });
+      res.json(item);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/watchlist/:symbol", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.removeWatchlistItem(user.id, req.params.symbol);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Journal API (Premium feature)
+  app.get("/api/journal", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const entries = await storage.getJournalEntries(user.id);
+      res.json(entries);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/journal", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const entry = await storage.createJournalEntry({
+        userId: user.id,
+        symbol: req.body.symbol,
+        type: req.body.type,
+        entryPrice: req.body.entryPrice,
+        exitPrice: req.body.exitPrice,
+        quantity: req.body.quantity,
+        pnl: req.body.pnl,
+        notes: req.body.notes,
+        strategy: req.body.strategy,
+        emotions: req.body.emotions,
+        lessons: req.body.lessons,
+        date: req.body.date,
+        tradeId: req.body.tradeId,
+      });
+      res.json(entry);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/journal/:id", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const entry = await storage.updateJournalEntry(req.params.id, req.body);
+      if (!entry) {
+        return res.status(404).json({ message: "Entry not found" });
+      }
+      res.json(entry);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/journal/:id", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      await storage.deleteJournalEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }

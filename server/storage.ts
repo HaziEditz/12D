@@ -3,7 +3,7 @@ import { eq, desc, asc, and, isNull, ilike, or, sql } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
-  friendships, chatMessages,
+  friendships, chatMessages, watchlistItems, journalEntries,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -11,7 +11,8 @@ import {
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement,
   type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
   type Friendship, type InsertFriendship, type Strategy, type InsertStrategy,
-  type ChatMessage, type InsertChatMessage
+  type ChatMessage, type InsertChatMessage,
+  type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -131,6 +132,17 @@ export interface IStorage {
   sendChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
   markMessagesAsRead(senderId: string, receiverId: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
+  
+  // Watchlist
+  getWatchlist(userId: string): Promise<WatchlistItem[]>;
+  addWatchlistItem(data: InsertWatchlistItem): Promise<WatchlistItem>;
+  removeWatchlistItem(userId: string, symbol: string): Promise<void>;
+  
+  // Journal
+  getJournalEntries(userId: string): Promise<JournalEntry[]>;
+  createJournalEntry(data: InsertJournalEntry): Promise<JournalEntry>;
+  updateJournalEntry(id: string, data: Partial<JournalEntry>): Promise<JournalEntry | undefined>;
+  deleteJournalEntry(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -731,6 +743,39 @@ export class DatabaseStorage implements IStorage {
       .from(chatMessages)
       .where(and(eq(chatMessages.receiverId, userId), eq(chatMessages.isRead, false)));
     return result[0]?.count ?? 0;
+  }
+
+  // Watchlist
+  async getWatchlist(userId: string): Promise<WatchlistItem[]> {
+    return db.select().from(watchlistItems).where(eq(watchlistItems.userId, userId)).orderBy(desc(watchlistItems.addedAt));
+  }
+
+  async addWatchlistItem(data: InsertWatchlistItem): Promise<WatchlistItem> {
+    const [item] = await db.insert(watchlistItems).values(data).returning();
+    return item;
+  }
+
+  async removeWatchlistItem(userId: string, symbol: string): Promise<void> {
+    await db.delete(watchlistItems).where(and(eq(watchlistItems.userId, userId), eq(watchlistItems.symbol, symbol)));
+  }
+
+  // Journal
+  async getJournalEntries(userId: string): Promise<JournalEntry[]> {
+    return db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).orderBy(desc(journalEntries.createdAt));
+  }
+
+  async createJournalEntry(data: InsertJournalEntry): Promise<JournalEntry> {
+    const [entry] = await db.insert(journalEntries).values(data).returning();
+    return entry;
+  }
+
+  async updateJournalEntry(id: string, data: Partial<JournalEntry>): Promise<JournalEntry | undefined> {
+    const [entry] = await db.update(journalEntries).set(data).where(eq(journalEntries.id, id)).returning();
+    return entry;
+  }
+
+  async deleteJournalEntry(id: string): Promise<void> {
+    await db.delete(journalEntries).where(eq(journalEntries.id, id));
   }
 }
 

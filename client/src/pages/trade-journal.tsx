@@ -17,12 +17,16 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
-  Search
+  Search,
+  Loader2
 } from "lucide-react";
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface JournalEntry {
-  id: number;
+  id: string;
   date: string;
   symbol: string;
   type: "buy" | "sell";
@@ -35,65 +39,6 @@ interface JournalEntry {
   emotions: string;
   lessons: string;
 }
-
-const mockEntries: JournalEntry[] = [
-  {
-    id: 1,
-    date: "2024-12-13",
-    symbol: "AAPL",
-    type: "buy",
-    entryPrice: 185.50,
-    exitPrice: 189.43,
-    quantity: 50,
-    pnl: 196.50,
-    notes: "Entered on support bounce. Volume confirmed the move.",
-    strategy: "Support/Resistance",
-    emotions: "Confident, followed the plan",
-    lessons: "Patience paid off - waited for confirmation before entry"
-  },
-  {
-    id: 2,
-    date: "2024-12-12",
-    symbol: "NVDA",
-    type: "sell",
-    entryPrice: 505.00,
-    exitPrice: 495.22,
-    quantity: 20,
-    pnl: -195.60,
-    notes: "Took profit too early. Should have held longer.",
-    strategy: "Momentum",
-    emotions: "Anxious about pullback",
-    lessons: "Need to trust the trend more and set proper trailing stops"
-  },
-  {
-    id: 3,
-    date: "2024-12-11",
-    symbol: "TSLA",
-    type: "buy",
-    entryPrice: 242.30,
-    exitPrice: 248.50,
-    quantity: 30,
-    pnl: 186.00,
-    notes: "Breakout trade above resistance. Strong momentum.",
-    strategy: "Breakout",
-    emotions: "Excited but managed risk well",
-    lessons: "Breakout patterns continue to work well in current market"
-  },
-  {
-    id: 4,
-    date: "2024-12-10",
-    symbol: "MSFT",
-    type: "buy",
-    entryPrice: 370.15,
-    exitPrice: 378.91,
-    quantity: 25,
-    pnl: 219.00,
-    notes: "Earnings play. Entered before announcement.",
-    strategy: "Earnings",
-    emotions: "Nervous about volatility",
-    lessons: "Size down on earnings plays due to unpredictability"
-  },
-];
 
 function JournalEntry({ entry, expanded, onToggle }: { entry: JournalEntry; expanded: boolean; onToggle: () => void }) {
   const isProfit = entry.pnl >= 0;
@@ -176,22 +121,97 @@ function JournalEntry({ entry, expanded, onToggle }: { entry: JournalEntry; expa
 
 function TradeJournalContent() {
   const { user } = useAuth();
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    symbol: "",
+    strategy: "",
+    entryPrice: "",
+    exitPrice: "",
+    quantity: "",
+    type: "buy" as "buy" | "sell",
+    notes: "",
+    emotions: "",
+    lessons: ""
+  });
 
-  const filteredEntries = mockEntries.filter(entry => 
+  const { data: entries = [], isLoading, error } = useQuery<JournalEntry[]>({
+    queryKey: ['/api/journal'],
+    retry: false,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/journal", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/journal'] });
+      setShowAddForm(false);
+      setFormData({
+        symbol: "",
+        strategy: "",
+        entryPrice: "",
+        exitPrice: "",
+        quantity: "",
+        type: "buy",
+        notes: "",
+        emotions: "",
+        lessons: ""
+      });
+      toast({ title: "Journal entry saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save entry", variant: "destructive" });
+    }
+  });
+
+  const handleSaveEntry = () => {
+    const entryPrice = parseFloat(formData.entryPrice) || 0;
+    const exitPrice = parseFloat(formData.exitPrice) || 0;
+    const quantity = parseFloat(formData.quantity) || 0;
+    const pnl = (exitPrice - entryPrice) * quantity * (formData.type === "sell" ? -1 : 1);
+    
+    createMutation.mutate({
+      symbol: formData.symbol.toUpperCase(),
+      type: formData.type,
+      entryPrice,
+      exitPrice,
+      quantity,
+      pnl,
+      notes: formData.notes,
+      strategy: formData.strategy,
+      emotions: formData.emotions,
+      lessons: formData.lessons,
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const filteredEntries = entries.filter(entry => 
     entry.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     entry.strategy.toLowerCase().includes(searchTerm.toLowerCase()) ||
     entry.notes.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const stats = {
-    totalTrades: mockEntries.length,
-    winRate: Math.round((mockEntries.filter(e => e.pnl > 0).length / mockEntries.length) * 100),
-    totalPnl: mockEntries.reduce((sum, e) => sum + e.pnl, 0),
-    avgWin: mockEntries.filter(e => e.pnl > 0).reduce((sum, e) => sum + e.pnl, 0) / mockEntries.filter(e => e.pnl > 0).length,
-    avgLoss: mockEntries.filter(e => e.pnl < 0).reduce((sum, e) => sum + e.pnl, 0) / mockEntries.filter(e => e.pnl < 0).length || 0,
+  const stats = entries.length > 0 ? {
+    totalTrades: entries.length,
+    winRate: Math.round((entries.filter(e => e.pnl > 0).length / entries.length) * 100),
+    totalPnl: entries.reduce((sum, e) => sum + e.pnl, 0),
+    avgWin: entries.filter(e => e.pnl > 0).length > 0 
+      ? entries.filter(e => e.pnl > 0).reduce((sum, e) => sum + e.pnl, 0) / entries.filter(e => e.pnl > 0).length
+      : 0,
+    avgLoss: entries.filter(e => e.pnl < 0).length > 0
+      ? entries.filter(e => e.pnl < 0).reduce((sum, e) => sum + e.pnl, 0) / entries.filter(e => e.pnl < 0).length
+      : 0,
+  } : {
+    totalTrades: 0,
+    winRate: 0,
+    totalPnl: 0,
+    avgWin: 0,
+    avgLoss: 0
   };
 
   return (
@@ -274,37 +294,114 @@ function TradeJournalContent() {
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Symbol</label>
-                  <Input placeholder="AAPL" data-testid="input-new-symbol" />
+                  <Input 
+                    placeholder="AAPL" 
+                    value={formData.symbol}
+                    onChange={(e) => setFormData({...formData, symbol: e.target.value})}
+                    data-testid="input-new-symbol" 
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Strategy</label>
-                  <Input placeholder="Breakout, Momentum, etc." data-testid="input-new-strategy" />
+                  <Input 
+                    placeholder="Breakout, Momentum, etc." 
+                    value={formData.strategy}
+                    onChange={(e) => setFormData({...formData, strategy: e.target.value})}
+                    data-testid="input-new-strategy" 
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Entry Price</label>
-                  <Input type="number" placeholder="0.00" data-testid="input-new-entry" />
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={formData.entryPrice}
+                    onChange={(e) => setFormData({...formData, entryPrice: e.target.value})}
+                    data-testid="input-new-entry" 
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Exit Price</label>
-                  <Input type="number" placeholder="0.00" data-testid="input-new-exit" />
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={formData.exitPrice}
+                    onChange={(e) => setFormData({...formData, exitPrice: e.target.value})}
+                    data-testid="input-new-exit" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Quantity</label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    data-testid="input-new-quantity" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Trade Type</label>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant={formData.type === "buy" ? "default" : "outline"}
+                      onClick={() => setFormData({...formData, type: "buy"})}
+                      className="flex-1"
+                      data-testid="button-type-buy"
+                    >
+                      Buy
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant={formData.type === "sell" ? "default" : "outline"}
+                      onClick={() => setFormData({...formData, type: "sell"})}
+                      className="flex-1"
+                      data-testid="button-type-sell"
+                    >
+                      Sell
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Trade Notes</label>
-                  <Textarea placeholder="What was your reasoning for this trade?" data-testid="input-new-notes" />
+                  <Textarea 
+                    placeholder="What was your reasoning for this trade?" 
+                    value={formData.notes}
+                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                    data-testid="input-new-notes" 
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Emotions & Mindset</label>
-                  <Textarea placeholder="How did you feel during this trade?" data-testid="input-new-emotions" />
+                  <Textarea 
+                    placeholder="How did you feel during this trade?" 
+                    value={formData.emotions}
+                    onChange={(e) => setFormData({...formData, emotions: e.target.value})}
+                    data-testid="input-new-emotions" 
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Lessons Learned</label>
-                  <Textarea placeholder="What can you learn from this trade?" data-testid="input-new-lessons" />
+                  <Textarea 
+                    placeholder="What can you learn from this trade?" 
+                    value={formData.lessons}
+                    onChange={(e) => setFormData({...formData, lessons: e.target.value})}
+                    data-testid="input-new-lessons" 
+                  />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button data-testid="button-save-entry">Save Entry</Button>
+                <Button 
+                  onClick={handleSaveEntry} 
+                  disabled={createMutation.isPending || !formData.symbol}
+                  data-testid="button-save-entry"
+                >
+                  {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Save Entry
+                </Button>
                 <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
               </div>
             </CardContent>
@@ -312,14 +409,35 @@ function TradeJournalContent() {
         )}
 
         <div className="space-y-4">
-          {filteredEntries.map((entry) => (
-            <JournalEntry
-              key={entry.id}
-              entry={entry}
-              expanded={expandedId === entry.id}
-              onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-            />
-          ))}
+          {isLoading ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Loading journal entries...</p>
+              </CardContent>
+            </Card>
+          ) : filteredEntries.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No journal entries yet</h3>
+                <p className="text-muted-foreground mb-4">Start tracking your trades to improve your performance</p>
+                <Button onClick={() => setShowAddForm(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Entry
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredEntries.map((entry) => (
+              <JournalEntry
+                key={entry.id}
+                entry={entry}
+                expanded={expandedId === entry.id}
+                onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -59,15 +59,12 @@ const AVAILABLE_STOCKS: Record<string, { name: string }> = {
 export default function WatchlistPage() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([
-    { symbol: "AAPL", name: "Apple Inc.", price: 0, change: 0, changePercent: 0, isLoading: true },
-    { symbol: "GOOGL", name: "Alphabet Inc.", price: 0, change: 0, changePercent: 0, isLoading: true },
-    { symbol: "MSFT", name: "Microsoft Corp.", price: 0, change: 0, changePercent: 0, isLoading: true },
-  ]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const fetchQuotes = useCallback(async (symbols: string[]) => {
     if (symbols.length === 0) return;
@@ -109,11 +106,35 @@ export default function WatchlistPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (isAuthenticated && watchlist.length > 0) {
-      const symbols = watchlist.map(w => w.symbol);
-      fetchQuotes(symbols);
+    if (isAuthenticated) {
+      loadWatchlistFromAPI();
+    } else {
+      setIsInitialLoading(false);
     }
   }, [isAuthenticated]);
+
+  const loadWatchlistFromAPI = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/watchlist");
+      const items = await response.json();
+      const watchlistItems = items.map((item: any) => ({
+        symbol: item.symbol,
+        name: item.name,
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        isLoading: true,
+      }));
+      setWatchlist(watchlistItems);
+      if (watchlistItems.length > 0) {
+        fetchQuotes(watchlistItems.map((w: WatchlistItem) => w.symbol));
+      }
+    } catch (error) {
+      console.error("Failed to load watchlist", error);
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
 
   const filteredStocks = Object.entries(AVAILABLE_STOCKS)
     .filter(([symbol, data]) => 
@@ -136,6 +157,15 @@ export default function WatchlistPage() {
       setWatchlist(prev => [...prev, newItem]);
       setSearchTerm("");
       setShowSearch(false);
+      
+      try {
+        await apiRequest("POST", "/api/watchlist", { symbol, name: stock.name });
+      } catch (error) {
+        console.error("Failed to save to watchlist", error);
+        setWatchlist(prev => prev.filter(w => w.symbol !== symbol));
+        toast({ title: "Failed to save stock to watchlist", variant: "destructive" });
+        return;
+      }
       
       try {
         const response = await apiRequest("POST", "/api/stocks/quotes", { symbols: [symbol] });
@@ -165,8 +195,18 @@ export default function WatchlistPage() {
     }
   };
 
-  const removeFromWatchlist = (symbol: string) => {
+  const removeFromWatchlist = async (symbol: string) => {
+    const removedItem = watchlist.find(w => w.symbol === symbol);
     setWatchlist(watchlist.filter(w => w.symbol !== symbol));
+    try {
+      await apiRequest("DELETE", `/api/watchlist/${symbol}`);
+    } catch (error) {
+      console.error("Failed to remove from watchlist", error);
+      if (removedItem) {
+        setWatchlist(prev => [...prev, removedItem]);
+      }
+      toast({ title: "Failed to remove stock from watchlist", variant: "destructive" });
+    }
   };
 
   const refreshPrices = async () => {
