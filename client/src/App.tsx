@@ -35,6 +35,7 @@ import UsersPage from "@/pages/users";
 import AchievementsPage from "@/pages/achievements";
 import WatchlistPage from "@/pages/watchlist";
 import TipsPage from "@/pages/tips";
+import FriendsPage from "@/pages/friends";
 
 function Router() {
   return (
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/watchlist" component={WatchlistPage} />
       <Route path="/tips" component={TipsPage} />
+      <Route path="/friends" component={FriendsPage} />
       <Route path="/strategies" component={StrategiesPage} />
       <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/command-center" component={CommandCenterPage} />

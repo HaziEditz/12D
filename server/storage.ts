@@ -3,12 +3,14 @@ import { eq, desc, and, isNull, ilike, or } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
+  friendships,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
   type Class, type InsertClass, type ClassStudent, type InsertClassStudent,
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement,
-  type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight
+  type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
+  type Friendship, type InsertFriendship
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -102,6 +104,16 @@ export interface IStorage {
   getMarketInsightById(id: string): Promise<MarketInsight | undefined>;
   updateMarketInsight(id: string, data: Partial<MarketInsight>): Promise<MarketInsight | undefined>;
   deleteMarketInsight(id: string): Promise<void>;
+  
+  // Friends
+  getFriends(userId: string): Promise<{friendship: Friendship, friend: User}[]>;
+  getFriendRequests(userId: string): Promise<{friendship: Friendship, sender: User}[]>;
+  sendFriendRequest(userId: string, friendId: string): Promise<Friendship>;
+  acceptFriendRequest(id: string): Promise<Friendship | undefined>;
+  rejectFriendRequest(id: string): Promise<void>;
+  removeFriend(id: string, userId: string): Promise<void>;
+  getFriendshipById(id: string): Promise<Friendship | undefined>;
+  getFriendCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -546,6 +558,76 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMarketInsight(id: string): Promise<void> {
     await db.delete(marketInsights).where(eq(marketInsights.id, id));
+  }
+
+  // Friends
+  async getFriends(userId: string): Promise<{friendship: Friendship, friend: User}[]> {
+    const sent = await db.select().from(friendships).where(and(eq(friendships.userId, userId), eq(friendships.status, "accepted")));
+    const received = await db.select().from(friendships).where(and(eq(friendships.friendId, userId), eq(friendships.status, "accepted")));
+    
+    const result: {friendship: Friendship, friend: User}[] = [];
+    for (const f of sent) {
+      const friend = await this.getUserById(f.friendId);
+      if (friend) result.push({ friendship: f, friend });
+    }
+    for (const f of received) {
+      const friend = await this.getUserById(f.userId);
+      if (friend) result.push({ friendship: f, friend });
+    }
+    return result;
+  }
+
+  async getFriendRequests(userId: string): Promise<{friendship: Friendship, sender: User}[]> {
+    const requests = await db.select().from(friendships).where(and(eq(friendships.friendId, userId), eq(friendships.status, "pending")));
+    const result: {friendship: Friendship, sender: User}[] = [];
+    for (const f of requests) {
+      const sender = await this.getUserById(f.userId);
+      if (sender) result.push({ friendship: f, sender });
+    }
+    return result;
+  }
+
+  async sendFriendRequest(userId: string, friendId: string): Promise<Friendship> {
+    // Check if friendship already exists in either direction
+    const existingSent = await db.select().from(friendships).where(
+      and(eq(friendships.userId, userId), eq(friendships.friendId, friendId))
+    ).limit(1);
+    const existingReceived = await db.select().from(friendships).where(
+      and(eq(friendships.userId, friendId), eq(friendships.friendId, userId))
+    ).limit(1);
+    
+    if (existingSent.length > 0 || existingReceived.length > 0) {
+      throw new Error("Friendship already exists or pending");
+    }
+    
+    const [friendship] = await db.insert(friendships).values({ userId, friendId, status: "pending" }).returning();
+    return friendship;
+  }
+
+  async acceptFriendRequest(id: string): Promise<Friendship | undefined> {
+    const [friendship] = await db.update(friendships).set({ status: "accepted" }).where(eq(friendships.id, id)).returning();
+    return friendship;
+  }
+
+  async rejectFriendRequest(id: string): Promise<void> {
+    await db.delete(friendships).where(eq(friendships.id, id));
+  }
+
+  async removeFriend(id: string, userId: string): Promise<void> {
+    const f = await this.getFriendshipById(id);
+    if (f && (f.userId === userId || f.friendId === userId)) {
+      await db.delete(friendships).where(eq(friendships.id, id));
+    }
+  }
+
+  async getFriendshipById(id: string): Promise<Friendship | undefined> {
+    const [f] = await db.select().from(friendships).where(eq(friendships.id, id)).limit(1);
+    return f;
+  }
+
+  async getFriendCount(userId: string): Promise<number> {
+    const friends = await this.getFriends(userId);
+    return friends.length;
   }
 }
 

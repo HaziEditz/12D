@@ -1498,4 +1498,150 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Friends routes - require paid membership (includes trial access)
+  const requirePaidMembership = (req: Request, res: Response, next: NextFunction) => {
+    const user = req.user as User;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    // Admin always has access
+    if (user.role === "admin") {
+      return next();
+    }
+    // Active subscription
+    if (user.membershipStatus === "active" && user.subscriptionId) {
+      return next();
+    }
+    // Check trial period (14 days)
+    const TRIAL_DAYS = 14;
+    if (user.trialStartDate) {
+      const trialStart = new Date(user.trialStartDate);
+      const now = new Date();
+      const daysSinceStart = Math.floor((now.getTime() - trialStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceStart < TRIAL_DAYS) {
+        return next();
+      }
+    }
+    res.status(403).json({ message: "This feature requires a paid membership" });
+  };
+
+  app.get("/api/friends", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const friends = await storage.getFriends(user.id);
+      res.json(friends);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/friends/requests", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const requests = await storage.getFriendRequests(user.id);
+      res.json(requests);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/friends/request", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { friendId } = req.body;
+      
+      if (!friendId) {
+        return res.status(400).json({ message: "Friend ID is required" });
+      }
+      
+      if (friendId === user.id) {
+        return res.status(400).json({ message: "You cannot send a friend request to yourself" });
+      }
+      
+      const friendUser = await storage.getUserById(friendId);
+      if (!friendUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const friendship = await storage.sendFriendRequest(user.id, friendId);
+      res.json(friendship);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/friends/accept/:id", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const friendshipId = req.params.id;
+      
+      const friendship = await storage.getFriendshipById(friendshipId);
+      if (!friendship) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+      
+      if (friendship.friendId !== user.id) {
+        return res.status(403).json({ message: "You can only accept requests sent to you" });
+      }
+      
+      const updated = await storage.acceptFriendRequest(friendshipId);
+      
+      await checkAndAwardAchievements(user.id);
+      await checkAndAwardAchievements(friendship.userId);
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/friends/reject/:id", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const friendshipId = req.params.id;
+      
+      const friendship = await storage.getFriendshipById(friendshipId);
+      if (!friendship) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+      
+      if (friendship.friendId !== user.id) {
+        return res.status(403).json({ message: "You can only reject requests sent to you" });
+      }
+      
+      await storage.rejectFriendRequest(friendshipId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/friends/:id", requireAuth, requirePaidMembership, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.removeFriend(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/search", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+      const users = await storage.searchUsers(query);
+      const safeUsers = users.map(u => ({
+        id: u.id,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+      }));
+      res.json(safeUsers);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 }
