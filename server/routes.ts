@@ -6,10 +6,11 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
-import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema } from "@shared/schema";
+import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema, insertChatMessageSchema } from "@shared/schema";
 import type { User, Trade } from "@shared/schema";
 import memorystore from "memorystore";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { setupWebSocket } from "./websocket";
 
 const MemoryStore = memorystore(session);
 
@@ -208,6 +209,9 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
+  // Setup WebSocket for real-time chat
+  setupWebSocket(httpServer);
+  
   // Session setup
   const isProduction = process.env.NODE_ENV === "production";
   
