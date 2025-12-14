@@ -95,14 +95,26 @@ const SYMBOL_BASE_PRICES: Record<string, number> = {
   V: 315.00,
 };
 
-function generateCandlestickData(count: number, basePrice: number): CandlestickData[] {
+const TIMEFRAME_SECONDS: Record<string, number> = {
+  "1m": 60,
+  "5m": 300,
+  "1h": 3600,
+  "1d": 86400
+};
+
+function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
   let price = basePrice * (0.98 + Math.random() * 0.04);
   const now = Math.floor(Date.now() / 1000);
+  const interval = TIMEFRAME_SECONDS[timeframe] || 60;
+  
+  // Adjust volatility based on timeframe - higher timeframes have larger moves
+  const baseVolatility = 0.02;
+  const volatilityMultiplier = Math.sqrt(interval / 60); // Scale volatility with timeframe
+  const volatility = baseVolatility * volatilityMultiplier;
   
   for (let i = count; i >= 0; i--) {
-    const time = (now - i * 60) as Time;
-    const volatility = 0.02;
+    const time = (now - i * interval) as Time;
     const change = (Math.random() - 0.5) * 2 * volatility * price;
     const open = price;
     const close = price + change;
@@ -291,7 +303,7 @@ export default function SimulatorPage() {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [priceSource, setPriceSource] = useState<"live" | "simulated">("simulated");
 
-  // Fetch real-time price and generate chart data when symbol changes
+  // Fetch real-time price and generate chart data when symbol or timeframe changes
   useEffect(() => {
     let cancelled = false;
     
@@ -304,7 +316,7 @@ export default function SimulatorPage() {
       const basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
       
-      const data = generateCandlestickData(100, basePrice);
+      const data = generateCandlestickData(100, basePrice, timeframe);
       setCandleData(data);
       if (data.length > 0) {
         setCurrentPrice(data[data.length - 1].close);
@@ -315,7 +327,7 @@ export default function SimulatorPage() {
     initializeData();
     
     return () => { cancelled = true; };
-  }, [selectedSymbol]);
+  }, [selectedSymbol, timeframe]);
 
   // Create/update chart when candleData changes
   useEffect(() => {
