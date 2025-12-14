@@ -52,6 +52,12 @@ interface TradeLimits {
   used: number;
 }
 
+interface TriggerResponse {
+  executed: number;
+  closed: number;
+  closedTrades?: Trade[];
+}
+
 const SYMBOLS = [
   // Popular Stocks
   "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX",
@@ -63,9 +69,36 @@ const SYMBOLS = [
   "AMD", "DIS", "PYPL", "UBER", "COIN", "BA", "JPM", "V"
 ];
 
-function generateCandlestickData(count: number): CandlestickData[] {
+const SYMBOL_BASE_PRICES: Record<string, number> = {
+  AAPL: 178.50,
+  GOOGL: 141.80,
+  MSFT: 378.90,
+  AMZN: 178.25,
+  TSLA: 248.50,
+  META: 505.75,
+  NVDA: 495.20,
+  NFLX: 485.60,
+  "BTC/USD": 43250.00,
+  "ETH/USD": 2280.00,
+  "SOL/USD": 98.50,
+  "DOGE/USD": 0.082,
+  SPY: 475.80,
+  QQQ: 405.30,
+  DIA: 378.50,
+  AMD: 142.80,
+  DIS: 112.35,
+  PYPL: 62.40,
+  UBER: 61.80,
+  COIN: 148.20,
+  BA: 205.60,
+  JPM: 195.30,
+  V: 278.45,
+};
+
+function generateCandlestickData(count: number, symbol: string): CandlestickData[] {
   const data: CandlestickData[] = [];
-  let basePrice = 100 + Math.random() * 50;
+  const symbolBasePrice = SYMBOL_BASE_PRICES[symbol] ?? 100;
+  let basePrice = symbolBasePrice * (0.98 + Math.random() * 0.04);
   const now = Math.floor(Date.now() / 1000);
   
   for (let i = count; i >= 0; i--) {
@@ -182,7 +215,7 @@ export default function SimulatorPage() {
       try {
         const response = await apiRequest("POST", "/api/trades/check-triggers", {
           prices: pricesRef.current
-        });
+        }) as TriggerResponse;
         
         if (response.executed > 0) {
           refetchTrades();
@@ -198,7 +231,7 @@ export default function SimulatorPage() {
           refetchTrades();
           refreshUser();
           playTradeSound();
-          const exitReasons = response.closedTrades?.map((t: Trade) => {
+          const exitReasons = response.closedTrades?.map((t) => {
             if (t.orderType === "trailing_stop") return "Trailing Stop";
             if (t.takeProfitPrice && t.exitPrice && t.exitPrice >= t.takeProfitPrice) return "Take Profit";
             if (t.stopLossPrice) return "Stop Loss";
@@ -221,8 +254,8 @@ export default function SimulatorPage() {
 
   // Generate fresh chart data and create chart when symbol changes
   useEffect(() => {
-    // Generate fresh data for this symbol
-    const data = generateCandlestickData(100);
+    // Generate fresh data for this symbol with realistic base price
+    const data = generateCandlestickData(100, selectedSymbol);
     setCandleData(data);
     if (data.length > 0) {
       setCurrentPrice(data[data.length - 1].close);
