@@ -239,26 +239,27 @@ export default function TipsPage() {
         </Card>
       )}
 
-      <Tabs defaultValue="tips" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="tips" data-testid="tab-tips">Trading Tips</TabsTrigger>
-          <TabsTrigger value="insights" data-testid="tab-insights">Market Insights</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tips">
-          <div className="flex flex-wrap gap-2 mb-6">
-            {["all", "strategy", "psychology", "risk", "market"].map((category) => (
-              <Button
-                key={category}
-                variant={selectedCategory === category ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setSelectedCategory(category)}
-                className="capitalize"
-                data-testid={`button-category-${category}`}
-              >
-                {category}
-              </Button>
-            ))}
+      <div className="space-y-12">
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Lightbulb className="h-6 w-6 text-primary" />
+              Trading Tips
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {["all", "strategy", "psychology", "risk", "market"].map((category) => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category)}
+                  className="capitalize"
+                  data-testid={`button-category-${category}`}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -289,9 +290,13 @@ export default function TipsPage() {
               );
             })}
           </div>
-        </TabsContent>
+        </section>
 
-        <TabsContent value="insights">
+        <section className="space-y-6">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Market Insights
+          </h2>
           <div className="grid gap-4">
             {displayInsights.map((insight) => (
               <Card key={insight.id} className="hover-elevate" data-testid={`card-insight-${insight.id}`}>
@@ -348,8 +353,8 @@ export default function TipsPage() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-      </Tabs>
+        </section>
+      </div>
     </div>
   );
 }
