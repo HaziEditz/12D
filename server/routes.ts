@@ -5,7 +5,20 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
+let createPaypalOrder: any, capturePaypalOrder: any, loadPaypalDefault: any;
+const paypalReady = !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+if (paypalReady) {
+  const paypal = await import("./paypal");
+  createPaypalOrder = paypal.createPaypalOrder;
+  capturePaypalOrder = paypal.capturePaypalOrder;
+  loadPaypalDefault = paypal.loadPaypalDefault;
+} else {
+  console.warn("PayPal credentials not configured - PayPal routes will return 503");
+  const unavailable = (_req: Request, res: Response) => res.status(503).json({ error: "PayPal not configured" });
+  createPaypalOrder = unavailable;
+  capturePaypalOrder = unavailable;
+  loadPaypalDefault = unavailable;
+}
 import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema, insertChatMessageSchema } from "@shared/schema";
 import type { User, Trade } from "@shared/schema";
 import memorystore from "memorystore";
