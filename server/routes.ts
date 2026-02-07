@@ -1356,11 +1356,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Update user's subscription status
-      await storage.updateUser(user.id, {
+      const updateData: any = {
         membershipTier: tier,
         membershipStatus: "active",
         subscriptionId: orderId,
-      });
+      };
+
+      // Upgrade balance to $10,000 for 12Digits+ (premium)
+      if (tier === "premium") {
+        updateData.simulatorBalance = 10000;
+      }
+
+      await storage.updateUser(user.id, updateData);
 
       res.json({ success: true });
     } catch (error) {
