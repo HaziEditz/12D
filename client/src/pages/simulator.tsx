@@ -371,6 +371,10 @@ export default function SimulatorPage() {
         wickDownColor: 'hsl(0, 72%, 51%)',
       });
 
+      chart.timeScale().applyOptions({
+        visible: false,
+      });
+
       series.setData(candleData);
       chart.timeScale().fitContent();
 
@@ -623,16 +627,6 @@ export default function SimulatorPage() {
                   <span className={`text-3xl font-bold ${candleData.length > 0 && candleData[candleData.length - 1].close >= candleData[candleData.length - 1].open ? 'text-success' : 'text-destructive'}`}>
                     ${currentPrice.toFixed(2)}
                   </span>
-                  {candleData.length > 1 && (
-                    <Badge variant={candleData[candleData.length - 1].close >= candleData[candleData.length - 2].close ? "default" : "destructive"}>
-                      {candleData[candleData.length - 1].close >= candleData[candleData.length - 2].close ? (
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 mr-1" />
-                      )}
-                      {(((candleData[candleData.length - 1].close - candleData[candleData.length - 2].close) / candleData[candleData.length - 2].close) * 100).toFixed(2)}%
-                    </Badge>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

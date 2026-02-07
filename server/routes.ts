@@ -687,14 +687,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.patch("/api/trades/:id/close", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
+      const { id } = req.params;
       const { exitPrice } = req.body;
-      const trade = await storage.closeTrade(req.params.id, exitPrice);
+
+      // Lock check to prevent double closing/double profit exploit
+      const existingTrade = await storage.getTradeById(id);
+      if (!existingTrade || existingTrade.userId !== user.id || existingTrade.status !== "open") {
+        return res.status(400).json({ message: "Trade not found, already closed, or unauthorized" });
+      }
+
+      const trade = await storage.closeTrade(id, exitPrice);
       if (!trade) {
         return res.status(404).json({ message: "Trade not found" });
       }
       
       // Check and award achievements after closing a trade
-      await checkAndAwardAchievements(user.id);
+      // Non-blocking for performance
+      checkAndAwardAchievements(user.id).catch(console.error);
       
       res.json(trade);
     } catch (error: any) {
