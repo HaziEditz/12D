@@ -138,10 +138,37 @@ function TradeJournalContent() {
     lessons: ""
   });
 
-  const { data: entries = [], isLoading, error } = useQuery<JournalEntry[]>({
+  const { data: journalEntries = [], isLoading: isJournalLoading } = useQuery<JournalEntry[]>({
     queryKey: ['/api/journal'],
     retry: false,
   });
+
+  const { data: simulatorTrades = [] } = useQuery<Trade[]>({
+    queryKey: ['/api/trades'],
+  });
+
+  const allEntries = [
+    ...journalEntries,
+    ...simulatorTrades
+      .filter(t => t.status === 'closed')
+      .map(t => ({
+        id: `sim-${t.id}`,
+        date: new Date(t.closedAt || t.openedAt || Date.now()).toISOString().split('T')[0],
+        symbol: t.symbol,
+        type: t.type as "buy" | "sell",
+        entryPrice: t.entryPrice,
+        exitPrice: t.exitPrice || 0,
+        quantity: t.quantity,
+        pnl: t.profit || 0,
+        notes: `Simulator trade${t.leverage && t.leverage > 1 ? ` (${t.leverage}x leverage)` : ''}`,
+        strategy: "Simulator",
+        emotions: "N/A",
+        lessons: "N/A"
+      }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const isLoading = isJournalLoading;
+  const entries = allEntries;
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -196,15 +223,15 @@ function TradeJournalContent() {
     entry.notes.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const stats = entries.length > 0 ? {
-    totalTrades: entries.length,
-    winRate: Math.round((entries.filter(e => e.pnl > 0).length / entries.length) * 100),
-    totalPnl: entries.reduce((sum, e) => sum + e.pnl, 0),
-    avgWin: entries.filter(e => e.pnl > 0).length > 0 
-      ? entries.filter(e => e.pnl > 0).reduce((sum, e) => sum + e.pnl, 0) / entries.filter(e => e.pnl > 0).length
+  const stats = allEntries.length > 0 ? {
+    totalTrades: allEntries.length,
+    winRate: Math.round((allEntries.filter(e => e.pnl > 0).length / allEntries.length) * 100),
+    totalPnl: allEntries.reduce((sum, e) => sum + e.pnl, 0),
+    avgWin: allEntries.filter(e => e.pnl > 0).length > 0 
+      ? allEntries.filter(e => e.pnl > 0).reduce((sum, e) => sum + e.pnl, 0) / allEntries.filter(e => e.pnl > 0).length
       : 0,
-    avgLoss: entries.filter(e => e.pnl < 0).length > 0
-      ? entries.filter(e => e.pnl < 0).reduce((sum, e) => sum + e.pnl, 0) / entries.filter(e => e.pnl < 0).length
+    avgLoss: allEntries.filter(e => e.pnl < 0).length > 0
+      ? allEntries.filter(e => e.pnl < 0).reduce((sum, e) => sum + e.pnl, 0) / allEntries.filter(e => e.pnl < 0).length
       : 0,
   } : {
     totalTrades: 0,

@@ -371,10 +371,6 @@ export default function SimulatorPage() {
         wickDownColor: 'hsl(0, 72%, 51%)',
       });
 
-      chart.timeScale().applyOptions({
-        visible: false,
-      });
-
       series.setData(candleData);
       chart.timeScale().fitContent();
 
@@ -606,14 +602,6 @@ export default function SimulatorPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Tabs value={timeframe} onValueChange={setTimeframe}>
-                <TabsList>
-                  <TabsTrigger value="1m">1m</TabsTrigger>
-                  <TabsTrigger value="5m">5m</TabsTrigger>
-                  <TabsTrigger value="1h">1h</TabsTrigger>
-                  <TabsTrigger value="1d">1d</TabsTrigger>
-                </TabsList>
-              </Tabs>
             </div>
           </CardContent>
         </Card>
@@ -652,7 +640,7 @@ export default function SimulatorPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Available Balance</span>
               <span className="font-bold text-lg" data-testid="text-balance">
-                ${(user?.simulatorBalance ?? 10000).toLocaleString()}
+                ${(user?.simulatorBalance ?? 5000).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between">
