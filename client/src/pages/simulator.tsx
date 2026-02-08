@@ -315,13 +315,34 @@ export default function SimulatorPage() {
       const realPrice = await fetchRealTimePrice(selectedSymbol);
       if (cancelled) return;
       
-      const basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
+      let basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
+      
+      // Try to get persistent simulated price if not live
+      if (!realPrice) {
+        try {
+          const res = await fetch("/api/simulated-prices");
+          if (res.ok) {
+            const prices = await res.json();
+            if (prices[selectedSymbol]) {
+              basePrice = prices[selectedSymbol];
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching simulated prices:", error);
+        }
+      }
       
       const data = generateCandlestickData(100, basePrice, timeframe);
       setCandleData(data);
       if (data.length > 0) {
-        setCurrentPrice(data[data.length - 1].close);
+        const lastPrice = data[data.length - 1].close;
+        setCurrentPrice(lastPrice);
+        
+        // Update persistent price if simulated
+        if (!realPrice) {
+          apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: lastPrice }).catch(() => {});
+        }
       }
       setIsLoadingPrice(false);
     };
@@ -419,6 +440,11 @@ export default function SimulatorPage() {
         
         setCurrentPrice(newClose);
         
+        // Update persistent price if simulated
+        if (priceSource === "simulated") {
+          apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: newClose }).catch(() => {});
+        }
+        
         const newData = [...prev.slice(0, -1), updatedCandle];
         
         if (seriesRef.current) {
@@ -430,7 +456,7 @@ export default function SimulatorPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [selectedSymbol]);
+  }, [selectedSymbol, priceSource]);
 
   const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);

@@ -128,6 +128,10 @@ export interface IStorage {
   getFriendshipById(id: string): Promise<Friendship | undefined>;
   getFriendCount(userId: string): Promise<number>;
   
+  // Simulated Prices
+  getSimulatedPrices(): Promise<Record<string, number>>;
+  updateSimulatedPrice(symbol: string, price: number): Promise<void>;
+  
   // Chat Messages
   getChatMessages(userId1: string, userId2: string): Promise<ChatMessage[]>;
   sendChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
@@ -726,6 +730,17 @@ export class DatabaseStorage implements IStorage {
     return friends.length;
   }
 
+  // Simulated Prices
+  private simulatedPrices: Record<string, number> = {};
+
+  async getSimulatedPrices(): Promise<Record<string, number>> {
+    return this.simulatedPrices;
+  }
+
+  async updateSimulatedPrice(symbol: string, price: number): Promise<void> {
+    this.simulatedPrices[symbol] = price;
+  }
+
   // Chat Messages
   async getChatMessages(userId1: string, userId2: string): Promise<ChatMessage[]> {
     return db.select().from(chatMessages)
@@ -817,6 +832,52 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNotification(id: string, userId: string): Promise<void> {
     await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async checkAndAwardAchievements(userId: string): Promise<void> {
+    const user = await this.getUserById(userId);
+    if (!user) return;
+
+    const trades = await this.getTradesByUser(userId);
+    const lessonProgress = await this.getLessonProgress(userId);
+    const completedLessons = lessonProgress.filter(lp => lp.completed).length;
+    const balance = Number(user.simulatorBalance ?? 5000);
+    
+    const achievements = await this.getAchievements();
+    const userAchievements = await this.getUserAchievements(userId);
+
+    for (const achievement of achievements) {
+      const existingUa = userAchievements.find(ua => ua.achievementId === achievement.id);
+      if (existingUa && existingUa.progress === 100) continue;
+
+      let currentProgress = 0;
+
+      switch (achievement.category) {
+        case "trading":
+          if (achievement.id === "first-trade") {
+            currentProgress = trades.length >= 1 ? 100 : 0;
+          } else if (achievement.id === "day-trader") {
+            currentProgress = Math.min(100, (trades.length / 10) * 100);
+          }
+          break;
+        case "learning":
+          if (achievement.id === "student") {
+            currentProgress = completedLessons >= 1 ? 100 : 0;
+          }
+          break;
+        case "balance":
+          if (achievement.id === "starter") {
+            currentProgress = balance >= 6000 ? 100 : 0;
+          } else if (achievement.id === "growing") {
+            currentProgress = balance >= 10000 ? 100 : 0;
+          }
+          break;
+      }
+
+      if (currentProgress > (existingUa?.progress ?? 0)) {
+        await this.updateAchievementProgress(userId, achievement.id, currentProgress);
+      }
+    }
   }
 }
 

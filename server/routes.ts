@@ -1376,6 +1376,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/simulated-prices", async (_req, res) => {
+    try {
+      const prices = await storage.getSimulatedPrices();
+      res.json(prices);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/simulated-prices/update", async (req, res) => {
+    try {
+      const { symbol, price } = req.body;
+      if (!symbol || typeof price !== "number") {
+        return res.status(400).json({ message: "Invalid symbol or price" });
+      }
+      await storage.updateSimulatedPrice(symbol, price);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Profile routes
   app.patch("/api/user/profile", requireAuth, async (req, res) => {
     try {
@@ -2122,4 +2144,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Background achievement check loop
+  setInterval(async () => {
+    try {
+      const leaderboard = await storage.getLeaderboard();
+      for (const user of leaderboard) {
+        // @ts-ignore - checkAndAwardAchievements is added to DatabaseStorage
+        await storage.checkAndAwardAchievements(user.id);
+      }
+    } catch (error) {
+      console.error("Error in background achievement check:", error);
+    }
+  }, 60000); // Check every minute for active users
 }
