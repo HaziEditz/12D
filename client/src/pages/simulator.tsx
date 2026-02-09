@@ -102,23 +102,9 @@ const TIMEFRAME_SECONDS: Record<string, number> = {
   "1d": 86400
 };
 
-// Deterministic random number generator based on a seed
-function mulberry32(a: number) {
-  return function() {
-    let t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  }
-}
-
-function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m", symbol: string): CandlestickData[] {
+function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
-  // Use symbol as seed for consistency
-  const seed = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const rand = mulberry32(seed);
-  
-  let price = basePrice * (0.98 + rand() * 0.04);
+  let price = basePrice;
   const now = Math.floor(Date.now() / 1000);
   const interval = TIMEFRAME_SECONDS[timeframe] || 60;
   
@@ -126,13 +112,19 @@ function generateCandlestickData(count: number, basePrice: number, timeframe: st
   const volatilityMultiplier = Math.sqrt(interval / 60);
   const volatility = baseVolatility * volatilityMultiplier;
   
+  // Use a fixed seed based on the symbol to make the historical path deterministic
+  // but since the user wants NO randomness after initial creation, 
+  // we will just use the basePrice and simple linear or flat start if count is needed.
+  // Actually, providing some history is good, so we'll use a very simple non-random walk.
+  
   for (let i = count; i >= 0; i--) {
     const time = (now - i * interval) as Time;
-    const change = (rand() - 0.5) * 2 * volatility * price;
-    const open = price;
-    const close = price + change;
-    const high = Math.max(open, close) + rand() * volatility * price;
-    const low = Math.min(open, close) - rand() * volatility * price;
+    // Simple deterministic wave instead of randomness
+    const offset = Math.sin(i * 0.1) * volatility * price;
+    const open = price + offset;
+    const close = price + offset * 1.1;
+    const high = Math.max(open, close) + Math.abs(offset) * 0.2;
+    const low = Math.min(open, close) - Math.abs(offset) * 0.2;
     
     data.push({ time, open, high, low, close });
     price = close;
@@ -331,39 +323,20 @@ export default function SimulatorPage() {
       let basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
       
-      // Use localStorage as a secondary persistent store for prices
+      // Use localStorage as the SINGLE source of truth for prices
       const storedPrice = localStorage.getItem(`price_${selectedSymbol}`);
       if (storedPrice) {
         basePrice = parseFloat(storedPrice);
+      } else if (!realPrice) {
+        // Only set the initial price if it doesn't exist
+        localStorage.setItem(`price_${selectedSymbol}`, basePrice.toString());
       }
 
-      // Try to get persistent simulated price if not live
-      if (!realPrice) {
-        try {
-          const res = await fetch("/api/simulated-prices");
-          if (res.ok) {
-            const prices = await res.json();
-            if (prices[selectedSymbol]) {
-              basePrice = prices[selectedSymbol];
-              localStorage.setItem(`price_${selectedSymbol}`, basePrice.toString());
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching simulated prices:", error);
-        }
-      }
-      
-      const data = generateCandlestickData(100, basePrice, timeframe, selectedSymbol);
+      const data = generateCandlestickData(100, basePrice, timeframe);
       setCandleData(data);
       if (data.length > 0) {
         const lastPrice = data[data.length - 1].close;
         setCurrentPrice(lastPrice);
-        
-        // Update persistent price if simulated
-        if (!realPrice) {
-          localStorage.setItem(`price_${selectedSymbol}`, lastPrice.toString());
-          apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: lastPrice }).catch(() => {});
-        }
       }
       setIsLoadingPrice(false);
     };
@@ -464,7 +437,6 @@ export default function SimulatorPage() {
         // Update persistent price if simulated
         if (priceSource === "simulated") {
           localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
-          apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: newClose }).catch(() => {});
         }
         
         const newData = [...prev.slice(0, -1), updatedCandle];
