@@ -102,24 +102,37 @@ const TIMEFRAME_SECONDS: Record<string, number> = {
   "1d": 86400
 };
 
-function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
+// Deterministic random number generator based on a seed
+function mulberry32(a: number) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m", symbol: string): CandlestickData[] {
   const data: CandlestickData[] = [];
-  let price = basePrice * (0.98 + Math.random() * 0.04);
+  // Use symbol as seed for consistency
+  const seed = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const rand = mulberry32(seed);
+  
+  let price = basePrice * (0.98 + rand() * 0.04);
   const now = Math.floor(Date.now() / 1000);
   const interval = TIMEFRAME_SECONDS[timeframe] || 60;
   
-  // Adjust volatility based on timeframe - higher timeframes have larger moves
   const baseVolatility = 0.02;
-  const volatilityMultiplier = Math.sqrt(interval / 60); // Scale volatility with timeframe
+  const volatilityMultiplier = Math.sqrt(interval / 60);
   const volatility = baseVolatility * volatilityMultiplier;
   
   for (let i = count; i >= 0; i--) {
     const time = (now - i * interval) as Time;
-    const change = (Math.random() - 0.5) * 2 * volatility * price;
+    const change = (rand() - 0.5) * 2 * volatility * price;
     const open = price;
     const close = price + change;
-    const high = Math.max(open, close) + Math.random() * volatility * price;
-    const low = Math.min(open, close) - Math.random() * volatility * price;
+    const high = Math.max(open, close) + rand() * volatility * price;
+    const low = Math.min(open, close) - rand() * volatility * price;
     
     data.push({ time, open, high, low, close });
     price = close;
@@ -318,6 +331,12 @@ export default function SimulatorPage() {
       let basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
       
+      // Use localStorage as a secondary persistent store for prices
+      const storedPrice = localStorage.getItem(`price_${selectedSymbol}`);
+      if (storedPrice) {
+        basePrice = parseFloat(storedPrice);
+      }
+
       // Try to get persistent simulated price if not live
       if (!realPrice) {
         try {
@@ -326,6 +345,7 @@ export default function SimulatorPage() {
             const prices = await res.json();
             if (prices[selectedSymbol]) {
               basePrice = prices[selectedSymbol];
+              localStorage.setItem(`price_${selectedSymbol}`, basePrice.toString());
             }
           }
         } catch (error) {
@@ -333,7 +353,7 @@ export default function SimulatorPage() {
         }
       }
       
-      const data = generateCandlestickData(100, basePrice, timeframe);
+      const data = generateCandlestickData(100, basePrice, timeframe, selectedSymbol);
       setCandleData(data);
       if (data.length > 0) {
         const lastPrice = data[data.length - 1].close;
@@ -341,6 +361,7 @@ export default function SimulatorPage() {
         
         // Update persistent price if simulated
         if (!realPrice) {
+          localStorage.setItem(`price_${selectedSymbol}`, lastPrice.toString());
           apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: lastPrice }).catch(() => {});
         }
       }
@@ -442,6 +463,7 @@ export default function SimulatorPage() {
         
         // Update persistent price if simulated
         if (priceSource === "simulated") {
+          localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
           apiRequest("POST", "/api/simulated-prices/update", { symbol: selectedSymbol, price: newClose }).catch(() => {});
         }
         
