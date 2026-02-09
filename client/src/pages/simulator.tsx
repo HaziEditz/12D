@@ -108,23 +108,17 @@ function generateCandlestickData(count: number, basePrice: number, timeframe: st
   const now = Math.floor(Date.now() / 1000);
   const interval = TIMEFRAME_SECONDS[timeframe] || 60;
   
-  const baseVolatility = 0.02;
+  const baseVolatility = 0.002;
   const volatilityMultiplier = Math.sqrt(interval / 60);
   const volatility = baseVolatility * volatilityMultiplier;
   
-  // Use a fixed seed based on the symbol to make the historical path deterministic
-  // but since the user wants NO randomness after initial creation, 
-  // we will just use the basePrice and simple linear or flat start if count is needed.
-  // Actually, providing some history is good, so we'll use a very simple non-random walk.
-  
   for (let i = count; i >= 0; i--) {
     const time = (now - i * interval) as Time;
-    // Simple deterministic wave instead of randomness
-    const offset = Math.sin(i * 0.1) * volatility * price;
-    const open = price + offset;
-    const close = price + offset * 1.1;
-    const high = Math.max(open, close) + Math.abs(offset) * 0.2;
-    const low = Math.min(open, close) - Math.abs(offset) * 0.2;
+    const change = (Math.random() - 0.5) * 2 * volatility * price;
+    const open = price;
+    const close = price + change;
+    const high = Math.max(open, close) + Math.random() * volatility * price * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * price * 0.5;
     
     data.push({ time, open, high, low, close });
     price = close;
@@ -323,16 +317,27 @@ export default function SimulatorPage() {
       let basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
       
-      // Use localStorage as the SINGLE source of truth for prices
-      const storedPrice = localStorage.getItem(`price_${selectedSymbol}`);
-      if (storedPrice) {
-        basePrice = parseFloat(storedPrice);
-      } else if (!realPrice) {
-        // Only set the initial price if it doesn't exist
-        localStorage.setItem(`price_${selectedSymbol}`, basePrice.toString());
+      // Use localStorage as the SINGLE source of truth for candles
+      const storedCandles = localStorage.getItem(`candles_${selectedSymbol}`);
+      let data: CandlestickData[] = [];
+
+      if (storedCandles) {
+        try {
+          data = JSON.parse(storedCandles);
+        } catch (e) {
+          console.error("Failed to parse stored candles", e);
+        }
       }
 
-      const data = generateCandlestickData(100, basePrice, timeframe);
+      if (data.length === 0) {
+        // Only generate initial candles once if none exist
+        data = generateCandlestickData(100, basePrice, timeframe);
+        if (!realPrice) {
+          localStorage.setItem(`candles_${selectedSymbol}`, JSON.stringify(data));
+          localStorage.setItem(`price_${selectedSymbol}`, data[data.length - 1].close.toString());
+        }
+      }
+
       setCandleData(data);
       if (data.length > 0) {
         const lastPrice = data[data.length - 1].close;
@@ -434,12 +439,13 @@ export default function SimulatorPage() {
         
         setCurrentPrice(newClose);
         
-        // Update persistent price if simulated
+        const newData = [...prev.slice(0, -1), updatedCandle];
+
+        // Update persistent candles and price if simulated
         if (priceSource === "simulated") {
           localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
+          localStorage.setItem(`candles_${selectedSymbol}`, JSON.stringify(newData));
         }
-        
-        const newData = [...prev.slice(0, -1), updatedCandle];
         
         if (seriesRef.current) {
           seriesRef.current.update(updatedCandle);
