@@ -424,11 +424,25 @@ export default function SimulatorPage() {
       setCandleData(prev => {
         if (prev.length === 0) return prev;
         const lastCandle = prev[prev.length - 1];
-        const volatility = 0.005;
+        
+        // Calculate average candle range from recent history (last 20-50 candles)
+        const recentCandles = prev.slice(-30);
+        const avgRange = recentCandles.reduce((acc, c) => acc + (c.high - c.low), 0) / recentCandles.length;
+        
+        // Derive volatility from the average range
+        // If avgRange is small, volatility should be small to match historical scale
+        const derivedVolatility = avgRange / lastCandle.close || 0.001;
+        
+        // Limit volatility to prevent sudden spikes or flatlining
+        const volatility = Math.max(0.0005, Math.min(derivedVolatility, 0.005));
+        
         const change = (Math.random() - 0.5) * 2 * volatility * lastCandle.close;
         const newClose = lastCandle.close + change;
-        const newHigh = Math.max(lastCandle.high, newClose);
-        const newLow = Math.min(lastCandle.low, newClose);
+        
+        // High/low should also stay within the derived volatility range
+        const wickVariation = Math.random() * volatility * lastCandle.close * 0.5;
+        const newHigh = Math.max(lastCandle.open, newClose) + wickVariation;
+        const newLow = Math.min(lastCandle.open, newClose) - wickVariation;
         
         const updatedCandle = {
           ...lastCandle,
