@@ -105,11 +105,11 @@ const TIMEFRAME_SECONDS: Record<string, number> = {
 function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
   let price = basePrice;
-  const now = Math.floor(Date.now() / 1000);
-  const interval = TIMEFRAME_SECONDS[timeframe] || 60;
+  const now = Date.now();
+  const interval = TIMEFRAME_SECONDS[timeframe] * 1000 || 60000;
   
   const baseVolatility = 0.002;
-  const volatilityMultiplier = Math.sqrt(interval / 60);
+  const volatilityMultiplier = Math.sqrt(interval / 60000);
   const volatility = baseVolatility * volatilityMultiplier;
   
   for (let i = count; i >= 0; i--) {
@@ -440,22 +440,26 @@ export default function SimulatorPage() {
         const newHigh = Math.max(lastCandle.open, newClose) + wickVariation;
         const newLow = Math.min(lastCandle.open, newClose) - wickVariation;
 
-        const now = Math.floor(Date.now() / 1000);
-        const intervalSeconds = TIMEFRAME_SECONDS[timeframe] || 60;
-        const isNewCandleTime = now >= (Number(lastCandle.time) + intervalSeconds);
+        const now = Date.now();
+        const timeframeMs = (TIMEFRAME_SECONDS[timeframe] || 60) * 1000;
+        const isNewCandleTime = now >= (Number(lastCandle.time) + timeframeMs);
 
         let newData: CandlestickData[];
         
         if (isNewCandleTime) {
           // Close current candle and start a NEW one
           const newCandle: CandlestickData = {
-            time: (Number(lastCandle.time) + intervalSeconds) as Time,
+            time: (Number(lastCandle.time) + timeframeMs) as Time,
             open: lastCandle.close,
             high: lastCandle.close,
             low: lastCandle.close,
             close: lastCandle.close,
           };
           newData = [...prev, newCandle];
+          
+          if (seriesRef.current) {
+            seriesRef.current.update(newCandle);
+          }
         } else {
           // Update the CURRENT candle
           const updatedCandle = {
