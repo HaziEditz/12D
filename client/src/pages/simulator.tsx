@@ -430,39 +430,53 @@ export default function SimulatorPage() {
         const avgRange = recentCandles.reduce((acc, c) => acc + (c.high - c.low), 0) / recentCandles.length;
         
         // Derive volatility from the average range
-        // If avgRange is small, volatility should be small to match historical scale
         const derivedVolatility = avgRange / lastCandle.close || 0.001;
-        
-        // Limit volatility to prevent sudden spikes or flatlining
         const volatility = Math.max(0.0005, Math.min(derivedVolatility, 0.005));
         
         const change = (Math.random() - 0.5) * 2 * volatility * lastCandle.close;
         const newClose = lastCandle.close + change;
         
-        // High/low should also stay within the derived volatility range
         const wickVariation = Math.random() * volatility * lastCandle.close * 0.5;
         const newHigh = Math.max(lastCandle.open, newClose) + wickVariation;
         const newLow = Math.min(lastCandle.open, newClose) - wickVariation;
+
+        const now = Math.floor(Date.now() / 1000);
+        const intervalSeconds = TIMEFRAME_SECONDS[timeframe] || 60;
+        const isNewCandleTime = now >= (Number(lastCandle.time) + intervalSeconds);
+
+        let newData: CandlestickData[];
         
-        const updatedCandle = {
-          ...lastCandle,
-          close: newClose,
-          high: newHigh,
-          low: newLow,
-        };
+        if (isNewCandleTime) {
+          // Close current candle and start a NEW one
+          const newCandle: CandlestickData = {
+            time: (Number(lastCandle.time) + intervalSeconds) as Time,
+            open: lastCandle.close,
+            high: lastCandle.close,
+            low: lastCandle.close,
+            close: lastCandle.close,
+          };
+          newData = [...prev, newCandle];
+        } else {
+          // Update the CURRENT candle
+          const updatedCandle = {
+            ...lastCandle,
+            close: newClose,
+            high: newHigh,
+            low: newLow,
+          };
+          newData = [...prev.slice(0, -1), updatedCandle];
+          
+          if (seriesRef.current) {
+            seriesRef.current.update(updatedCandle);
+          }
+        }
         
         setCurrentPrice(newClose);
         
-        const newData = [...prev.slice(0, -1), updatedCandle];
-
         // Update persistent candles and price if simulated
         if (priceSource === "simulated") {
           localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
           localStorage.setItem(`candles_${selectedSymbol}`, JSON.stringify(newData));
-        }
-        
-        if (seriesRef.current) {
-          seriesRef.current.update(updatedCandle);
         }
         
         return newData;
@@ -470,7 +484,7 @@ export default function SimulatorPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [selectedSymbol, priceSource]);
+  }, [selectedSymbol, priceSource, timeframe]);
 
   const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);
