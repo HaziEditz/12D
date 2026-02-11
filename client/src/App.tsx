@@ -73,6 +73,18 @@ function Router() {
 }
 
 function AppContent() {
+  const [location] = useLocation();
+  const isAdminPage = location.startsWith("/admin");
+
+  if (isAdminPage) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-background">
+        <Router />
+        <Toaster />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <TrialBanner />

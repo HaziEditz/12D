@@ -555,8 +555,8 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
-      <div className="flex items-center gap-4 p-4 border-b bg-background">
+    <div className="h-screen w-screen flex flex-col overflow-hidden">
+      <div className="flex items-center gap-4 p-4 border-b bg-background shrink-0">
         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
           <Settings className="h-5 w-5 text-primary" />
         </div>
@@ -581,11 +581,17 @@ export default function AdminPage() {
             <span className="font-medium" data-testid="text-stat-trades">{stats?.trades ?? 0}</span>
             <span className="text-muted-foreground">trades</span>
           </div>
+          <Button variant="ghost" size="sm" asChild className="ml-2">
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Exit Admin
+            </Link>
+          </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b px-4">
+        <div className="border-b px-4 shrink-0 bg-background">
           <TabsList className="h-12">
             <TabsTrigger value="lessons" className="gap-2" data-testid="tab-lessons">
               <BookOpen className="h-4 w-4" />
@@ -607,7 +613,7 @@ export default function AdminPage() {
         </div>
 
         <TabsContent value="lessons" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-72 border-r flex flex-col bg-muted/30">
+          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
             <div className="p-3 border-b">
               <Button onClick={handleCreateNewLesson} className="w-full gap-2" data-testid="button-create-lesson">
                 <Plus className="h-4 w-4" />
@@ -891,7 +897,7 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="tips" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-72 border-r flex flex-col bg-muted/30">
+          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
             <div className="p-3 border-b">
               <Button onClick={handleCreateNewTip} className="w-full gap-2" data-testid="button-create-tip">
                 <Plus className="h-4 w-4" />
@@ -1158,7 +1164,7 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="insights" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-72 border-r flex flex-col bg-muted/30">
+          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
             <div className="p-3 border-b">
               <Button onClick={handleCreateNewInsight} className="w-full gap-2" data-testid="button-create-insight">
                 <Plus className="h-4 w-4" />
@@ -1399,7 +1405,7 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="strategies" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-72 border-r flex flex-col bg-muted/30">
+          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
             <div className="p-3 border-b">
               <Button onClick={handleCreateNewStrategy} className="w-full gap-2" data-testid="button-create-strategy">
                 <Plus className="h-4 w-4" />
