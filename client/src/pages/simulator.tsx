@@ -391,7 +391,9 @@ export default function SimulatorPage() {
         wickDownColor: 'hsl(0, 72%, 51%)',
       });
 
-      series.setData(candleData);
+      // Only show the last 150 candles for better performance and visibility
+      const visibleData = candleData.slice(-150);
+      series.setData(visibleData);
       chart.timeScale().fitContent();
 
       chartRef.current = chart;
@@ -423,9 +425,11 @@ export default function SimulatorPage() {
     const interval = setInterval(() => {
       setCandleData(prev => {
         if (prev.length === 0) return prev;
+        
+        // Use a fixed reference to the last candle
         const lastCandle = prev[prev.length - 1];
         
-        // Calculate average candle range from recent history (last 20-50 candles)
+        // Calculate average candle range from recent history (last 20-30 candles)
         const recentCandles = prev.slice(-30);
         const avgRange = recentCandles.reduce((acc, c) => acc + (c.high - c.low), 0) / recentCandles.length;
         
@@ -437,24 +441,32 @@ export default function SimulatorPage() {
         const newClose = lastCandle.close + change;
         
         const wickVariation = Math.random() * volatility * lastCandle.close * 0.5;
-        const newHigh = Math.max(lastCandle.open, newClose) + wickVariation;
-        const newLow = Math.min(lastCandle.open, newClose) - wickVariation;
+        const newHigh = Math.max(lastCandle.open, newClose, lastCandle.high) + wickVariation * 0.1;
+        const newLow = Math.min(lastCandle.open, newClose, lastCandle.low) - wickVariation * 0.1;
 
         const now = Date.now();
         const timeframeMs = (TIMEFRAME_SECONDS[timeframe] || 60) * 1000;
-        const isNewCandleTime = now >= (Number(lastCandle.time) + timeframeMs);
+        
+        // Round current time to the start of the current interval for consistency
+        const currentIntervalStart = Math.floor(now / timeframeMs) * timeframeMs;
+        const lastCandleTime = Number(lastCandle.time);
+        
+        const isNewCandleTime = currentIntervalStart > lastCandleTime;
 
         let newData: CandlestickData[];
         
         if (isNewCandleTime) {
           // Close current candle and start a NEW one
+          // The new candle's open MUST equal the previous candle's close
           const newCandle: CandlestickData = {
-            time: (Number(lastCandle.time) + timeframeMs) as Time,
+            time: currentIntervalStart as Time,
             open: lastCandle.close,
             high: lastCandle.close,
             low: lastCandle.close,
             close: lastCandle.close,
           };
+          
+          // Append the new candle to the existing list
           newData = [...prev, newCandle];
           
           if (seriesRef.current) {
@@ -465,8 +477,8 @@ export default function SimulatorPage() {
           const updatedCandle = {
             ...lastCandle,
             close: newClose,
-            high: newHigh,
-            low: newLow,
+            high: Math.max(lastCandle.high, newHigh),
+            low: Math.min(lastCandle.low, newLow),
           };
           newData = [...prev.slice(0, -1), updatedCandle];
           
