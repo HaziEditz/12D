@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { Navbar } from "@/components/navbar";
 import { TrialBanner } from "@/components/paywall";
+import { OnboardingTour } from "@/components/onboarding-tour";
 import { AchievementNotificationProvider } from "@/components/achievement-notification";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
@@ -91,6 +92,7 @@ function AppContent() {
       <TrialBanner />
       <Navbar />
       <Router />
+      <OnboardingTour />
       <AchievementNotificationProvider />
     </div>
   );

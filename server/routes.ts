@@ -2145,6 +2145,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.patch("/api/user/onboarding", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const updatedUser = await storage.updateUser(user.id, { 
+        onboardingCompleted: req.body.onboardingCompleted 
+      });
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Background achievement check loop
   setInterval(async () => {
     try {

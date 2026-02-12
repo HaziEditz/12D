@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   dailyTradesCount: integer("daily_trades_count").default(0),
   lastTradeDate: text("last_trade_date"),
   xp: integer("xp").default(0),
+  onboardingCompleted: boolean("onboarding_completed").default(false),
 });
 
 export const lessons = pgTable("lessons", {
