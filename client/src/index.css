@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Explicitly set from option for postcss-import if needed, but usually handled by build tool */
+/* No other tailwind directives allowed here */
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);
