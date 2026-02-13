@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,25 +21,22 @@ import { useAuth } from "@/lib/auth-context";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { 
   Plus, 
-  Pencil, 
   Trash2,
   BookOpen,
   Settings,
   Users,
   BarChart3,
   Clock,
-  ChevronRight,
   Save,
-  Eye,
   EyeOff,
   Loader2,
   FileText,
   ArrowLeft,
   Lightbulb,
-  TrendingUp
+  TrendingUp,
+  Target
 } from "lucide-react";
 import type { Lesson, TradingTip, MarketInsight, Strategy } from "@shared/schema";
-import { Target } from "lucide-react";
 
 const lessonSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -524,12 +521,15 @@ export default function AdminPage() {
 
   if (!user || user.role !== "admin") {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]" data-testid="unauthorized-message">
+      <div className="flex items-center justify-center h-screen bg-background" data-testid="unauthorized-message">
         <Card>
-          <CardContent className="p-6 text-center">
-            <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Admin Access Required</h2>
-            <p className="text-muted-foreground">You need admin privileges to access this page.</p>
+          <CardContent className="p-12 text-center">
+            <Settings className="h-16 w-16 mx-auto text-muted-foreground mb-6" />
+            <h2 className="text-2xl font-bold mb-3">Admin Access Required</h2>
+            <p className="text-muted-foreground text-lg">You need admin privileges to access the command center.</p>
+            <Button asChild className="mt-8">
+              <Link href="/">Return to Dashboard</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -538,15 +538,18 @@ export default function AdminPage() {
 
   if (lessonsLoading) {
     return (
-      <div className="h-[calc(100vh-4rem)] flex flex-col p-4 gap-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid md:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
+      <div className="h-screen w-screen flex flex-col items-center justify-center p-12 gap-8 bg-background">
+        <div className="flex items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <h2 className="text-xl font-medium">Initializing Admin Tools...</h2>
+        </div>
+        <div className="grid md:grid-cols-4 gap-6 w-full max-w-6xl">
+          {[1, 2, 3, 4].map(i => (
             <Card key={i}>
-              <CardContent className="pt-6">
-                <Skeleton className="h-10 w-10 rounded-lg mb-3" />
-                <Skeleton className="h-8 w-16 mb-1" />
-                <Skeleton className="h-4 w-24" />
+              <CardContent className="pt-8">
+                <Skeleton className="h-12 w-12 rounded-xl mb-4" />
+                <Skeleton className="h-8 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-1/2" />
               </CardContent>
             </Card>
           ))}
@@ -556,1101 +559,1043 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
-      <div className="flex items-center gap-4 p-4 border-b bg-background shrink-0">
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Settings className="h-5 w-5 text-primary" />
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+      <header className="h-16 border-b flex items-center justify-between px-6 bg-background shrink-0 z-20">
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Settings className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold leading-none" data-testid="text-admin-title">Admin Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1 font-medium">Platform Management Console</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold" data-testid="text-admin-title">Admin Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Manage lessons, tips, and insights</p>
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-4 text-sm">
+
+        <div className="flex items-center gap-8 text-sm">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium" data-testid="text-stat-users">{stats?.users ?? 0}</span>
-            <span className="text-muted-foreground">users</span>
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold leading-none">Total Users</p>
+              <p className="font-bold text-base" data-testid="text-stat-users">{stats?.users ?? 0}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium" data-testid="text-stat-lessons">{stats?.lessons ?? lessons?.length ?? 0}</span>
-            <span className="text-muted-foreground">lessons</span>
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold leading-none">Lessons</p>
+              <p className="font-bold text-base" data-testid="text-stat-lessons">{stats?.lessons ?? lessons?.length ?? 0}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium" data-testid="text-stat-trades">{stats?.trades ?? 0}</span>
-            <span className="text-muted-foreground">trades</span>
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold leading-none">Trades</p>
+              <p className="font-bold text-base" data-testid="text-stat-trades">{stats?.trades ?? 0}</p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" asChild className="ml-2">
+          <Button variant="outline" size="sm" asChild className="ml-4 rounded-full px-6">
             <Link href="/">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Exit Admin
+              Exit Dashboard
             </Link>
           </Button>
         </div>
+      </header>
+
+      <div className="flex-1 flex overflow-hidden">
+        <aside className="w-64 border-r bg-muted/20 flex flex-col shrink-0 z-10">
+          <div className="p-6">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] mb-6">Tools & Content</p>
+            <nav className="flex flex-col gap-2">
+              <Button
+                variant={activeTab === "lessons" ? "default" : "ghost"}
+                onClick={() => setActiveTab("lessons")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "lessons" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-lessons"
+              >
+                <BookOpen className={`h-5 w-5 ${activeTab === "lessons" ? "text-primary-foreground" : "text-primary"}`} />
+                <span className="font-semibold">Lessons</span>
+              </Button>
+              <Button
+                variant={activeTab === "tips" ? "default" : "ghost"}
+                onClick={() => setActiveTab("tips")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "tips" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-tips"
+              >
+                <Lightbulb className={`h-5 w-5 ${activeTab === "tips" ? "text-primary-foreground" : "text-yellow-500"}`} />
+                <span className="font-semibold">Trading Tips</span>
+              </Button>
+              <Button
+                variant={activeTab === "insights" ? "default" : "ghost"}
+                onClick={() => setActiveTab("insights")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "insights" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-insights"
+              >
+                <TrendingUp className={`h-5 w-5 ${activeTab === "insights" ? "text-primary-foreground" : "text-success"}`} />
+                <span className="font-semibold">Market Insights</span>
+              </Button>
+              <Button
+                variant={activeTab === "strategies" ? "default" : "ghost"}
+                onClick={() => setActiveTab("strategies")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "strategies" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-strategies"
+              >
+                <Target className={`h-5 w-5 ${activeTab === "strategies" ? "text-primary-foreground" : "text-destructive"}`} />
+                <span className="font-semibold">Strategies</span>
+              </Button>
+            </nav>
+          </div>
+          <div className="mt-auto p-6 border-t bg-background/50">
+            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+              <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Pro Tip</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Changes are saved instantly to the platform but may take a moment to reflect for active users.</p>
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex-1 relative overflow-hidden bg-background">
+          <Tabs value={activeTab} className="h-full w-full">
+            <TabsContent value="lessons" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
+                  <div className="p-6 border-b">
+                    <Button onClick={handleCreateNewLesson} className="w-full gap-2 rounded-xl h-12" data-testid="button-create-lesson">
+                      <Plus className="h-5 w-5" />
+                      Add New Lesson
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-3">
+                      {(!lessons || lessons.length === 0) ? (
+                        <div className="text-center py-16 px-6" data-testid="empty-lessons">
+                          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-10" />
+                          <p className="text-sm font-bold text-muted-foreground">Curriculum Empty</p>
+                        </div>
+                      ) : (
+                        lessons.map((lesson) => (
+                          <div
+                            key={lesson.id}
+                            onClick={() => handleSelectLesson(lesson)}
+                            className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                              selectedLesson?.id === lesson.id && !isCreatingLesson 
+                                ? "bg-primary/5 border-primary shadow-sm" 
+                                : "bg-card hover:border-primary/50 border-transparent shadow-sm"
+                            }`}
+                            data-testid={`lesson-item-${lesson.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm truncate leading-tight mb-2">{lesson.title}</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-[10px] h-4 px-1.5 uppercase tracking-tighter ${getDifficultyColor(lesson.difficulty)}`}>
+                                    {lesson.difficulty}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-bold">
+                                    <Clock className="h-3 w-3" />
+                                    {lesson.duration}m
+                                  </span>
+                                </div>
+                              </div>
+                              {!(lesson.isPublished ?? true) && (
+                                <EyeOff className="h-4 w-4 text-muted-foreground shrink-0 opacity-50" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <div className="flex-1 overflow-hidden bg-background">
+                  {(selectedLesson || isCreatingLesson) ? (
+                    <div className="h-full flex flex-col">
+                      <div className="p-8 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-xl z-10 sticky top-0">
+                        <div className="flex items-center gap-6">
+                          <Button variant="outline" size="icon" onClick={handleBackLesson} className="rounded-2xl h-12 w-12 border-2">
+                            <ArrowLeft className="h-5 w-5" />
+                          </Button>
+                          <div>
+                            <h2 className="text-2xl font-black tracking-tight">
+                              {isCreatingLesson ? "Blueprint New Lesson" : "Edit Module"}
+                            </h2>
+                            <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.3em] mt-1">Course Content Engine</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {!isCreatingLesson && (
+                            <Button
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 font-bold rounded-xl h-12 px-6"
+                              onClick={() => {
+                                if (window.confirm("CRITICAL: Delete this lesson permanently?")) {
+                                  deleteLessonMutation.mutate(selectedLesson!.id);
+                                }
+                              }}
+                              disabled={deleteLessonMutation.isPending}
+                            >
+                              <Trash2 className="h-5 w-5 mr-3" />
+                              Purge Lesson
+                            </Button>
+                          )}
+                          <Button
+                            size="lg"
+                            onClick={lessonForm.handleSubmit(onSubmitLesson)}
+                            disabled={createLessonMutation.isPending || updateLessonMutation.isPending}
+                            className="rounded-xl h-12 px-10 font-black shadow-xl shadow-primary/20"
+                          >
+                            {(createLessonMutation.isPending || updateLessonMutation.isPending) ? (
+                              <Loader2 className="h-5 w-5 animate-spin mr-3" />
+                            ) : (
+                              <Save className="h-5 w-5 mr-3" />
+                            )}
+                            {isCreatingLesson ? "Launch Lesson" : "Sync Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                      <ScrollArea className="flex-1 bg-muted/5">
+                        <div className="max-w-5xl mx-auto p-12">
+                          <Form {...lessonForm}>
+                            <form className="space-y-12">
+                              <div className="grid md:grid-cols-3 gap-12">
+                                <div className="md:col-span-2 space-y-8">
+                                  <FormField
+                                    control={lessonForm.control}
+                                    name="title"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Module Heading</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} placeholder="e.g., Candlestick Psychology Masterclass" className="bg-background h-16 text-xl font-bold rounded-2xl border-2 focus:border-primary px-6" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={lessonForm.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Executive Summary</FormLabel>
+                                        <FormControl>
+                                          <Textarea {...field} placeholder="What will students master in this session?" className="bg-background min-h-[160px] resize-none text-lg leading-relaxed rounded-2xl border-2 p-6" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-8">
+                                  <div className="p-8 rounded-3xl bg-background border-2 shadow-sm space-y-6">
+                                    <FormField
+                                      control={lessonForm.control}
+                                      name="category"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Stream</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-muted/50 h-12 rounded-xl border-0 font-bold px-4">
+                                                <SelectValue placeholder="Stream" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl border-2">
+                                              <SelectItem value="basics">Fundamentals</SelectItem>
+                                              <SelectItem value="technical">Technical Analysis</SelectItem>
+                                              <SelectItem value="fundamental">Market Economics</SelectItem>
+                                              <SelectItem value="psychology">Trade Psychology</SelectItem>
+                                              <SelectItem value="advanced">Advanced Systems</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={lessonForm.control}
+                                      name="difficulty"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Proficiency</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-muted/50 h-12 rounded-xl border-0 font-bold px-4">
+                                                <SelectValue placeholder="Proficiency" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl border-2">
+                                              <SelectItem value="beginner">Novice</SelectItem>
+                                              <SelectItem value="intermediate">Skilled</SelectItem>
+                                              <SelectItem value="advanced">Expert</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <FormField
+                                        control={lessonForm.control}
+                                        name="duration"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Time (min)</FormLabel>
+                                            <FormControl>
+                                              <Input type="number" {...field} className="bg-muted/50 h-12 rounded-xl border-0 font-bold text-center" />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormField
+                                        control={lessonForm.control}
+                                        name="order"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sequence</FormLabel>
+                                            <FormControl>
+                                              <Input type="number" {...field} className="bg-muted/50 h-12 rounded-xl border-0 font-bold text-center" />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                    </div>
+                                    <FormField
+                                      control={lessonForm.control}
+                                      name="isPublished"
+                                      render={({ field }) => (
+                                        <FormItem className="flex items-center justify-between pt-4 border-t">
+                                          <div>
+                                            <FormLabel className="text-sm font-black">Live Status</FormLabel>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Visible to academy</p>
+                                          </div>
+                                          <FormControl>
+                                            <Switch
+                                              checked={field.value}
+                                              onCheckedChange={field.onChange}
+                                              className="data-[state=checked]:bg-primary"
+                                            />
+                                          </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              <FormField
+                                control={lessonForm.control}
+                                name="content"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4 block">Knowledge Base & Curriculum (Rich Markdown)</FormLabel>
+                                    <FormControl>
+                                      <div className="rounded-3xl border-2 overflow-hidden bg-background">
+                                        <RichTextEditor
+                                          content={field.value}
+                                          onChange={field.onChange}
+                                          placeholder="Unleash the professional trading wisdom here..."
+                                        />
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </form>
+                          </Form>
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-24 text-center max-w-2xl mx-auto">
+                      <div className="h-32 w-32 rounded-[2.5rem] bg-primary/5 flex items-center justify-center mb-10 shadow-inner">
+                        <BookOpen className="h-16 w-16 text-primary opacity-30" />
+                      </div>
+                      <h3 className="text-4xl font-black tracking-tight mb-4">Academy Architect</h3>
+                      <p className="text-xl text-muted-foreground leading-relaxed font-medium">Select a learning module from the ledger or initialize a new sequence to expand the 12Digits curriculum.</p>
+                      <Button onClick={handleCreateNewLesson} size="lg" className="mt-12 rounded-2xl h-16 px-12 font-black text-lg shadow-2xl shadow-primary/30">
+                        <Plus className="h-6 w-6 mr-4" />
+                        Initialize New Module
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="tips" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
+                  <div className="p-6 border-b">
+                    <Button onClick={handleCreateNewTip} className="w-full gap-2 rounded-xl h-12" data-testid="button-create-tip">
+                      <Plus className="h-5 w-5" />
+                      Add Daily Tip
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-3">
+                      {(!tips || tips.length === 0) ? (
+                        <div className="text-center py-16 px-6">
+                          <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-10" />
+                          <p className="text-sm font-bold text-muted-foreground">Tips Feed Empty</p>
+                        </div>
+                      ) : (
+                        tips.map((tip) => (
+                          <div
+                            key={tip.id}
+                            onClick={() => handleSelectTip(tip)}
+                            className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                              selectedTip?.id === tip.id && !isCreatingTip
+                                ? "bg-primary/5 border-primary shadow-sm"
+                                : "bg-card hover:border-primary/50 border-transparent shadow-sm"
+                            }`}
+                            data-testid={`tip-item-${tip.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm truncate leading-tight mb-2">{tip.title}</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-[10px] h-4 px-1.5 uppercase tracking-tighter ${getCategoryColor(tip.category)}`}>
+                                    {tip.category}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {!(tip.isPublished ?? true) && (
+                                <EyeOff className="h-4 w-4 text-muted-foreground shrink-0 opacity-50" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <div className="flex-1 overflow-hidden bg-background">
+                  {(selectedTip || isCreatingTip) ? (
+                    <div className="h-full flex flex-col">
+                      <div className="p-8 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-xl z-10 sticky top-0">
+                        <div className="flex items-center gap-6">
+                          <Button variant="outline" size="icon" onClick={handleBackTip} className="rounded-2xl h-12 w-12 border-2">
+                            <ArrowLeft className="h-5 w-5" />
+                          </Button>
+                          <div>
+                            <h2 className="text-2xl font-black tracking-tight">
+                              {isCreatingTip ? "Draft New Insight" : "Refine Trading Tip"}
+                            </h2>
+                            <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.3em] mt-1">Wisdom Dispatcher</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {!isCreatingTip && (
+                            <Button
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 font-bold rounded-xl h-12 px-6"
+                              onClick={() => {
+                                if (window.confirm("CRITICAL: Delete this tip permanently?")) {
+                                  deleteTipMutation.mutate(selectedTip!.id);
+                                }
+                              }}
+                              disabled={deleteTipMutation.isPending}
+                            >
+                              <Trash2 className="h-5 w-5 mr-3" />
+                              Purge Tip
+                            </Button>
+                          )}
+                          <Button
+                            size="lg"
+                            onClick={tipForm.handleSubmit(onSubmitTip)}
+                            disabled={createTipMutation.isPending || updateTipMutation.isPending}
+                            className="rounded-xl h-12 px-10 font-black shadow-xl shadow-primary/20"
+                          >
+                            {(createTipMutation.isPending || updateTipMutation.isPending) ? (
+                              <Loader2 className="h-5 w-5 animate-spin mr-3" />
+                            ) : (
+                              <Save className="h-5 w-5 mr-3" />
+                            )}
+                            {isCreatingTip ? "Launch Tip" : "Sync Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                      <ScrollArea className="flex-1 bg-muted/5">
+                        <div className="max-w-3xl mx-auto p-12">
+                          <Form {...tipForm}>
+                            <form className="space-y-8">
+                              <FormField
+                                control={tipForm.control}
+                                name="title"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Insight Headline</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="e.g., The Rule of Three in Price Action" className="bg-background h-16 text-xl font-bold rounded-2xl border-2 focus:border-primary px-6" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="grid grid-cols-2 gap-8">
+                                <FormField
+                                  control={tipForm.control}
+                                  name="category"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Focus Area</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className="bg-background h-14 rounded-2xl border-2 font-bold px-6">
+                                            <SelectValue placeholder="Focus Area" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="rounded-2xl border-2">
+                                          <SelectItem value="strategy">Tactical Strategy</SelectItem>
+                                          <SelectItem value="psychology">Trade Psychology</SelectItem>
+                                          <SelectItem value="risk">Risk Protocols</SelectItem>
+                                          <SelectItem value="market">Market Structure</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={tipForm.control}
+                                  name="difficulty"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Complexity</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className="bg-background h-14 rounded-2xl border-2 font-bold px-6">
+                                            <SelectValue placeholder="Complexity" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="rounded-2xl border-2">
+                                          <SelectItem value="beginner">Core</SelectItem>
+                                          <SelectItem value="intermediate">Advanced</SelectItem>
+                                          <SelectItem value="advanced">Expert Only</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <FormField
+                                control={tipForm.control}
+                                name="content"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Wisdom Transmission</FormLabel>
+                                    <FormControl>
+                                      <Textarea {...field} placeholder="Distill the trading wisdom here..." className="bg-background min-h-[300px] resize-none text-xl leading-relaxed rounded-3xl border-2 p-8 shadow-sm" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="p-8 rounded-[2rem] bg-background border-2 shadow-sm">
+                                <FormField
+                                  control={tipForm.control}
+                                  name="isPublished"
+                                  render={({ field }) => (
+                                    <FormItem className="flex items-center justify-between">
+                                      <div>
+                                        <FormLabel className="text-lg font-black">Broadcast Status</FormLabel>
+                                        <p className="text-xs font-bold text-muted-foreground uppercase mt-1">Visible in terminal tips feed</p>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          className="scale-125 data-[state=checked]:bg-primary"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </form>
+                          </Form>
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-24 text-center max-w-2xl mx-auto">
+                      <div className="h-32 w-32 rounded-[2.5rem] bg-primary/5 flex items-center justify-center mb-10 shadow-inner">
+                        <Lightbulb className="h-16 w-16 text-primary opacity-30" />
+                      </div>
+                      <h3 className="text-4xl font-black tracking-tight mb-4">Sage Mode</h3>
+                      <p className="text-xl text-muted-foreground leading-relaxed font-medium">Broadcast daily trading nuggets to the community. Keep them sharp, actionable, and professional.</p>
+                      <Button onClick={handleCreateNewTip} size="lg" className="mt-12 rounded-2xl h-16 px-12 font-black text-lg shadow-2xl shadow-primary/30">
+                        <Plus className="h-6 w-6 mr-4" />
+                        Initialize New Tip
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="insights" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
+                  <div className="p-6 border-b">
+                    <Button onClick={handleCreateNewInsight} className="w-full gap-2 rounded-xl h-12" data-testid="button-create-insight">
+                      <Plus className="h-5 w-5" />
+                      Add Market Insight
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-3">
+                      {(!insights || insights.length === 0) ? (
+                        <div className="text-center py-16 px-6">
+                          <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-10" />
+                          <p className="text-sm font-bold text-muted-foreground">Market Feed Empty</p>
+                        </div>
+                      ) : (
+                        insights.map((insight) => (
+                          <div
+                            key={insight.id}
+                            onClick={() => handleSelectInsight(insight)}
+                            className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                              selectedInsight?.id === insight.id && !isCreatingInsight
+                                ? "bg-primary/5 border-primary shadow-sm"
+                                : "bg-card hover:border-primary/50 border-transparent shadow-sm"
+                            }`}
+                            data-testid={`insight-item-${insight.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm truncate leading-tight mb-2">{insight.title}</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-[10px] h-4 px-1.5 uppercase tracking-tighter ${getSentimentColor(insight.sentiment)}`}>
+                                    {insight.sentiment}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {!(insight.isPublished ?? true) && (
+                                <EyeOff className="h-4 w-4 text-muted-foreground shrink-0 opacity-50" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <div className="flex-1 overflow-hidden bg-background">
+                  {(selectedInsight || isCreatingInsight) ? (
+                    <div className="h-full flex flex-col">
+                      <div className="p-8 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-xl z-10 sticky top-0">
+                        <div className="flex items-center gap-6">
+                          <Button variant="outline" size="icon" onClick={handleBackInsight} className="rounded-2xl h-12 w-12 border-2">
+                            <ArrowLeft className="h-5 w-5" />
+                          </Button>
+                          <div>
+                            <h2 className="text-2xl font-black tracking-tight">
+                              {isCreatingInsight ? "Draft Sector Intel" : "Refine Intel"}
+                            </h2>
+                            <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.3em] mt-1">Market Pulse Engine</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {!isCreatingInsight && (
+                            <Button
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 font-bold rounded-xl h-12 px-6"
+                              onClick={() => {
+                                if (window.confirm("CRITICAL: Delete this intel permanently?")) {
+                                  deleteInsightMutation.mutate(selectedInsight!.id);
+                                }
+                              }}
+                              disabled={deleteInsightMutation.isPending}
+                            >
+                              <Trash2 className="h-5 w-5 mr-3" />
+                              Purge Intel
+                            </Button>
+                          )}
+                          <Button
+                            size="lg"
+                            onClick={insightForm.handleSubmit(onSubmitInsight)}
+                            disabled={createInsightMutation.isPending || updateInsightMutation.isPending}
+                            className="rounded-xl h-12 px-10 font-black shadow-xl shadow-primary/20"
+                          >
+                            {(createInsightMutation.isPending || updateInsightMutation.isPending) ? (
+                              <Loader2 className="h-5 w-5 animate-spin mr-3" />
+                            ) : (
+                              <Save className="h-5 w-5 mr-3" />
+                            )}
+                            {isCreatingInsight ? "Launch Intel" : "Sync Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                      <ScrollArea className="flex-1 bg-muted/5">
+                        <div className="max-w-3xl mx-auto p-12">
+                          <Form {...insightForm}>
+                            <form className="space-y-8">
+                              <FormField
+                                control={insightForm.control}
+                                name="title"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Market Headline</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="e.g., Q3 Tech Sector Deep Dive" className="bg-background h-16 text-xl font-bold rounded-2xl border-2 focus:border-primary px-6" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="grid grid-cols-2 gap-8">
+                                <FormField
+                                  control={insightForm.control}
+                                  name="sentiment"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Sentiment Bias</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className="bg-background h-14 rounded-2xl border-2 font-bold px-6">
+                                            <SelectValue placeholder="Sentiment" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="rounded-2xl border-2">
+                                          <SelectItem value="bullish" className="text-success font-bold">Bullish Bias</SelectItem>
+                                          <SelectItem value="bearish" className="text-destructive font-bold">Bearish Bias</SelectItem>
+                                          <SelectItem value="neutral" className="font-bold">Neutral Stance</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={insightForm.control}
+                                  name="sector"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Affected Sector</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className="bg-background h-14 rounded-2xl border-2 font-bold px-6">
+                                            <SelectValue placeholder="Target Sector" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="rounded-2xl border-2">
+                                          <SelectItem value="Technology">Tech Core</SelectItem>
+                                          <SelectItem value="Finance">Global Finance</SelectItem>
+                                          <SelectItem value="Healthcare">Bio & Pharma</SelectItem>
+                                          <SelectItem value="Energy">Energy Systems</SelectItem>
+                                          <SelectItem value="Consumer">Consumer Goods</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <FormField
+                                control={insightForm.control}
+                                name="summary"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Intelligence Briefing</FormLabel>
+                                    <FormControl>
+                                      <Textarea {...field} placeholder="Distill the sector intel here..." className="bg-background min-h-[300px] resize-none text-xl leading-relaxed rounded-3xl border-2 p-8 shadow-sm" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="p-8 rounded-[2rem] bg-background border-2 shadow-sm">
+                                <FormField
+                                  control={insightForm.control}
+                                  name="isPublished"
+                                  render={({ field }) => (
+                                    <FormItem className="flex items-center justify-between">
+                                      <div>
+                                        <FormLabel className="text-lg font-black">Live Broadcast</FormLabel>
+                                        <p className="text-xs font-bold text-muted-foreground uppercase mt-1">Visible in market feed terminal</p>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                          className="scale-125 data-[state=checked]:bg-primary"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </form>
+                          </Form>
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-24 text-center max-w-2xl mx-auto">
+                      <div className="h-32 w-32 rounded-[2.5rem] bg-primary/5 flex items-center justify-center mb-10 shadow-inner">
+                        <TrendingUp className="h-16 w-16 text-primary opacity-30" />
+                      </div>
+                      <h3 className="text-4xl font-black tracking-tight mb-4">Intel Hub</h3>
+                      <p className="text-xl text-muted-foreground leading-relaxed font-medium">Broadcast high-impact market analysis. Provide the edge that every 12Digits trader needs to stay profitable.</p>
+                      <Button onClick={handleCreateNewInsight} size="lg" className="mt-12 rounded-2xl h-16 px-12 font-black text-lg shadow-2xl shadow-primary/30">
+                        <Plus className="h-6 w-6 mr-4" />
+                        Initialize New Intel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="strategies" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
+                  <div className="p-6 border-b">
+                    <Button onClick={handleCreateNewStrategy} className="w-full gap-2 rounded-xl h-12" data-testid="button-create-strategy">
+                      <Plus className="h-5 w-5" />
+                      Blueprint Strategy
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-3">
+                      {(!strategies || strategies.length === 0) ? (
+                        <div className="text-center py-16 px-6">
+                          <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-10" />
+                          <p className="text-sm font-bold text-muted-foreground">Blueprint Vault Empty</p>
+                        </div>
+                      ) : (
+                        strategies.map((strategy) => (
+                          <div
+                            key={strategy.id}
+                            onClick={() => handleSelectStrategy(strategy)}
+                            className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                              selectedStrategy?.id === strategy.id && !isCreatingStrategy
+                                ? "bg-primary/5 border-primary shadow-sm"
+                                : "bg-card hover:border-primary/50 border-transparent shadow-sm"
+                            }`}
+                            data-testid={`strategy-item-${strategy.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm truncate leading-tight mb-2">{strategy.title}</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-[10px] h-4 px-1.5 uppercase tracking-tighter ${getDifficultyColor(strategy.difficulty)}`}>
+                                    {strategy.difficulty}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {!(strategy.isPublished ?? true) && (
+                                <EyeOff className="h-4 w-4 text-muted-foreground shrink-0 opacity-50" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <div className="flex-1 overflow-hidden bg-background">
+                  {(selectedStrategy || isCreatingStrategy) ? (
+                    <div className="h-full flex flex-col">
+                      <div className="p-8 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-xl z-10 sticky top-0">
+                        <div className="flex items-center gap-6">
+                          <Button variant="outline" size="icon" onClick={handleBackStrategy} className="rounded-2xl h-12 w-12 border-2">
+                            <ArrowLeft className="h-5 w-5" />
+                          </Button>
+                          <div>
+                            <h2 className="text-2xl font-black tracking-tight">
+                              {isCreatingStrategy ? "Forge Strategy" : "Refine Blueprint"}
+                            </h2>
+                            <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.3em] mt-1">Alpha Factory</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {!isCreatingStrategy && (
+                            <Button
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 font-bold rounded-xl h-12 px-6"
+                              onClick={() => {
+                                if (window.confirm("CRITICAL: Delete this strategy permanently?")) {
+                                  deleteStrategyMutation.mutate(selectedStrategy!.id);
+                                }
+                              }}
+                              disabled={deleteStrategyMutation.isPending}
+                            >
+                              <Trash2 className="h-5 w-5 mr-3" />
+                              Purge Strategy
+                            </Button>
+                          )}
+                          <Button
+                            size="lg"
+                            onClick={strategyForm.handleSubmit(onSubmitStrategy)}
+                            disabled={createStrategyMutation.isPending || updateStrategyMutation.isPending}
+                            className="rounded-xl h-12 px-10 font-black shadow-xl shadow-primary/20"
+                          >
+                            {(createStrategyMutation.isPending || updateStrategyMutation.isPending) ? (
+                              <Loader2 className="h-5 w-5 animate-spin mr-3" />
+                            ) : (
+                              <Save className="h-5 w-5 mr-3" />
+                            )}
+                            {isCreatingStrategy ? "Deploy Strategy" : "Sync Blueprint"}
+                          </Button>
+                        </div>
+                      </div>
+                      <ScrollArea className="flex-1 bg-muted/5">
+                        <div className="max-w-5xl mx-auto p-12">
+                          <Form {...strategyForm}>
+                            <form className="space-y-12">
+                              <div className="grid md:grid-cols-3 gap-12">
+                                <div className="md:col-span-2 space-y-8">
+                                  <FormField
+                                    control={strategyForm.control}
+                                    name="title"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Blueprint Name</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} placeholder="e.g., V-Reversal Trend System" className="bg-background h-16 text-xl font-bold rounded-2xl border-2 focus:border-primary px-6" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={strategyForm.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Strategic Vision</FormLabel>
+                                        <FormControl>
+                                          <Textarea {...field} placeholder="Distill the strategic edge of this system..." className="bg-background min-h-[160px] resize-none text-lg leading-relaxed rounded-2xl border-2 p-6" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-8">
+                                  <div className="p-8 rounded-3xl bg-background border-2 shadow-sm space-y-6">
+                                    <FormField
+                                      control={strategyForm.control}
+                                      name="category"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Alpha Type</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-muted/50 h-12 rounded-xl border-0 font-bold px-4">
+                                                <SelectValue placeholder="Alpha Type" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl border-2">
+                                              <SelectItem value="trend">Trend Momentum</SelectItem>
+                                              <SelectItem value="mean-reversion">Mean Reversion</SelectItem>
+                                              <SelectItem value="breakout">Volatility Breakout</SelectItem>
+                                              <SelectItem value="scalping">Intraday Scalping</SelectItem>
+                                              <SelectItem value="swing">Swing Macro</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={strategyForm.control}
+                                      name="difficulty"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Risk Rating</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-muted/50 h-12 rounded-xl border-0 font-bold px-4">
+                                                <SelectValue placeholder="Risk Rating" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl border-2">
+                                              <SelectItem value="beginner">Low Risk</SelectItem>
+                                              <SelectItem value="intermediate">Active Risk</SelectItem>
+                                              <SelectItem value="advanced">High Risk</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={strategyForm.control}
+                                      name="isPublished"
+                                      render={({ field }) => (
+                                        <FormItem className="flex items-center justify-between pt-4 border-t">
+                                          <div>
+                                            <FormLabel className="text-sm font-black">Elite Access</FormLabel>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Premium members only</p>
+                                          </div>
+                                          <FormControl>
+                                            <Switch
+                                              checked={field.value}
+                                              onCheckedChange={field.onChange}
+                                              className="data-[state=checked]:bg-primary"
+                                            />
+                                          </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              <FormField
+                                control={strategyForm.control}
+                                name="content"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4 block">Rules, Parameters & Edge (Markdown Support)</FormLabel>
+                                    <FormControl>
+                                      <div className="rounded-3xl border-2 overflow-hidden bg-background">
+                                        <RichTextEditor
+                                          content={field.value}
+                                          onChange={field.onChange}
+                                          placeholder="Define the mechanical rules and technical edge..."
+                                        />
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </form>
+                          </Form>
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-24 text-center max-w-2xl mx-auto">
+                      <div className="h-32 w-32 rounded-[2.5rem] bg-primary/5 flex items-center justify-center mb-10 shadow-inner">
+                        <Target className="h-16 w-16 text-primary opacity-30" />
+                      </div>
+                      <h3 className="text-4xl font-black tracking-tight mb-4">Alpha Factory</h3>
+                      <p className="text-xl text-muted-foreground leading-relaxed font-medium">Forge institutional-grade strategies for premium 12Digits+ members. Precision is the ultimate edge.</p>
+                      <Button onClick={handleCreateNewStrategy} size="lg" className="mt-12 rounded-2xl h-16 px-12 font-black text-lg shadow-2xl shadow-primary/30">
+                        <Plus className="h-6 w-6 mr-4" />
+                        Forging New Strategy
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </main>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b px-4 shrink-0 bg-background">
-          <TabsList className="h-12">
-            <TabsTrigger value="lessons" className="gap-2" data-testid="tab-lessons">
-              <BookOpen className="h-4 w-4" />
-              Lessons
-            </TabsTrigger>
-            <TabsTrigger value="tips" className="gap-2" data-testid="tab-tips">
-              <Lightbulb className="h-4 w-4" />
-              Trading Tips
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-2" data-testid="tab-insights">
-              <TrendingUp className="h-4 w-4" />
-              Market Insights
-            </TabsTrigger>
-            <TabsTrigger value="strategies" className="gap-2" data-testid="tab-strategies">
-              <Target className="h-4 w-4" />
-              Strategies
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="lessons" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
-            <div className="p-3 border-b">
-              <Button onClick={handleCreateNewLesson} className="w-full gap-2" data-testid="button-create-lesson">
-                <Plus className="h-4 w-4" />
-                New Lesson
-              </Button>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {(!lessons || lessons.length === 0) ? (
-                  <div className="text-center py-8 px-4" data-testid="empty-lessons">
-                    <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No lessons yet</p>
-                    <p className="text-xs text-muted-foreground">Create your first lesson</p>
-                  </div>
-                ) : (
-                  lessons.map((lesson) => (
-                    <div
-                      key={lesson.id}
-                      onClick={() => handleSelectLesson(lesson)}
-                      className={`p-3 rounded-lg cursor-pointer hover-elevate ${
-                        selectedLesson?.id === lesson.id && !isCreatingLesson ? "bg-accent" : "bg-background"
-                      }`}
-                      data-testid={`lesson-item-${lesson.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground">#{lesson.order + 1}</span>
-                            {!lesson.isPublished && (
-                              <EyeOff className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          <p className="font-medium truncate" data-testid={`text-lesson-title-${lesson.id}`}>{lesson.title}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className={`text-xs ${getDifficultyColor(lesson.difficulty)}`}>
-                              {lesson.difficulty}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {lesson.duration}m
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {!selectedLesson && !isCreatingLesson ? (
-              <div className="h-full flex items-center justify-center" data-testid="no-lesson-selected">
-                <div className="text-center">
-                  <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Lesson Editor</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Select a lesson from the sidebar or create a new one
-                  </p>
-                  <Button onClick={handleCreateNewLesson} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create New Lesson
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between gap-4 p-4 border-b">
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={handleBackLesson} data-testid="button-back">
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h2 className="text-lg font-semibold" data-testid="text-editor-title">
-                      {isCreatingLesson ? "Create New Lesson" : "Edit Lesson"}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isCreatingLesson && selectedLesson && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteLessonMutation.mutate(selectedLesson.id)}
-                        disabled={deleteLessonMutation.isPending}
-                        className="gap-2 text-destructive"
-                        data-testid="button-delete-lesson"
-                      >
-                        {deleteLessonMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        Delete
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={lessonForm.handleSubmit(onSubmitLesson)}
-                      disabled={createLessonMutation.isPending || updateLessonMutation.isPending}
-                      className="gap-2"
-                      data-testid="button-save-lesson"
-                    >
-                      {(createLessonMutation.isPending || updateLessonMutation.isPending) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      {isCreatingLesson ? "Create Lesson" : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-
-                <ScrollArea className="flex-1">
-                  <Form {...lessonForm}>
-                    <form className="p-4 space-y-6">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <FormField
-                          control={lessonForm.control}
-                          name="title"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Lesson Title</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  placeholder="Introduction to Trading Basics" 
-                                  data-testid="input-lesson-title" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={lessonForm.control}
-                            name="category"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Category</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-category">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="basics">Basics</SelectItem>
-                                    <SelectItem value="technical">Technical Analysis</SelectItem>
-                                    <SelectItem value="fundamental">Fundamental Analysis</SelectItem>
-                                    <SelectItem value="strategies">Strategies</SelectItem>
-                                    <SelectItem value="psychology">Trading Psychology</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={lessonForm.control}
-                            name="difficulty"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Difficulty</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-difficulty">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="beginner">Beginner</SelectItem>
-                                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                                    <SelectItem value="advanced">Advanced</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-
-                      <FormField
-                        control={lessonForm.control}
-                        name="description"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Short Description</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="A brief overview of what students will learn in this lesson..." 
-                                className="resize-none"
-                                data-testid="input-lesson-description"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={lessonForm.control}
-                        name="content"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Lesson Content</FormLabel>
-                            <FormControl>
-                              <RichTextEditor
-                                content={field.value}
-                                onChange={field.onChange}
-                                placeholder="Write your lesson content here. Use the toolbar to format text, add headings, lists, and more..."
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <FormField
-                          control={lessonForm.control}
-                          name="duration"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Duration (minutes)</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="1" data-testid="input-duration" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={lessonForm.control}
-                          name="order"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Display Order</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="0" data-testid="input-order" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={lessonForm.control}
-                          name="isPublished"
-                          render={({ field }) => (
-                            <FormItem className="flex items-center justify-between rounded-lg border p-3 h-[68px]">
-                              <div className="flex items-center gap-2">
-                                {field.value ? (
-                                  <Eye className="h-4 w-4 text-success" />
-                                ) : (
-                                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <div>
-                                  <FormLabel className="mb-0">Published</FormLabel>
-                                </div>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  data-testid="switch-published"
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </form>
-                  </Form>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="tips" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
-            <div className="p-3 border-b">
-              <Button onClick={handleCreateNewTip} className="w-full gap-2" data-testid="button-create-tip">
-                <Plus className="h-4 w-4" />
-                New Tip
-              </Button>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {tipsLoading ? (
-                  <div className="p-4 space-y-2">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-                  </div>
-                ) : (!tips || tips.length === 0) ? (
-                  <div className="text-center py-8 px-4" data-testid="empty-tips">
-                    <Lightbulb className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No tips yet</p>
-                    <p className="text-xs text-muted-foreground">Create your first trading tip</p>
-                  </div>
-                ) : (
-                  tips.map((tip) => (
-                    <div
-                      key={tip.id}
-                      onClick={() => handleSelectTip(tip)}
-                      className={`p-3 rounded-lg cursor-pointer hover-elevate ${
-                        selectedTip?.id === tip.id && !isCreatingTip ? "bg-accent" : "bg-background"
-                      }`}
-                      data-testid={`tip-item-${tip.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {!tip.isPublished && (
-                              <EyeOff className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          <p className="font-medium truncate" data-testid={`text-tip-title-${tip.id}`}>{tip.title}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant="secondary" className={`text-xs ${getDifficultyColor(tip.difficulty)}`}>
-                              {tip.difficulty}
-                            </Badge>
-                            <Badge variant="secondary" className={`text-xs ${getCategoryColor(tip.category)}`}>
-                              {tip.category}
-                            </Badge>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {!selectedTip && !isCreatingTip ? (
-              <div className="h-full flex items-center justify-center" data-testid="no-tip-selected">
-                <div className="text-center">
-                  <Lightbulb className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Tip Editor</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Select a tip from the sidebar or create a new one
-                  </p>
-                  <Button onClick={handleCreateNewTip} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create New Tip
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between gap-4 p-4 border-b">
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={handleBackTip} data-testid="button-back-tip">
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h2 className="text-lg font-semibold" data-testid="text-tip-editor-title">
-                      {isCreatingTip ? "Create New Tip" : "Edit Tip"}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isCreatingTip && selectedTip && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteTipMutation.mutate(selectedTip.id)}
-                        disabled={deleteTipMutation.isPending}
-                        className="gap-2 text-destructive"
-                        data-testid="button-delete-tip"
-                      >
-                        {deleteTipMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        Delete
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={tipForm.handleSubmit(onSubmitTip)}
-                      disabled={createTipMutation.isPending || updateTipMutation.isPending}
-                      className="gap-2"
-                      data-testid="button-save-tip"
-                    >
-                      {(createTipMutation.isPending || updateTipMutation.isPending) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      {isCreatingTip ? "Create Tip" : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-
-                <ScrollArea className="flex-1">
-                  <Form {...tipForm}>
-                    <form className="p-4 space-y-6">
-                      <FormField
-                        control={tipForm.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tip Title</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Always Use Stop Losses" 
-                                data-testid="input-tip-title" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={tipForm.control}
-                        name="content"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tip Content</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Explain the trading tip in detail..." 
-                                className="resize-none min-h-[120px]"
-                                data-testid="input-tip-content"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <FormField
-                          control={tipForm.control}
-                          name="category"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Category</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-tip-category">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="strategy">Strategy</SelectItem>
-                                  <SelectItem value="psychology">Psychology</SelectItem>
-                                  <SelectItem value="risk">Risk Management</SelectItem>
-                                  <SelectItem value="market">Market Analysis</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={tipForm.control}
-                          name="difficulty"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Difficulty</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-tip-difficulty">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="beginner">Beginner</SelectItem>
-                                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                                  <SelectItem value="advanced">Advanced</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <FormField
-                          control={tipForm.control}
-                          name="iconName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Icon</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-tip-icon">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Lightbulb">Lightbulb</SelectItem>
-                                  <SelectItem value="TrendingUp">Trending Up</SelectItem>
-                                  <SelectItem value="TrendingDown">Trending Down</SelectItem>
-                                  <SelectItem value="Target">Target</SelectItem>
-                                  <SelectItem value="Shield">Shield</SelectItem>
-                                  <SelectItem value="AlertTriangle">Alert</SelectItem>
-                                  <SelectItem value="BookOpen">Book</SelectItem>
-                                  <SelectItem value="Clock">Clock</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={tipForm.control}
-                          name="isPublished"
-                          render={({ field }) => (
-                            <FormItem className="flex items-center justify-between rounded-lg border p-3 h-[68px]">
-                              <div className="flex items-center gap-2">
-                                {field.value ? (
-                                  <Eye className="h-4 w-4 text-success" />
-                                ) : (
-                                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <div>
-                                  <FormLabel className="mb-0">Published</FormLabel>
-                                </div>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  data-testid="switch-tip-published"
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </form>
-                  </Form>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="insights" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
-            <div className="p-3 border-b">
-              <Button onClick={handleCreateNewInsight} className="w-full gap-2" data-testid="button-create-insight">
-                <Plus className="h-4 w-4" />
-                New Insight
-              </Button>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {insightsLoading ? (
-                  <div className="p-4 space-y-2">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-                  </div>
-                ) : (!insights || insights.length === 0) ? (
-                  <div className="text-center py-8 px-4" data-testid="empty-insights">
-                    <TrendingUp className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No insights yet</p>
-                    <p className="text-xs text-muted-foreground">Create your first market insight</p>
-                  </div>
-                ) : (
-                  insights.map((insight) => (
-                    <div
-                      key={insight.id}
-                      onClick={() => handleSelectInsight(insight)}
-                      className={`p-3 rounded-lg cursor-pointer hover-elevate ${
-                        selectedInsight?.id === insight.id && !isCreatingInsight ? "bg-accent" : "bg-background"
-                      }`}
-                      data-testid={`insight-item-${insight.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {!insight.isPublished && (
-                              <EyeOff className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          <p className="font-medium truncate" data-testid={`text-insight-title-${insight.id}`}>{insight.title}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant="secondary" className={`text-xs ${getSentimentColor(insight.sentiment)}`}>
-                              {insight.sentiment}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {insight.sector}
-                            </Badge>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {!selectedInsight && !isCreatingInsight ? (
-              <div className="h-full flex items-center justify-center" data-testid="no-insight-selected">
-                <div className="text-center">
-                  <TrendingUp className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Insight Editor</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Select an insight from the sidebar or create a new one
-                  </p>
-                  <Button onClick={handleCreateNewInsight} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create New Insight
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between gap-4 p-4 border-b">
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={handleBackInsight} data-testid="button-back-insight">
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h2 className="text-lg font-semibold" data-testid="text-insight-editor-title">
-                      {isCreatingInsight ? "Create New Insight" : "Edit Insight"}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isCreatingInsight && selectedInsight && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteInsightMutation.mutate(selectedInsight.id)}
-                        disabled={deleteInsightMutation.isPending}
-                        className="gap-2 text-destructive"
-                        data-testid="button-delete-insight"
-                      >
-                        {deleteInsightMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        Delete
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={insightForm.handleSubmit(onSubmitInsight)}
-                      disabled={createInsightMutation.isPending || updateInsightMutation.isPending}
-                      className="gap-2"
-                      data-testid="button-save-insight"
-                    >
-                      {(createInsightMutation.isPending || updateInsightMutation.isPending) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      {isCreatingInsight ? "Create Insight" : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-
-                <ScrollArea className="flex-1">
-                  <Form {...insightForm}>
-                    <form className="p-4 space-y-6">
-                      <FormField
-                        control={insightForm.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Insight Title</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Tech Sector Shows Strength" 
-                                data-testid="input-insight-title" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={insightForm.control}
-                        name="summary"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Summary</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Describe the market insight..." 
-                                className="resize-none min-h-[120px]"
-                                data-testid="input-insight-summary"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <FormField
-                          control={insightForm.control}
-                          name="sentiment"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Market Sentiment</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-insight-sentiment">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="bullish">Bullish</SelectItem>
-                                  <SelectItem value="bearish">Bearish</SelectItem>
-                                  <SelectItem value="neutral">Neutral</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={insightForm.control}
-                          name="sector"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Sector</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-insight-sector">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Technology">Technology</SelectItem>
-                                  <SelectItem value="Healthcare">Healthcare</SelectItem>
-                                  <SelectItem value="Finance">Finance</SelectItem>
-                                  <SelectItem value="Energy">Energy</SelectItem>
-                                  <SelectItem value="Consumer">Consumer</SelectItem>
-                                  <SelectItem value="Industrial">Industrial</SelectItem>
-                                  <SelectItem value="Macro">Macro</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={insightForm.control}
-                        name="isPublished"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                            <div className="flex items-center gap-2">
-                              {field.value ? (
-                                <Eye className="h-4 w-4 text-success" />
-                              ) : (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <div>
-                                <FormLabel className="mb-0">Published</FormLabel>
-                              </div>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="switch-insight-published"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </form>
-                  </Form>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="strategies" className="flex-1 flex overflow-hidden m-0">
-          <div className="w-80 border-r flex flex-col bg-muted/30 shrink-0">
-            <div className="p-3 border-b">
-              <Button onClick={handleCreateNewStrategy} className="w-full gap-2" data-testid="button-create-strategy">
-                <Plus className="h-4 w-4" />
-                New Strategy
-              </Button>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {strategiesLoading ? (
-                  <div className="space-y-2 p-2">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-                  </div>
-                ) : (!strategies || strategies.length === 0) ? (
-                  <div className="text-center py-8 px-4" data-testid="empty-strategies">
-                    <Target className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No strategies yet</p>
-                    <p className="text-xs text-muted-foreground">Create your first strategy</p>
-                  </div>
-                ) : (
-                  strategies.map((strategy) => (
-                    <div
-                      key={strategy.id}
-                      onClick={() => handleSelectStrategy(strategy)}
-                      className={`p-3 rounded-lg cursor-pointer hover-elevate ${
-                        selectedStrategy?.id === strategy.id && !isCreatingStrategy ? "bg-accent" : "bg-background"
-                      }`}
-                      data-testid={`strategy-item-${strategy.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {!strategy.isPublished && (
-                              <EyeOff className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          <p className="font-medium truncate" data-testid={`text-strategy-title-${strategy.id}`}>{strategy.title}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant="secondary" className={`text-xs ${getDifficultyColor(strategy.difficulty)}`}>
-                              {strategy.difficulty}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {strategy.category}
-                            </Badge>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {!selectedStrategy && !isCreatingStrategy ? (
-              <div className="h-full flex items-center justify-center" data-testid="no-strategy-selected">
-                <div className="text-center">
-                  <Target className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Strategy Editor</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Select a strategy from the sidebar or create a new one
-                  </p>
-                  <Button onClick={handleCreateNewStrategy} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create New Strategy
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between gap-4 p-4 border-b">
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={handleBackStrategy} data-testid="button-back-strategy">
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h2 className="text-lg font-semibold" data-testid="text-strategy-editor-title">
-                      {isCreatingStrategy ? "Create New Strategy" : "Edit Strategy"}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isCreatingStrategy && selectedStrategy && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteStrategyMutation.mutate(selectedStrategy.id)}
-                        disabled={deleteStrategyMutation.isPending}
-                        className="gap-2 text-destructive"
-                        data-testid="button-delete-strategy"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={strategyForm.handleSubmit(onSubmitStrategy)}
-                      disabled={createStrategyMutation.isPending || updateStrategyMutation.isPending}
-                      className="gap-2"
-                      data-testid="button-save-strategy"
-                    >
-                      {(createStrategyMutation.isPending || updateStrategyMutation.isPending) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      Save
-                    </Button>
-                  </div>
-                </div>
-                <ScrollArea className="flex-1">
-                  <Form {...strategyForm}>
-                    <form className="p-4 space-y-4">
-                      <FormField
-                        control={strategyForm.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Title</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Strategy title" {...field} data-testid="input-strategy-title" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={strategyForm.control}
-                        name="description"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Description</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Brief description of the strategy" 
-                                {...field} 
-                                data-testid="textarea-strategy-description"
-                                rows={3}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={strategyForm.control}
-                        name="content"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Content</FormLabel>
-                            <FormControl>
-                              <RichTextEditor
-                                content={field.value}
-                                onChange={field.onChange}
-                                data-testid="editor-strategy-content"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <FormField
-                          control={strategyForm.control}
-                          name="category"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Category</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-strategy-category">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="trend">Trend Following</SelectItem>
-                                  <SelectItem value="scalping">Scalping</SelectItem>
-                                  <SelectItem value="swing">Swing Trading</SelectItem>
-                                  <SelectItem value="position">Position Trading</SelectItem>
-                                  <SelectItem value="momentum">Momentum</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={strategyForm.control}
-                          name="difficulty"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Difficulty</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-strategy-difficulty">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="beginner">Beginner</SelectItem>
-                                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                                  <SelectItem value="advanced">Advanced</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={strategyForm.control}
-                        name="isPublished"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                            <div className="flex items-center gap-2">
-                              {field.value ? (
-                                <Eye className="h-4 w-4 text-success" />
-                              ) : (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <div>
-                                <FormLabel className="mb-0">Published</FormLabel>
-                              </div>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="switch-strategy-published"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </form>
-                  </Form>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
