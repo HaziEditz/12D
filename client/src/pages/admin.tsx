@@ -1145,7 +1145,7 @@ export default function AdminPage() {
 
             <TabsContent value="insights" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
               <div className="flex h-full w-full overflow-hidden">
-                <div className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
+                <aside className="w-80 border-r flex flex-col bg-muted/5 shrink-0">
                   <div className="p-6 border-b">
                     <Button onClick={handleCreateNewInsight} className="w-full gap-2 rounded-xl h-12" data-testid="button-create-insight">
                       <Plus className="h-5 w-5" />
@@ -1180,17 +1180,14 @@ export default function AdminPage() {
                                   </Badge>
                                 </div>
                               </div>
-                              {!(insight.isPublished ?? true) && (
-                                <EyeOff className="h-4 w-4 text-muted-foreground shrink-0 opacity-50" />
-                              )}
                             </div>
                           </div>
                         ))
                       )}
                     </div>
                   </ScrollArea>
-                </div>
-                <div className="flex-1 overflow-hidden bg-background">
+                </aside>
+                <main className="flex-1 overflow-hidden bg-background">
                   {(selectedInsight || isCreatingInsight) ? (
                     <div className="h-full flex flex-col">
                       <div className="p-8 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-xl z-10 sticky top-0">
@@ -1353,7 +1350,7 @@ export default function AdminPage() {
                       </Button>
                     </div>
                   )}
-                </div>
+                </main>
               </div>
             </TabsContent>
 
