@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   xp: integer("xp").default(0),
   onboardingCompleted: boolean("onboarding_completed").default(false),
   username: varchar("username", { length: 50 }).unique(),
+  classroomTokens: integer("classroom_tokens").default(0),
 });
 
 export const lessons = pgTable("lessons", {
@@ -134,6 +135,9 @@ export const schools = pgTable("schools", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const ageGroups = ["primary", "intermediate", "high_school"] as const;
+export type AgeGroup = typeof ageGroups[number];
+
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   schoolId: varchar("school_id").notNull(),
@@ -141,6 +145,7 @@ export const classes = pgTable("classes", {
   name: text("name").notNull(),
   description: text("description"),
   joinCode: text("join_code").notNull().unique(),
+  ageGroup: text("age_group").default("high_school"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -236,6 +241,26 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const classroomEvents = pgTable("classroom_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  teacherId: varchar("teacher_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const funZoneScores = pgTable("fun_zone_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  game: text("game").notNull(),
+  score: integer("score").notNull(),
+  tokensEarned: integer("tokens_earned").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -256,6 +281,8 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ i
 export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).omit({ id: true, addedAt: true });
 export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, createdAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export const insertClassroomEventSchema = createInsertSchema(classroomEvents).omit({ id: true, createdAt: true });
+export const insertFunZoneScoreSchema = createInsertSchema(funZoneScores).omit({ id: true, createdAt: true });
 
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -349,6 +376,10 @@ export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertClassroomEvent = z.infer<typeof insertClassroomEventSchema>;
+export type ClassroomEvent = typeof classroomEvents.$inferSelect;
+export type InsertFunZoneScore = z.infer<typeof insertFunZoneScoreSchema>;
+export type FunZoneScore = typeof funZoneScores.$inferSelect;
 
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),

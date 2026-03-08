@@ -16,10 +16,15 @@ import {
   Clock,
   TrendingUp,
   User as UserIcon,
-  Users
+  Users,
+  Coins,
+  Zap,
+  Gamepad2
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { type Class, type User, type Assignment } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +52,10 @@ export default function ClassroomPage() {
 
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<AssignmentWithProgress[]>({
     queryKey: ["/api/classroom/assignments"],
+  });
+
+  const { data: events } = useQuery<{ id: string; type: string; title: string; description: string; createdAt: string }[]>({
+    queryKey: ["/api/classroom/events"],
   });
 
   if (classroomLoading || assignmentsLoading) {
@@ -90,12 +99,53 @@ export default function ClassroomPage() {
             <UserIcon className="h-4 w-4" />
             Teacher: {classroom.teacher?.displayName || "Unknown"}
           </p>
+          {(classroom.class as any).ageGroup && (
+            <Badge variant="secondary" className="mt-2 text-xs gap-1">
+              {{primary: "🎨 Primary", intermediate: "📐 Intermediate", high_school: "📊 High School"}[(classroom.class as any).ageGroup] || "High School"}
+            </Badge>
+          )}
         </div>
-        <Badge variant="outline" className="w-fit text-sm py-1 px-3 gap-2">
-          <GraduationCap className="h-4 w-4 text-primary" />
-          Classroom ID: {classroom.class.joinCode}
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge variant="outline" className="w-fit text-sm py-1 px-3 gap-2">
+            <GraduationCap className="h-4 w-4 text-primary" />
+            Join Code: {classroom.class.joinCode}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-amber-500 font-bold text-sm">
+              <Coins className="h-4 w-4" />
+              <span data-testid="text-classroom-tokens">{(user as any)?.classroomTokens ?? 0} tokens</span>
+            </div>
+            <Link href="/fun-zone">
+              <Button size="sm" variant="outline" className="gap-1.5 text-primary border-primary/30">
+                <Gamepad2 className="h-3.5 w-3.5" /> Fun Zone
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
+
+      {events && events.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold flex items-center gap-1.5">
+            <Zap className="h-4 w-4 text-amber-500" /> Live Market Events
+          </h3>
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            {events.map(event => {
+              const icons: Record<string, string> = { boom: "📈", crash: "📉", news: "📰", challenge: "🏆", tip: "💡" };
+              const colors: Record<string, string> = { boom: "border-green-500/30 bg-green-500/5", crash: "border-red-500/30 bg-red-500/5", news: "border-blue-500/30 bg-blue-500/5", challenge: "border-amber-500/30 bg-amber-500/5", tip: "border-primary/30 bg-primary/5" };
+              return (
+                <div key={event.id} className={`flex-shrink-0 rounded-lg border p-3 min-w-[200px] max-w-[280px] ${colors[event.type] || "border-border"}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{icons[event.type] || "📌"}</span>
+                    <span className="font-semibold text-sm">{event.title}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{event.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Progress Summary Card */}

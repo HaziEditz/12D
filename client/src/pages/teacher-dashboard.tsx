@@ -33,7 +33,8 @@ import {
   Calendar,
   ClipboardList,
   CheckCircle2,
-  Clock
+  Clock,
+  Zap
 } from "lucide-react";
 
 interface Class {
@@ -78,6 +79,11 @@ export default function TeacherDashboard() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [newClassName, setNewClassName] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
+  const [newClassAgeGroup, setNewClassAgeGroup] = useState("high_school");
+  const [newEventType, setNewEventType] = useState("news");
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDescription, setNewEventDescription] = useState("");
+  const [createEventOpen, setCreateEventOpen] = useState(false);
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentEmail, setNewStudentEmail] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
@@ -105,19 +111,54 @@ export default function TeacherDashboard() {
     queryKey: ["/api/teacher/assignments"],
   });
 
+  const { data: classroomEvents } = useQuery<{ id: string; type: string; title: string; description: string; createdAt: string }[]>({
+    queryKey: ["/api/classroom/events", selectedClass?.id],
+    enabled: !!selectedClass,
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/classroom/events/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classroom/events", selectedClass?.id] });
+      toast({ title: "Event removed" });
+    },
+  });
+
   const createClassMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/teacher/classes", { name: newClassName, description: newClassDescription });
+      return apiRequest("POST", "/api/teacher/classes", { name: newClassName, description: newClassDescription, ageGroup: newClassAgeGroup });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classes"] });
       setNewClassName("");
       setNewClassDescription("");
+      setNewClassAgeGroup("high_school");
       setCreateClassOpen(false);
       toast({ title: "Class created successfully!" });
     },
     onError: (error: any) => {
       toast({ title: "Failed to create class", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/classroom/events", {
+        classId: selectedClass?.id,
+        type: newEventType,
+        title: newEventTitle,
+        description: newEventDescription,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classroom/events", selectedClass?.id] });
+      setNewEventTitle("");
+      setNewEventDescription("");
+      setCreateEventOpen(false);
+      toast({ title: "Market event posted!", description: "Your students will see this event in their classroom." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to post event", description: error.message, variant: "destructive" });
     },
   });
 
@@ -302,6 +343,19 @@ export default function TeacherDashboard() {
                         data-testid="input-class-description"
                       />
                     </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Age Group</label>
+                      <Select value={newClassAgeGroup} onValueChange={setNewClassAgeGroup}>
+                        <SelectTrigger data-testid="select-age-group">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="primary">🎨 Primary (Ages 6–10)</SelectItem>
+                          <SelectItem value="intermediate">📐 Intermediate (Ages 11–13)</SelectItem>
+                          <SelectItem value="high_school">📊 High School (Ages 14–18)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button
@@ -468,6 +522,10 @@ export default function TeacherDashboard() {
                   <TabsTrigger value="assignments" className="gap-2">
                     <ClipboardList className="h-4 w-4" />
                     Assignments
+                  </TabsTrigger>
+                  <TabsTrigger value="events" className="gap-2">
+                    <Zap className="h-4 w-4" />
+                    Market Events
                   </TabsTrigger>
                 </TabsList>
 
@@ -765,6 +823,98 @@ export default function TeacherDashboard() {
                             </div>
                           ))}
                         </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="events" className="flex-1 overflow-hidden flex flex-col m-0 border-0 p-0">
+                  <Card className="flex-1 border-0 rounded-none shadow-none flex flex-col">
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-lg">Market Events</CardTitle>
+                          <CardDescription>Post events that affect your classroom market simulation</CardDescription>
+                        </div>
+                        <Dialog open={createEventOpen} onOpenChange={setCreateEventOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" className="gap-1" data-testid="button-create-event">
+                              <Plus className="h-4 w-4" /> Post Event
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Post Market Event</DialogTitle>
+                              <DialogDescription>Create a market event that students see in their classroom feed.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div>
+                                <label className="text-sm font-medium mb-1 block">Event Type</label>
+                                <Select value={newEventType} onValueChange={setNewEventType}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="boom">📈 Market Boom</SelectItem>
+                                    <SelectItem value="crash">📉 Market Crash</SelectItem>
+                                    <SelectItem value="news">📰 Breaking News</SelectItem>
+                                    <SelectItem value="challenge">🏆 Class Challenge</SelectItem>
+                                    <SelectItem value="tip">💡 Teacher Tip</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Title</label>
+                                <Input
+                                  placeholder="e.g., Tech stocks surging today!"
+                                  value={newEventTitle}
+                                  onChange={e => setNewEventTitle(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Details</label>
+                                <Textarea
+                                  placeholder="Describe what's happening and what students should consider..."
+                                  value={newEventDescription}
+                                  onChange={e => setNewEventDescription(e.target.value)}
+                                  rows={3}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={() => createEventMutation.mutate()} disabled={!newEventTitle || !newEventDescription || createEventMutation.isPending}>
+                                {createEventMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Post Event
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto space-y-3">
+                      {!classroomEvents || classroomEvents.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Zap className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                          <p>No events posted yet.</p>
+                          <p className="text-xs mt-1">Post a market event to engage your students!</p>
+                        </div>
+                      ) : (
+                        classroomEvents.map(event => {
+                          const icons: Record<string, string> = { boom: "📈", crash: "📉", news: "📰", challenge: "🏆", tip: "💡" };
+                          return (
+                            <div key={event.id} className="flex gap-3 p-3 rounded-lg border bg-card">
+                              <div className="text-2xl flex-shrink-0">{icons[event.type] || "📌"}</div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm">{event.title}</p>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{event.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{new Date(event.createdAt).toLocaleDateString()}</p>
+                              </div>
+                              <Button size="icon" variant="ghost" className="flex-shrink-0 h-7 w-7" onClick={() => deleteEventMutation.mutate(event.id)}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </div>
+                          );
+                        })
                       )}
                     </CardContent>
                   </Card>

@@ -4,7 +4,7 @@ import {
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
   friendships, chatMessages, watchlistItems, journalEntries, notifications, promoCodes,
-  quizzes, quizAttempts, priceAlerts,
+  quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -17,7 +17,9 @@ import {
   type Notification, type InsertNotification,
   type PromoCode, type InsertPromoCode,
   type Quiz, type InsertQuiz, type QuizAttempt, type InsertQuizAttempt,
-  type PriceAlert, type InsertPriceAlert
+  type PriceAlert, type InsertPriceAlert,
+  type ClassroomEvent, type InsertClassroomEvent,
+  type FunZoneScore, type InsertFunZoneScore
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -190,6 +192,12 @@ export interface IStorage {
 
   getUserByUsername(username: string): Promise<User | undefined>;
   getFinancialStats(): Promise<{ totalUsers: number; activeSubscribers: number; trialUsers: number; byTier: Record<string, number>; recentSignups: User[] }>;
+  createClassroomEvent(data: InsertClassroomEvent): Promise<ClassroomEvent>;
+  getClassroomEvents(classId: string): Promise<ClassroomEvent[]>;
+  deleteClassroomEvent(id: string): Promise<void>;
+  addClassroomTokens(userId: string, tokens: number): Promise<void>;
+  saveFunZoneScore(data: InsertFunZoneScore): Promise<FunZoneScore>;
+  getFunZoneLeaderboard(game: string): Promise<{ userId: string; displayName: string; score: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1021,6 +1029,38 @@ export class DatabaseStorage implements IStorage {
     }
     const recentSignups = await db.select().from(users).where(sql`${users.role} != 'admin'`).orderBy(desc(users.trialStartDate)).limit(10);
     return { totalUsers, activeSubscribers, trialUsers, byTier, recentSignups };
+  }
+
+  async createClassroomEvent(data: InsertClassroomEvent): Promise<ClassroomEvent> {
+    const [event] = await db.insert(classroomEvents).values(data).returning();
+    return event;
+  }
+
+  async getClassroomEvents(classId: string): Promise<ClassroomEvent[]> {
+    return db.select().from(classroomEvents).where(and(eq(classroomEvents.classId, classId), eq(classroomEvents.isActive, true))).orderBy(desc(classroomEvents.createdAt));
+  }
+
+  async deleteClassroomEvent(id: string): Promise<void> {
+    await db.update(classroomEvents).set({ isActive: false }).where(eq(classroomEvents.id, id));
+  }
+
+  async addClassroomTokens(userId: string, tokens: number): Promise<void> {
+    await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${tokens}` }).where(eq(users.id, userId));
+  }
+
+  async saveFunZoneScore(data: InsertFunZoneScore): Promise<FunZoneScore> {
+    const [score] = await db.insert(funZoneScores).values(data).returning();
+    return score;
+  }
+
+  async getFunZoneLeaderboard(game: string): Promise<{ userId: string; displayName: string; score: number }[]> {
+    const results = await db.select({ userId: funZoneScores.userId, score: funZoneScores.score, displayName: users.displayName })
+      .from(funZoneScores)
+      .innerJoin(users, eq(funZoneScores.userId, users.id))
+      .where(eq(funZoneScores.game, game))
+      .orderBy(desc(funZoneScores.score))
+      .limit(20);
+    return results;
   }
 
   async checkAndAwardAchievements(userId: string): Promise<void> {

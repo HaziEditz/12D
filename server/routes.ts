@@ -1423,25 +1423,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = req.user as User;
       const classes = await storage.getClassesByStudent(user.id);
-      if (!classes.length) return res.json({ enrolled: false });
-      const cls = classes[0];
-      const teacher = await storage.getUserById(cls.teacherId);
-      const classmates = await storage.getStudentsByClass(cls.id);
-      res.json({
-        enrolled: true,
-        class: cls,
-        teacher: teacher ? { id: teacher.id, displayName: teacher.displayName } : null,
-        classmates: classmates.map(({ password: _, ...s }) => s),
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get("/api/classroom", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const classes = await storage.getClassesByStudent(user.id);
       if (!classes.length) return res.status(404).json({ message: "No class found" });
       
       const cls = classes[0];
@@ -1499,6 +1480,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         completedAt: completed ? new Date() : null,
       });
       res.json(progress);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/events", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const classStudent = await storage.getClassesByStudent(user.id);
+      if (!classStudent.length) return res.json([]);
+      const events = await storage.getClassroomEvents(classStudent[0].id);
+      res.json(events);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/classroom/events", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "teacher" && user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+      const { classId, type, title, description } = req.body;
+      const event = await storage.createClassroomEvent({ classId, teacherId: user.id, type, title, description });
+      res.json(event);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/classroom/events/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "teacher" && user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteClassroomEvent(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/fun-zone/leaderboard/:game", requireAuth, async (req, res) => {
+    try {
+      const leaderboard = await storage.getFunZoneLeaderboard(req.params.game);
+      res.json(leaderboard);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/fun-zone/score", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { game, score, tokensEarned } = req.body;
+      const saved = await storage.saveFunZoneScore({ userId: user.id, game, score, tokensEarned: tokensEarned || 0 });
+      if (tokensEarned > 0) await storage.addClassroomTokens(user.id, tokensEarned);
+      res.json(saved);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

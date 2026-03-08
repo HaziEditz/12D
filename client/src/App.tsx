@@ -38,6 +38,7 @@ import WatchlistPage from "@/pages/watchlist";
 import TipsPage from "@/pages/tips";
 import FriendsPage from "@/pages/friends";
 import ClassroomPage from "@/pages/classroom";
+import FunZonePage from "@/pages/fun-zone";
 
 function Router() {
   const { user } = useAuth();
@@ -69,7 +70,8 @@ function Router() {
       <Route path="/users/:id" component={PublicProfilePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/teacher" component={TeacherPage} />
-      <Route path="/classroom" component={user?.role === "student" ? ClassroomPage : TeacherDashboard} />
+      <Route path="/classroom" component={user?.role === "teacher" ? TeacherDashboard : ClassroomPage} />
+      <Route path="/fun-zone" component={FunZonePage} />
       <Route component={NotFound} />
     </Switch>
   );
