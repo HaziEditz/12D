@@ -11,7 +11,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, CreditCard } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { School } from "@shared/schema";
+import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, CreditCard, Search } from "lucide-react";
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
@@ -21,6 +23,10 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showTeacherPopup, setShowTeacherPopup] = useState(false);
   const [pendingTeacherData, setPendingTeacherData] = useState<RegisterInput | null>(null);
+
+  const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
+    queryKey: ["/api/schools"],
+  });
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -41,7 +47,7 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     try {
-      await register(data.email, data.password, data.displayName, data.role);
+      await register(data);
       toast({
         title: "Account created!",
         description: "Welcome to 12Digits. Start your trading journey!",
@@ -63,12 +69,7 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     try {
-      await register(
-        pendingTeacherData.email, 
-        pendingTeacherData.password, 
-        pendingTeacherData.displayName, 
-        pendingTeacherData.role
-      );
+      await register(pendingTeacherData);
       toast({
         title: "Account created!",
         description: "Now let's set up your School subscription.",
@@ -196,6 +197,58 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
+
+              {form.watch("role") === "student" && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="schoolId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>School</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-school">
+                              <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select your school"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {schools.map((school) => (
+                              <SelectItem key={school.id} value={school.id}>
+                                {school.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="other">Other / Not Listed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {(form.watch("schoolId") === "other" || !form.watch("schoolId")) && (
+                    <FormField
+                      control={form.control}
+                      name="schoolEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="your@school.edu"
+                              data-testid="input-school-email"
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </>
+              )}
 
               <Button 
                 type="submit" 

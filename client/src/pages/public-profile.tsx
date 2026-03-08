@@ -20,8 +20,10 @@ import {
   Users,
   Calendar,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShieldCheck
 } from "lucide-react";
+import { getLevelInfo } from "@/lib/levels";
 
 interface PublicUser {
   id: string;
@@ -32,6 +34,7 @@ interface PublicUser {
   membershipTier: string | null;
   lessonsCompleted: number | null;
   totalProfit: number | null;
+  xp: number | null;
 }
 
 interface UserAchievement {
@@ -211,17 +214,26 @@ export default function PublicProfilePage() {
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center gap-4">
-            <Avatar className="h-24 w-24">
+            <Avatar className="h-24 w-24 relative">
               <AvatarImage src={profile.avatarUrl || undefined} />
               <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                 {getInitials(profile.displayName)}
               </AvatarFallback>
+              <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary flex items-center justify-center border-4 border-background text-xs font-bold text-primary-foreground">
+                {getLevelInfo(profile.xp).level}
+              </div>
             </Avatar>
             
             <div>
-              <h1 className="text-2xl font-bold mb-2" data-testid="text-public-profile-name">
-                {profile.displayName}
-              </h1>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <h1 className="text-2xl font-bold" data-testid="text-public-profile-name">
+                  {profile.displayName}
+                </h1>
+                <Badge variant="outline" className="gap-1">
+                  <ShieldCheck className="h-3 w-3 text-primary" />
+                  {getLevelInfo(profile.xp).title}
+                </Badge>
+              </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Badge variant="secondary" className="gap-1" data-testid="badge-public-membership">
                   <MembershipIcon className="h-3 w-3" />

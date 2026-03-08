@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Navbar } from "@/components/navbar";
 import { TrialBanner } from "@/components/paywall";
 import { OnboardingTour } from "@/components/onboarding-tour";
@@ -37,8 +37,10 @@ import AchievementsPage from "@/pages/achievements";
 import WatchlistPage from "@/pages/watchlist";
 import TipsPage from "@/pages/tips";
 import FriendsPage from "@/pages/friends";
+import ClassroomPage from "@/pages/classroom";
 
 function Router() {
+  const { user } = useAuth();
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
@@ -67,7 +69,7 @@ function Router() {
       <Route path="/users/:id" component={PublicProfilePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/teacher" component={TeacherPage} />
-      <Route path="/classroom" component={TeacherDashboard} />
+      <Route path="/classroom" component={user?.role === "student" ? ClassroomPage : TeacherDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

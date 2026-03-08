@@ -4,6 +4,7 @@ import {
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
   friendships, chatMessages, watchlistItems, journalEntries, notifications, promoCodes,
+  quizzes, quizAttempts, priceAlerts,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -14,7 +15,9 @@ import {
   type ChatMessage, type InsertChatMessage,
   type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry,
   type Notification, type InsertNotification,
-  type PromoCode, type InsertPromoCode
+  type PromoCode, type InsertPromoCode,
+  type Quiz, type InsertQuiz, type QuizAttempt, type InsertQuizAttempt,
+  type PriceAlert, type InsertPriceAlert
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -24,7 +27,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
-  getLeaderboard(): Promise<User[]>;
+  getLeaderboard(scope?: string, userId?: string): Promise<User[]>;
   getStudentsByTeacher(teacherId: string): Promise<User[]>;
   searchUsers(query: string): Promise<User[]>;
   
@@ -60,6 +63,11 @@ export interface IStorage {
   // Assignments
   createAssignment(data: InsertAssignment): Promise<Assignment>;
   getAssignmentsByTeacher(teacherId: string): Promise<Assignment[]>;
+  getAssignmentsByClass(classId: string): Promise<Assignment[]>;
+  getAssignmentProgress(assignmentId: string): Promise<AssignmentProgress[]>;
+  getAssignmentProgressForStudent(studentId: string): Promise<AssignmentProgress[]>;
+  updateAssignmentProgress(data: InsertAssignmentProgress): Promise<AssignmentProgress>;
+  getAssignmentById(id: string): Promise<Assignment | undefined>;
   
   // Admin stats
   getUsersCount(): Promise<number>;
@@ -110,7 +118,8 @@ export interface IStorage {
   getMarketInsightById(id: string): Promise<MarketInsight | undefined>;
   updateMarketInsight(id: string, data: Partial<MarketInsight>): Promise<MarketInsight | undefined>;
   deleteMarketInsight(id: string): Promise<void>;
-  
+  getMarketInsightsCount(): Promise<number>;
+
   // Strategies
   createStrategy(data: InsertStrategy): Promise<Strategy>;
   getStrategies(): Promise<Strategy[]>;
@@ -164,6 +173,23 @@ export interface IStorage {
   updatePromoCode(id: string, data: Partial<PromoCode>): Promise<PromoCode | undefined>;
   deletePromoCode(id: string): Promise<void>;
   incrementPromoCodeUsed(id: string): Promise<void>;
+
+  createQuiz(data: InsertQuiz): Promise<Quiz>;
+  getQuizByLessonId(lessonId: string): Promise<Quiz | undefined>;
+  updateQuiz(id: string, data: Partial<Quiz>): Promise<Quiz | undefined>;
+  deleteQuiz(id: string): Promise<void>;
+  createQuizAttempt(data: InsertQuizAttempt): Promise<QuizAttempt>;
+  getQuizAttemptsByUser(userId: string): Promise<QuizAttempt[]>;
+  getBestQuizAttempt(userId: string, lessonId: string): Promise<QuizAttempt | undefined>;
+
+  createPriceAlert(data: InsertPriceAlert): Promise<PriceAlert>;
+  getPriceAlertsByUser(userId: string): Promise<PriceAlert[]>;
+  deletePriceAlert(id: string, userId: string): Promise<void>;
+  triggerPriceAlert(id: string): Promise<void>;
+  getActivePriceAlerts(): Promise<PriceAlert[]>;
+
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getFinancialStats(): Promise<{ totalUsers: number; activeSubscribers: number; trialUsers: number; byTier: Record<string, number>; recentSignups: User[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -192,7 +218,21 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getLeaderboard(): Promise<User[]> {
+  async getLeaderboard(scope?: string, userId?: string): Promise<User[]> {
+    if (scope === "class" && userId) {
+      const enrollments = await db.select().from(classStudents).where(eq(classStudents.studentId, userId));
+      if (enrollments.length > 0) {
+        const classIds = enrollments.map(e => e.classId);
+        const classmateEnrollments = await db.select().from(classStudents).where(sql`${classStudents.classId} IN ${classIds}`);
+        const classmateIds = [...new Set(classmateEnrollments.map(e => e.studentId))];
+        return db.select().from(users).where(sql`${users.id} IN ${classmateIds}`).orderBy(desc(users.totalProfit));
+      }
+    } else if (scope === "friends" && userId) {
+      const friendsData = await this.getFriends(userId);
+      const friendIds = friendsData.map(f => f.friend.id);
+      friendIds.push(userId); // Include self in friends leaderboard
+      return db.select().from(users).where(sql`${users.id} IN ${friendIds}`).orderBy(desc(users.totalProfit));
+    }
     return db.select().from(users).orderBy(desc(users.totalProfit)).limit(50);
   }
 
@@ -386,6 +426,40 @@ export class DatabaseStorage implements IStorage {
 
   async getAssignmentsByTeacher(teacherId: string): Promise<Assignment[]> {
     return db.select().from(assignments).where(eq(assignments.teacherId, teacherId));
+  }
+
+  async getAssignmentsByClass(classId: string): Promise<Assignment[]> {
+    return db.select().from(assignments).where(eq(assignments.classId, classId));
+  }
+
+  async getAssignmentProgress(assignmentId: string): Promise<AssignmentProgress[]> {
+    return db.select().from(assignmentProgress).where(eq(assignmentProgress.assignmentId, assignmentId));
+  }
+
+  async getAssignmentProgressForStudent(studentId: string): Promise<AssignmentProgress[]> {
+    return db.select().from(assignmentProgress).where(eq(assignmentProgress.studentId, studentId));
+  }
+
+  async updateAssignmentProgress(data: InsertAssignmentProgress): Promise<AssignmentProgress> {
+    const existing = await db.select().from(assignmentProgress)
+      .where(and(eq(assignmentProgress.assignmentId, data.assignmentId), eq(assignmentProgress.studentId, data.studentId)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db.update(assignmentProgress)
+        .set(data)
+        .where(eq(assignmentProgress.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    const [inserted] = await db.insert(assignmentProgress).values(data).returning();
+    return inserted;
+  }
+
+  async getAssignmentById(id: string): Promise<Assignment | undefined> {
+    const [assignment] = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1);
+    return assignment;
   }
 
   // Admin stats
@@ -640,6 +714,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(marketInsights).where(eq(marketInsights.id, id));
   }
 
+  async getMarketInsightsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(marketInsights);
+    return Number(result[0].count);
+  }
+
   // Strategies
   async createStrategy(data: InsertStrategy): Promise<Strategy> {
     const [strategy] = await db.insert(strategies).values(data).returning();
@@ -867,6 +946,81 @@ export class DatabaseStorage implements IStorage {
 
   async incrementPromoCodeUsed(id: string): Promise<void> {
     await db.update(promoCodes).set({ usedCount: sql`${promoCodes.usedCount} + 1` }).where(eq(promoCodes.id, id));
+  }
+
+  async createQuiz(data: InsertQuiz): Promise<Quiz> {
+    const [quiz] = await db.insert(quizzes).values(data).returning();
+    return quiz;
+  }
+
+  async getQuizByLessonId(lessonId: string): Promise<Quiz | undefined> {
+    const [quiz] = await db.select().from(quizzes).where(eq(quizzes.lessonId, lessonId));
+    return quiz;
+  }
+
+  async updateQuiz(id: string, data: Partial<Quiz>): Promise<Quiz | undefined> {
+    const [quiz] = await db.update(quizzes).set(data).where(eq(quizzes.id, id)).returning();
+    return quiz;
+  }
+
+  async deleteQuiz(id: string): Promise<void> {
+    await db.delete(quizzes).where(eq(quizzes.id, id));
+  }
+
+  async createQuizAttempt(data: InsertQuizAttempt): Promise<QuizAttempt> {
+    const [attempt] = await db.insert(quizAttempts).values(data).returning();
+    return attempt;
+  }
+
+  async getQuizAttemptsByUser(userId: string): Promise<QuizAttempt[]> {
+    return await db.select().from(quizAttempts).where(eq(quizAttempts.userId, userId)).orderBy(desc(quizAttempts.completedAt));
+  }
+
+  async getBestQuizAttempt(userId: string, lessonId: string): Promise<QuizAttempt | undefined> {
+    const attempts = await db.select().from(quizAttempts)
+      .where(and(eq(quizAttempts.userId, userId), eq(quizAttempts.lessonId, lessonId)))
+      .orderBy(desc(quizAttempts.score));
+    return attempts[0];
+  }
+
+  async createPriceAlert(data: InsertPriceAlert): Promise<PriceAlert> {
+    const [alert] = await db.insert(priceAlerts).values(data).returning();
+    return alert;
+  }
+
+  async getPriceAlertsByUser(userId: string): Promise<PriceAlert[]> {
+    return await db.select().from(priceAlerts).where(eq(priceAlerts.userId, userId)).orderBy(desc(priceAlerts.createdAt));
+  }
+
+  async deletePriceAlert(id: string, userId: string): Promise<void> {
+    await db.delete(priceAlerts).where(and(eq(priceAlerts.id, id), eq(priceAlerts.userId, userId)));
+  }
+
+  async triggerPriceAlert(id: string): Promise<void> {
+    await db.update(priceAlerts).set({ triggered: true }).where(eq(priceAlerts.id, id));
+  }
+
+  async getActivePriceAlerts(): Promise<PriceAlert[]> {
+    return await db.select().from(priceAlerts).where(eq(priceAlerts.triggered, false));
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getFinancialStats(): Promise<{ totalUsers: number; activeSubscribers: number; trialUsers: number; byTier: Record<string, number>; recentSignups: User[] }> {
+    const allUsers = await db.select().from(users).where(sql`${users.role} != 'admin'`);
+    const totalUsers = allUsers.length;
+    const activeSubscribers = allUsers.filter(u => u.membershipStatus === "active").length;
+    const trialUsers = allUsers.filter(u => u.membershipStatus !== "active").length;
+    const byTier: Record<string, number> = { school: 0, casual: 0, premium: 0 };
+    for (const u of allUsers.filter(u => u.membershipStatus === "active" && u.membershipTier)) {
+      const tier = u.membershipTier!;
+      byTier[tier] = (byTier[tier] || 0) + 1;
+    }
+    const recentSignups = await db.select().from(users).where(sql`${users.role} != 'admin'`).orderBy(desc(users.trialStartDate)).limit(10);
+    return { totalUsers, activeSubscribers, trialUsers, byTier, recentSignups };
   }
 
   async checkAndAwardAchievements(userId: string): Promise<void> {

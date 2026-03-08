@@ -36,16 +36,29 @@ import {
   Calculator,
   Star,
   Lightbulb,
-  Users
+  Users,
+  ShieldCheck,
+  HelpCircle
 } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "@/components/notification-bell";
+import { getLevelInfo } from "@/lib/levels";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const hasPremium = isPremiumTier(user);
+
+  const resetOnboarding = async () => {
+    try {
+      await apiRequest("PATCH", "/api/user/onboarding", { onboardingCompleted: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    } catch (error) {
+      console.error("Failed to reset onboarding:", error);
+    }
+  };
 
   const navItems = [
     { href: "/lessons", label: "Lessons", icon: BookOpen, premium: false },
@@ -116,6 +129,18 @@ export function Navbar() {
         )}
 
         <div className="flex items-center gap-2">
+          {isAuthenticated && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={resetOnboarding}
+              title="Reset Tutorial"
+              className="hover-elevate"
+              data-testid="button-reset-tutorial"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          )}
           <ThemeToggle />
           
           {isAuthenticated ? (
@@ -131,12 +156,17 @@ export function Navbar() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        {getInitials(user?.displayName ?? "U")}
-                      </AvatarFallback>
-                    </Avatar>
+                  <Button variant="ghost" className="gap-2 relative" data-testid="button-user-menu">
+                    <div className="relative">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                          {getInitials(user?.displayName ?? "U")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground border-2 border-background">
+                        {getLevelInfo(user?.xp).level}
+                      </div>
+                    </div>
                     <span className="hidden sm:inline text-sm font-medium">
                       {user?.displayName}
                     </span>
@@ -144,8 +174,26 @@ export function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">{user?.displayName}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{user?.displayName}</p>
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1">
+                        <ShieldCheck className="h-3 w-3 text-primary" />
+                        Lvl {getLevelInfo(user?.xp).level}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-muted-foreground">{getLevelInfo(user?.xp).title}</span>
+                        <span>{getLevelInfo(user?.xp).progress}%</span>
+                      </div>
+                      <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary transition-all duration-300" 
+                          style={{ width: `${getLevelInfo(user?.xp).progress}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
@@ -195,6 +243,14 @@ export function Navbar() {
                         );
                       })}
                     </>
+                  )}
+                  {user?.role === "student" && user?.teacherId && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/classroom" className="flex items-center gap-2 cursor-pointer" data-testid="link-student-classroom">
+                        <GraduationCap className="h-4 w-4" />
+                        My Classroom
+                      </Link>
+                    </DropdownMenuItem>
                   )}
                   {(user?.role === "teacher" || user?.role === "admin") && (
                     <DropdownMenuItem asChild>

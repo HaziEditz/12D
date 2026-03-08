@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Medal, TrendingUp, Crown, Sparkles } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trophy, Medal, TrendingUp, Crown, Sparkles, ShieldCheck, Globe, Users } from "lucide-react";
 import type { User } from "@shared/schema";
+import { getLevelInfo } from "@/lib/levels";
 
 function getMembershipBadge(tier: string | null | undefined, status: string | null | undefined) {
   if (status !== "active" || !tier) return null;
@@ -36,8 +39,9 @@ function getMembershipBadge(tier: string | null | undefined, status: string | nu
 }
 
 export default function LeaderboardPage() {
+  const [scope, setScope] = useState<string>("global");
   const { data: leaderboard, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/leaderboard"],
+    queryKey: ["/api/leaderboard", { scope }],
   });
 
   const getInitials = (name: string) => {
@@ -104,14 +108,33 @@ export default function LeaderboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-center gap-4 mb-8">
-        <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Trophy className="h-7 w-7 text-primary" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Trophy className="h-7 w-7 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">Leaderboard</h1>
+            <p className="text-muted-foreground">Top traders ranked by total profit</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold">Leaderboard</h1>
-          <p className="text-muted-foreground">Top traders ranked by total profit</p>
-        </div>
+
+        <Tabs value={scope} onValueChange={setScope} className="w-full md:w-auto">
+          <TabsList className="grid w-full grid-cols-3 md:w-[300px]">
+            <TabsTrigger value="global" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              <span>Global</span>
+            </TabsTrigger>
+            <TabsTrigger value="class" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Local</span>
+            </TabsTrigger>
+            <TabsTrigger value="friends" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span>Friends</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {leaderboard && leaderboard.length > 0 && (
@@ -183,15 +206,24 @@ export default function LeaderboardPage() {
                         )}
                       </div>
                       
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {getInitials(user.displayName)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                        <Avatar className="h-12 w-12">
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(user.displayName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground border-2 border-background">
+                          {getLevelInfo(user.xp).level}
+                        </div>
+                      </div>
                       
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold">{user.displayName}</p>
+                          <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1">
+                            <ShieldCheck className="h-3 w-3 text-primary" />
+                            {getLevelInfo(user.xp).title}
+                          </Badge>
                           {getMembershipBadge(user.membershipTier, user.membershipStatus)}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

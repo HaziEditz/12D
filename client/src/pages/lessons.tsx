@@ -16,7 +16,21 @@ import {
   Filter,
   Lock,
   Sparkles,
-  X
+  X,
+  ArrowUpDown,
+  SortAsc,
+  SortDesc,
+  Timer,
+  GraduationCap,
+  LayoutGrid,
+  TrendingUp,
+  Coins,
+  Globe,
+  BarChart3,
+  Brain,
+  Briefcase,
+  Newspaper,
+  Zap
 } from "lucide-react";
 import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
@@ -29,15 +43,77 @@ export default function LessonsPage() {
   const [showFilter, setShowFilter] = useState(false);
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("default");
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
   });
 
+  const categories = [
+    { id: "all", label: "All", icon: LayoutGrid },
+    { id: "basics", label: "Basics", icon: BookOpen },
+    { id: "technical-analysis", label: "Technical Analysis", icon: BarChart3 },
+    { id: "risk-management", label: "Risk Management", icon: Briefcase },
+    { id: "psychology", label: "Psychology", icon: Brain },
+    { id: "strategies", label: "Strategies", icon: Zap },
+    { id: "options", label: "Options", icon: TrendingUp },
+    { id: "crypto", label: "Crypto", icon: Coins },
+    { id: "forex", label: "Forex", icon: Globe },
+    { id: "economics", label: "Economics", icon: GraduationCap },
+    { id: "fundamental-analysis", label: "Fundamental", icon: Newspaper },
+    { id: "chart-patterns", label: "Chart Patterns", icon: BarChart3 },
+    { id: "portfolio-management", label: "Portfolio", icon: Briefcase },
+    { id: "news-trading", label: "News Trading", icon: Newspaper },
+  ];
+
+  const sortOptions = [
+    { id: "default", label: "Default", icon: ArrowUpDown },
+    { id: "az", label: "A-Z", icon: SortAsc },
+    { id: "za", label: "Z-A", icon: SortDesc },
+    { id: "shortest", label: "Shortest First", icon: Timer },
+    { id: "longest", label: "Longest First", icon: Clock },
+    { id: "beginner", label: "Beginner First", icon: GraduationCap },
+    { id: "advanced", label: "Advanced First", icon: Sparkles },
+  ];
+
   const { data: progress } = useQuery<LessonProgress[]>({
     queryKey: ["/api/lessons/progress"],
     enabled: !!user,
   });
+
+  const getDifficultyValue = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "beginner": return 1;
+      case "intermediate": return 2;
+      case "advanced": return 3;
+      default: return 0;
+    }
+  };
+
+  const filteredAndSortedLessons = (lessons ?? [])
+    .filter(lesson => {
+      const diffMatch = filterDifficulty === "all" || lesson.difficulty.toLowerCase() === filterDifficulty;
+      const catMatch = filterCategory === "all" || lesson.category.toLowerCase() === filterCategory;
+      return diffMatch && catMatch;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "az":
+          return a.title.localeCompare(b.title);
+        case "za":
+          return b.title.localeCompare(a.title);
+        case "shortest":
+          return (a.duration || 0) - (b.duration || 0);
+        case "longest":
+          return (b.duration || 0) - (a.duration || 0);
+        case "beginner":
+          return getDifficultyValue(a.difficulty) - getDifficultyValue(b.difficulty);
+        case "advanced":
+          return getDifficultyValue(b.difficulty) - getDifficultyValue(a.difficulty);
+        default:
+          return 0;
+      }
+    });
 
   const completedLessonIds = new Set(
     progress?.filter(p => p.completed).map(p => p.lessonId) ?? []
@@ -124,54 +200,74 @@ export default function LessonsPage() {
       {showFilter && (
         <Card className="mb-4 border-primary/30 bg-primary/5">
           <CardContent className="pt-4 pb-4">
-            <div className="flex flex-wrap gap-6">
+            <div className="space-y-6">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Difficulty</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Sort By</p>
+                <div className="flex gap-2 flex-wrap">
+                  {sortOptions.map((option) => (
+                    <Button
+                      key={option.id}
+                      variant={sortBy === option.id ? "default" : "secondary"}
+                      size="sm"
+                      className="h-8 gap-1.5 rounded-full"
+                      onClick={() => setSortBy(option.id)}
+                      data-testid={`sort-${option.id}`}
+                    >
+                      <option.icon className="h-3.5 w-3.5" />
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Difficulty</p>
                 <div className="flex gap-2 flex-wrap">
                   {["all", "beginner", "intermediate", "advanced"].map((d) => (
-                    <button
+                    <Button
                       key={d}
+                      variant={filterDifficulty === d ? "default" : "secondary"}
+                      size="sm"
+                      className="h-8 rounded-full capitalize"
                       onClick={() => setFilterDifficulty(d)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
-                        filterDifficulty === d 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-muted hover:bg-muted/80"
-                      }`}
                       data-testid={`filter-difficulty-${d}`}
                     >
                       {d === "all" ? "All" : d}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
+
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Category</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Category</p>
                 <div className="flex gap-2 flex-wrap">
-                  {["all", "basics", "technical-analysis", "risk-management", "psychology", "strategies"].map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setFilterCategory(c)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
-                        filterCategory === c 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-muted hover:bg-muted/80"
-                      }`}
-                      data-testid={`filter-category-${c}`}
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant={filterCategory === cat.id ? "default" : "secondary"}
+                      size="sm"
+                      className="h-8 gap-1.5 rounded-full"
+                      onClick={() => setFilterCategory(cat.id)}
+                      data-testid={`filter-category-${cat.id}`}
                     >
-                      {c === "all" ? "All" : c.replace("-", " ")}
-                    </button>
+                      <cat.icon className="h-3.5 w-3.5" />
+                      {cat.label}
+                    </Button>
                   ))}
                 </div>
               </div>
-              {(filterDifficulty !== "all" || filterCategory !== "all") && (
-                <div className="flex items-end">
-                  <button
-                    onClick={() => { setFilterDifficulty("all"); setFilterCategory("all"); }}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+
+              {(filterDifficulty !== "all" || filterCategory !== "all" || sortBy !== "default") && (
+                <div className="pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setFilterDifficulty("all"); setFilterCategory("all"); setSortBy("default"); }}
+                    className="h-8 gap-1 text-muted-foreground hover:text-foreground"
                     data-testid="button-clear-filters"
                   >
-                    <X className="h-3 w-3" /> Clear filters
-                  </button>
+                    <X className="h-3.5 w-3.5" /> Clear all filters
+                  </Button>
                 </div>
               )}
             </div>
@@ -249,11 +345,7 @@ export default function LessonsPage() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {lessons?.filter(lesson => {
-          const diffMatch = filterDifficulty === "all" || lesson.difficulty.toLowerCase() === filterDifficulty;
-          const catMatch = filterCategory === "all" || lesson.category.toLowerCase() === filterCategory;
-          return diffMatch && catMatch;
-        }).map((lesson) => {
+        {filteredAndSortedLessons.map((lesson) => {
           const isCompleted = completedLessonIds.has(lesson.id);
           const isLocked = isLessonLocked(lesson);
           return (

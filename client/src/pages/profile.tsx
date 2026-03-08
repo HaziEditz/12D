@@ -15,8 +15,10 @@ import {
   Crown,
   GraduationCap,
   Zap,
-  Settings
+  Settings,
+  ShieldCheck
 } from "lucide-react";
+import { getLevelInfo } from "@/lib/levels";
 
 interface Lesson {
   id: string;
@@ -72,6 +74,8 @@ export default function ProfilePage() {
 
   const totalCompleted = completedLessonIds.size;
   const totalLessons = lessons?.length || 50;
+
+  const levelInfo = getLevelInfo(user?.xp);
 
   const getInitials = (name: string) => {
     return name
@@ -136,20 +140,38 @@ export default function ProfilePage() {
       <Card className="mb-8">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={user?.avatarUrl || undefined} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                {getInitials(user?.displayName ?? "U")}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={user?.avatarUrl || undefined} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                  {getInitials(user?.displayName ?? "U")}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full bg-primary flex items-center justify-center border-4 border-background text-sm font-bold text-primary-foreground">
+                {levelInfo.level}
+              </div>
+            </div>
             
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-2xl font-bold mb-1" data-testid="text-profile-name">
-                {user?.displayName}
-              </h1>
-              <p className="text-muted-foreground mb-2" data-testid="text-profile-email">
-                {user?.email}
-              </p>
+              <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
+                <h1 className="text-2xl font-bold" data-testid="text-profile-name">
+                  {user?.displayName}
+                </h1>
+                <Badge variant="outline" className="gap-1">
+                  <ShieldCheck className="h-3 w-3 text-primary" />
+                  {levelInfo.title}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-1 mb-2">
+                <p className="text-muted-foreground" data-testid="text-profile-email">
+                  {user?.email}
+                </p>
+                {user?.username && (
+                  <p className="text-sm font-medium text-primary" data-testid="text-profile-username">
+                    @{user.username}
+                  </p>
+                )}
+              </div>
               {(user as any)?.bio && (
                 <p className="text-sm text-muted-foreground mb-3 max-w-md" data-testid="text-profile-bio">
                   {(user as any).bio}
@@ -186,6 +208,34 @@ export default function ProfilePage() {
       </Card>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Card className="md:col-span-2 lg:col-span-4">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <ShieldCheck className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Level {levelInfo.level}: {levelInfo.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {levelInfo.currentXp} total XP • {levelInfo.xpToNext} XP until next level
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-primary">{levelInfo.level}</span>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Level</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-medium">
+                <span>XP Progress</span>
+                <span>{levelInfo.progress}%</span>
+              </div>
+              <Progress value={levelInfo.progress} className="h-3" />
+            </div>
+          </CardContent>
+        </Card>
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (

@@ -21,7 +21,7 @@ export default function LoginPage() {
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
   });
@@ -29,7 +29,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+      await login(data.identifier, data.password);
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
@@ -66,15 +66,15 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
+                name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email or Username</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
-                        placeholder="you@example.com"
-                        data-testid="input-email"
+                        type="text"
+                        placeholder="you@example.com or username"
+                        data-testid="input-identifier"
                         {...field}
                       />
                     </FormControl>

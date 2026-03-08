@@ -16,7 +16,8 @@ import {
   DollarSign,
   Percent,
   Info,
-  Shield
+  Shield,
+  Zap
 } from "lucide-react";
 import { useState, useMemo } from "react";
 
@@ -28,12 +29,14 @@ function RiskCalculatorContent() {
   const [stopLoss, setStopLoss] = useState("95");
   const [takeProfit, setTakeProfit] = useState("110");
   const [riskPercent, setRiskPercent] = useState([2]);
+  const [leverage, setLeverage] = useState("1");
 
   const calculations = useMemo(() => {
     const entry = parseFloat(entryPrice) || 0;
     const stop = parseFloat(stopLoss) || 0;
     const target = parseFloat(takeProfit) || 0;
     const risk = riskPercent[0] / 100;
+    const lev = parseFloat(leverage) || 1;
 
     const riskPerShare = Math.abs(entry - stop);
     const rewardPerShare = Math.abs(target - entry);
@@ -47,6 +50,9 @@ function RiskCalculatorContent() {
     const potentialProfit = positionSize * rewardPerShare;
     
     const breakEvenWinRate = riskRewardRatio > 0 ? (1 / (1 + riskRewardRatio)) * 100 : 0;
+    const breakEvenMove = entry > 0 ? (riskPerShare / entry) * 100 : 0;
+    
+    const marginRequired = lev > 0 ? positionValue / lev : positionValue;
     
     const isLong = entry > stop;
 
@@ -60,10 +66,12 @@ function RiskCalculatorContent() {
       potentialLoss: potentialLoss.toFixed(2),
       potentialProfit: potentialProfit.toFixed(2),
       breakEvenWinRate: breakEvenWinRate.toFixed(1),
+      breakEvenMove: breakEvenMove.toFixed(2),
+      marginRequired: marginRequired.toFixed(2),
       isLong,
       percentOfAccount: ((positionValue / accountBalance) * 100).toFixed(1)
     };
-  }, [entryPrice, stopLoss, takeProfit, riskPercent, accountBalance]);
+  }, [entryPrice, stopLoss, takeProfit, riskPercent, accountBalance, leverage]);
 
   const riskLevel = useMemo(() => {
     const ratio = parseFloat(calculations.riskRewardRatio);
@@ -148,6 +156,22 @@ function RiskCalculatorContent() {
                     onChange={(e) => setTakeProfit(e.target.value)}
                     className="font-mono border-green-500/30"
                     data-testid="input-take-profit"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="leverage" className="flex items-center gap-2 mb-2">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    Leverage (x:1)
+                  </Label>
+                  <Input
+                    id="leverage"
+                    type="number"
+                    value={leverage}
+                    onChange={(e) => setLeverage(e.target.value)}
+                    className="font-mono border-amber-500/30"
+                    data-testid="input-leverage"
+                    min="1"
                   />
                 </div>
 
@@ -243,6 +267,17 @@ function RiskCalculatorContent() {
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Break-even Win Rate</p>
                     <p className="text-lg font-bold font-mono">{calculations.breakEvenWinRate}%</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Break-even Move</p>
+                    <p className="text-lg font-bold font-mono">{calculations.breakEvenMove}%</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Margin Required</p>
+                    <p className="text-lg font-bold font-mono">${parseFloat(calculations.marginRequired).toLocaleString()}</p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Trade Direction</p>

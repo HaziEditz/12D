@@ -5,9 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Check, Crown, GraduationCap, User, Sparkles, Tag, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Check, Crown, GraduationCap, User, Sparkles, Tag, Loader2, Search } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import type { School } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import SubscriptionPayPalButton from "@/components/SubscriptionPayPalButton";
 
@@ -75,6 +78,16 @@ export default function Pricing() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [showPromoInput, setShowPromoInput] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
+  const [showSchoolModal, setShowSchoolModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
+    queryKey: ["/api/schools"],
+  });
+
+  const filteredSchools = schools.filter(school => 
+    school.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleRedeemPromo = async () => {
     if (!promoCode.trim()) {
@@ -246,6 +259,16 @@ export default function Pricing() {
                     >
                       You have a higher tier
                     </Button>
+                  ) : plan.id === "school" ? (
+                    <Button
+                      className="w-full"
+                      variant={plan.popular ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setShowSchoolModal(true)}
+                      data-testid={`button-subscribe-${plan.id}`}
+                    >
+                      Subscribe to School
+                    </Button>
                   ) : (
                     <SubscriptionPayPalButton
                       planId={plan.id}
@@ -308,6 +331,77 @@ export default function Pricing() {
           </p>
         </div>
       </div>
+
+      <Dialog open={showSchoolModal} onOpenChange={setShowSchoolModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>School Subscription</DialogTitle>
+            <DialogDescription>
+              Is your school already registered? Search below, or continue to set up a new school account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search schools..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2 rounded-md border p-2">
+              {isLoadingSchools ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredSchools.length > 0 ? (
+                filteredSchools.map((school) => (
+                  <div
+                    key={school.id}
+                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{school.name}</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        // In a real app, this would link the teacher to the school
+                        // For now we'll just proceed to checkout
+                        setShowSchoolModal(false);
+                      }}
+                    >
+                      Connect
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No schools found matching your search.
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <p className="text-xs text-muted-foreground text-center">
+                Don't see your school? You can register it during checkout.
+              </p>
+              <SubscriptionPayPalButton
+                planId="school"
+                amount={isAnnual ? (8.49 * 10).toString() : "8.49"}
+                planName="School Plan"
+                onSuccess={() => setShowSchoolModal(false)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowSchoolModal(false)} className="w-full">
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

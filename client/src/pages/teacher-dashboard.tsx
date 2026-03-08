@@ -9,6 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Users, 
   Plus, 
@@ -25,7 +29,11 @@ import {
   Crown,
   Medal,
   CreditCard,
-  Lock
+  Lock,
+  Calendar,
+  ClipboardList,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 
 interface Class {
@@ -47,6 +55,16 @@ interface StudentProgress {
   profitableTrades: number;
 }
 
+interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  targetValue: number;
+  dueDate: string | null;
+  classId: string | null;
+}
+
 interface NewStudentResult {
   id: string;
   displayName: string;
@@ -66,6 +84,14 @@ export default function TeacherDashboard() {
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [createdStudent, setCreatedStudent] = useState<NewStudentResult | null>(null);
 
+  // Assignment states
+  const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
+  const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [assignmentDescription, setAssignmentDescription] = useState("");
+  const [assignmentType, setAssignmentType] = useState("profit_target");
+  const [assignmentTargetValue, setAssignmentTargetValue] = useState("1000");
+  const [assignmentDueDate, setAssignmentDueDate] = useState("");
+
   const { data: classes, isLoading: classesLoading } = useQuery<Class[]>({
     queryKey: ["/api/teacher/classes"],
   });
@@ -73,6 +99,10 @@ export default function TeacherDashboard() {
   const { data: students, isLoading: studentsLoading } = useQuery<StudentProgress[]>({
     queryKey: ["/api/teacher/classes", selectedClass?.id, "students"],
     enabled: !!selectedClass,
+  });
+
+  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+    queryKey: ["/api/teacher/assignments"],
   });
 
   const createClassMutation = useMutation({
@@ -128,6 +158,29 @@ export default function TeacherDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classes", selectedClass?.id, "students"] });
       toast({ title: "Student removed from class" });
+    },
+  });
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/teacher/assignments", {
+        title: assignmentTitle,
+        description: assignmentDescription,
+        type: assignmentType,
+        targetValue: parseFloat(assignmentTargetValue),
+        dueDate: assignmentDueDate ? new Date(assignmentDueDate).toISOString() : null,
+        classId: selectedClass?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/assignments"] });
+      setAssignmentTitle("");
+      setAssignmentDescription("");
+      setCreateAssignmentOpen(false);
+      toast({ title: "Assignment created successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create assignment", description: error.message, variant: "destructive" });
     },
   });
 
@@ -406,184 +459,317 @@ export default function TeacherDashboard() {
                 </Card>
               )}
 
-              <Card className="flex-1 overflow-hidden flex flex-col">
-                <CardHeader className="pb-3 flex-shrink-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-lg">Students</CardTitle>
-                      <CardDescription data-testid="text-student-count">{students?.length ?? 0} students enrolled</CardDescription>
-                    </div>
-                    <Dialog open={addStudentOpen} onOpenChange={(open) => {
-                      if (!open) closeStudentDialog();
-                      else setAddStudentOpen(true);
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" data-testid="button-add-student">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Student
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        {createdStudent ? (
-                          <>
-                            <DialogHeader>
-                              <DialogTitle>Student Account Created</DialogTitle>
-                              <DialogDescription>
-                                Share these login credentials with your student. They can use these to sign in.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="p-4 rounded-lg bg-muted">
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Student Name</p>
-                                    <p className="font-medium" data-testid="text-created-student-name">{createdStudent.displayName}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Email</p>
-                                    <p className="font-medium" data-testid="text-created-student-email">{createdStudent.email}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Temporary Password</p>
-                                    <p className="font-mono font-medium text-lg" data-testid="text-created-student-password">{createdStudent.temporaryPassword}</p>
+              <Tabs defaultValue="students" className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="w-full justify-start border-b rounded-none px-4 bg-transparent h-12 flex-shrink-0">
+                  <TabsTrigger value="students" className="gap-2">
+                    <Users className="h-4 w-4" />
+                    Students
+                  </TabsTrigger>
+                  <TabsTrigger value="assignments" className="gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Assignments
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="students" className="flex-1 overflow-hidden flex flex-col m-0 border-0 p-0">
+                  <Card className="flex-1 border-0 rounded-none shadow-none flex flex-col">
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-lg">Enrolled Students</CardTitle>
+                          <CardDescription data-testid="text-student-count">{students?.length ?? 0} students in this class</CardDescription>
+                        </div>
+                        <Dialog open={addStudentOpen} onOpenChange={(open) => {
+                          if (!open) closeStudentDialog();
+                          else setAddStudentOpen(true);
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" data-testid="button-add-student">
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Student
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            {createdStudent ? (
+                              <>
+                                <DialogHeader>
+                                  <DialogTitle>Student Account Created</DialogTitle>
+                                  <DialogDescription>
+                                    Share these login credentials with your student. They can use these to sign in.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="p-4 rounded-lg bg-muted">
+                                    <div className="space-y-2">
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Student Name</p>
+                                        <p className="font-medium" data-testid="text-created-student-name">{createdStudent.displayName}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Email</p>
+                                        <p className="font-medium" data-testid="text-created-student-email">{createdStudent.email}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Temporary Password</p>
+                                        <p className="font-mono font-medium text-lg" data-testid="text-created-student-password">{createdStudent.temporaryPassword}</p>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
+                                <DialogFooter className="gap-2">
+                                  <Button variant="outline" onClick={copyCredentials} data-testid="button-copy-credentials">
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy Credentials
+                                  </Button>
+                                  <Button onClick={closeStudentDialog} data-testid="button-done-creating">
+                                    Done
+                                  </Button>
+                                </DialogFooter>
+                              </>
+                            ) : (
+                              <>
+                                <DialogHeader>
+                                  <DialogTitle>Create Student Account</DialogTitle>
+                                  <DialogDescription>
+                                    Enter the student's details. A secure password will be automatically generated.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div>
+                                    <label className="text-sm font-medium">Student Name</label>
+                                    <Input
+                                      placeholder="e.g., John Smith"
+                                      value={newStudentName}
+                                      onChange={(e) => setNewStudentName(e.target.value)}
+                                      data-testid="input-student-name"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Email</label>
+                                    <Input
+                                      type="email"
+                                      placeholder="e.g., john.smith@school.edu"
+                                      value={newStudentEmail}
+                                      onChange={(e) => setNewStudentEmail(e.target.value)}
+                                      data-testid="input-student-email"
+                                    />
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button
+                                    onClick={() => addStudentMutation.mutate()}
+                                    disabled={!newStudentName || !newStudentEmail || addStudentMutation.isPending}
+                                    data-testid="button-submit-student"
+                                  >
+                                    {addStudentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                    Create Account
+                                  </Button>
+                                </DialogFooter>
+                              </>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto">
+                      {studentsLoading ? (
+                        <div className="flex items-center justify-center py-8" data-testid="loading-students">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : !students || students.length === 0 ? (
+                        <div className="text-center py-8" data-testid="empty-students">
+                          <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">No students in this class yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {students.map((student) => (
+                            <div 
+                              key={student.id} 
+                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover-elevate transition-all"
+                              data-testid={`student-item-${student.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="bg-primary/10 text-primary">
+                                    {student.displayName.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium" data-testid={`student-name-${student.id}`}>{student.displayName}</p>
+                                  <p className="text-xs text-muted-foreground">{student.email}</p>
+                                </div>
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                The student should change their password after logging in for the first time.
-                              </p>
+                              <div className="flex items-center gap-6">
+                                <div className="text-right hidden sm:block">
+                                  <p className="text-xs text-muted-foreground uppercase font-semibold">Progress</p>
+                                  <p className="text-sm font-medium">{student.lessonsCompleted} lessons</p>
+                                </div>
+                                <div className="text-right hidden sm:block">
+                                  <p className="text-xs text-muted-foreground uppercase font-semibold">Balance</p>
+                                  <p className="text-sm font-medium text-success">${student.simulatorBalance.toLocaleString()}</p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:bg-destructive/10"
+                                  onClick={() => removeStudentMutation.mutate(student.id)}
+                                  disabled={removeStudentMutation.isPending}
+                                  data-testid={`button-remove-student-${student.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <DialogFooter className="gap-2">
-                              <Button variant="outline" onClick={copyCredentials} data-testid="button-copy-credentials">
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Credentials
-                              </Button>
-                              <Button onClick={closeStudentDialog} data-testid="button-done-creating">
-                                Done
-                              </Button>
-                            </DialogFooter>
-                          </>
-                        ) : (
-                          <>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="assignments" className="flex-1 overflow-hidden flex flex-col m-0 border-0 p-0">
+                  <Card className="flex-1 border-0 rounded-none shadow-none flex flex-col">
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-lg">Class Assignments</CardTitle>
+                          <CardDescription>Create and manage tasks for your students</CardDescription>
+                        </div>
+                        <Dialog open={createAssignmentOpen} onOpenChange={setCreateAssignmentOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" data-testid="button-create-assignment">
+                              <Plus className="h-4 w-4 mr-2" />
+                              New Assignment
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
                             <DialogHeader>
-                              <DialogTitle>Create Student Account</DialogTitle>
+                              <DialogTitle>Create Assignment</DialogTitle>
                               <DialogDescription>
-                                Enter the student's details. A secure password will be automatically generated.
+                                Assign a task to all students in {selectedClass.name}
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
-                              <div>
-                                <label className="text-sm font-medium">Student Name</label>
-                                <Input
-                                  placeholder="e.g., John Smith"
-                                  value={newStudentName}
-                                  onChange={(e) => setNewStudentName(e.target.value)}
-                                  data-testid="input-student-name"
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Assignment Title</label>
+                                <Input 
+                                  placeholder="e.g., Reach $10,000 Portfolio" 
+                                  value={assignmentTitle}
+                                  onChange={(e) => setAssignmentTitle(e.target.value)}
+                                  data-testid="input-assignment-title"
                                 />
                               </div>
-                              <div>
-                                <label className="text-sm font-medium">Email</label>
-                                <Input
-                                  type="email"
-                                  placeholder="e.g., john.smith@school.edu"
-                                  value={newStudentEmail}
-                                  onChange={(e) => setNewStudentEmail(e.target.value)}
-                                  data-testid="input-student-email"
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Description</label>
+                                <Textarea 
+                                  placeholder="Describe the goals of this assignment" 
+                                  value={assignmentDescription}
+                                  onChange={(e) => setAssignmentDescription(e.target.value)}
+                                  className="h-20"
+                                  data-testid="input-assignment-description"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Type</label>
+                                  <Select value={assignmentType} onValueChange={setAssignmentType}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="profit_target">Profit Target</SelectItem>
+                                      <SelectItem value="lesson_completion">Lesson Count</SelectItem>
+                                      <SelectItem value="portfolio_balance">Min. Balance</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Target Value</label>
+                                  <Input 
+                                    type="number" 
+                                    value={assignmentTargetValue}
+                                    onChange={(e) => setAssignmentTargetValue(e.target.value)}
+                                    data-testid="input-assignment-target"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Due Date</label>
+                                <Input 
+                                  type="date" 
+                                  value={assignmentDueDate}
+                                  onChange={(e) => setAssignmentDueDate(e.target.value)}
+                                  data-testid="input-assignment-due-date"
                                 />
                               </div>
                             </div>
                             <DialogFooter>
-                              <Button
-                                onClick={() => addStudentMutation.mutate()}
-                                disabled={!newStudentName || !newStudentEmail || addStudentMutation.isPending}
-                                data-testid="button-submit-student"
+                              <Button 
+                                className="w-full"
+                                onClick={() => createAssignmentMutation.mutate()}
+                                disabled={!assignmentTitle || !assignmentDescription || createAssignmentMutation.isPending}
+                                data-testid="button-submit-assignment"
                               >
-                                {addStudentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                Create Account
+                                {createAssignmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Create Assignment
                               </Button>
                             </DialogFooter>
-                          </>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  {studentsLoading ? (
-                    <div className="flex items-center justify-center py-8" data-testid="loading-students">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : !students || students.length === 0 ? (
-                    <div className="text-center py-8" data-testid="empty-students">
-                      <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">No students yet</p>
-                      <p className="text-xs text-muted-foreground">Add your first student to this class</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {students.map((student) => (
-                        <div
-                          key={student.id}
-                          className="p-4 rounded-lg bg-muted/50 hover-elevate"
-                          data-testid={`student-row-${student.id}`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <span className="font-medium" data-testid={`text-student-name-${student.id}`}>{student.displayName}</span>
-                                <Badge variant="outline" className="text-xs">{student.email}</Badge>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto">
+                      {assignmentsLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : !assignments || assignments.filter(a => a.classId === selectedClass.id).length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                          <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
+                          <h3 className="text-lg font-medium">No assignments yet</h3>
+                          <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
+                            Create your first assignment to start tracking student progress.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {assignments.filter(a => a.classId === selectedClass.id).map((assignment) => (
+                            <div 
+                              key={assignment.id} 
+                              className="p-4 rounded-lg border bg-card hover-elevate transition-all"
+                            >
+                              <div className="flex justify-between gap-4">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-semibold">{assignment.title}</h4>
+                                    <Badge variant="outline" className="text-[10px] uppercase">
+                                      {assignment.type.replace("_", " ")}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {assignment.description}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Lessons</p>
-                                    <p className="font-medium" data-testid={`text-lessons-${student.id}`}>{student.lessonsCompleted}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Balance</p>
-                                    <p className="font-medium" data-testid={`text-balance-${student.id}`}>${student.simulatorBalance.toLocaleString()}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Total Profit</p>
-                                    <p className={`font-medium ${student.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} data-testid={`text-profit-${student.id}`}>
-                                      {student.totalProfit >= 0 ? '+' : ''}${student.totalProfit.toFixed(2)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Trades</p>
-                                    <p className="font-medium" data-testid={`text-trades-${student.id}`}>
-                                      {student.profitableTrades}/{student.totalTrades} wins
-                                    </p>
-                                  </div>
-                                </div>
+                              <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Target: {assignment.targetValue.toLocaleString()}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3.5 w-3.5" />
+                                  Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'None'}
+                                </span>
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeStudentMutation.mutate(student.id)}
-                              disabled={removeStudentMutation.isPending}
-                              data-testid={`button-remove-student-${student.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </div>

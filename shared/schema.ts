@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   lastTradeDate: text("last_trade_date"),
   xp: integer("xp").default(0),
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  username: varchar("username", { length: 50 }).unique(),
 });
 
 export const lessons = pgTable("lessons", {
@@ -88,10 +89,12 @@ export const portfolioItems = pgTable("portfolio_items", {
 export const assignments = pgTable("assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teacherId: varchar("teacher_id").notNull(),
+  classId: varchar("class_id"), // Added classId to link assignment to a class
   title: text("title").notNull(),
   description: text("description").notNull(),
+  type: text("type").notNull().default("profit_target"), // profit_target, lesson_completion, portfolio_balance
+  targetValue: real("target_value").notNull().default(0),
   dueDate: timestamp("due_date"),
-  targetProfit: real("target_profit"),
 });
 
 export const assignmentProgress = pgTable("assignment_progress", {
@@ -99,7 +102,7 @@ export const assignmentProgress = pgTable("assignment_progress", {
   assignmentId: varchar("assignment_id").notNull(),
   studentId: varchar("student_id").notNull(),
   completed: boolean("completed").default(false),
-  profit: real("profit").default(0),
+  currentValue: real("current_value").default(0),
   completedAt: timestamp("completed_at"),
 });
 
@@ -269,6 +272,43 @@ export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({ id: t
 export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
 export type PromoCode = typeof promoCodes.$inferSelect;
 
+export const quizzes = pgTable("quizzes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lessonId: varchar("lesson_id").notNull(),
+  questions: jsonb("questions").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  lessonId: varchar("lesson_id").notNull(),
+  score: integer("score").notNull(),
+  total: integer("total").notNull(),
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+export const priceAlerts = pgTable("price_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  symbol: varchar("symbol", { length: 20 }).notNull(),
+  targetPrice: real("target_price").notNull(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),
+  triggered: boolean("triggered").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQuizSchema = createInsertSchema(quizzes).omit({ id: true, createdAt: true });
+export const insertQuizAttemptSchema = createInsertSchema(quizAttempts).omit({ id: true, completedAt: true });
+export const insertPriceAlertSchema = createInsertSchema(priceAlerts).omit({ id: true, createdAt: true, triggered: true });
+export type InsertQuiz = z.infer<typeof insertQuizSchema>;
+export type Quiz = typeof quizzes.$inferSelect;
+export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;
+export type QuizAttempt = typeof quizAttempts.$inferSelect;
+export type InsertPriceAlert = z.infer<typeof insertPriceAlertSchema>;
+export type PriceAlert = typeof priceAlerts.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
@@ -311,8 +351,20 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  identifier: z.string().min(1, "Email or username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const updateProfileSchema = z.object({
+  displayName: z.string().min(2, "Display name must be at least 2 characters").optional(),
+  bio: z.string().max(200, "Bio must be at most 200 characters").optional(),
+  avatarUrl: z.string().url("Invalid URL").optional().nullable(),
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(20, "Username must be at most 200 characters")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers and underscores")
+    .optional()
+    .nullable(),
 });
 
 export const registerSchema = z.object({
@@ -320,6 +372,8 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
   role: z.enum(userRoles).optional(),
+  schoolId: z.string().optional().nullable(),
+  schoolEmail: z.string().email("Invalid school email").optional().nullable(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

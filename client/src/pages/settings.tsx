@@ -31,6 +31,12 @@ import { AvatarUploader } from "@/components/AvatarUploader";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(20, "Username must be at most 20 characters")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers and underscores")
+    .optional()
+    .or(z.literal("")),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
   avatarUrl: z.string().optional().or(z.literal("")),
 });
@@ -87,6 +93,7 @@ export default function SettingsPage() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       displayName: user?.displayName ?? "",
+      username: user?.username ?? "",
       bio: (user as any)?.bio ?? "",
       avatarUrl: user?.avatarUrl ?? "",
     },
@@ -105,6 +112,7 @@ export default function SettingsPage() {
     mutationFn: async (data: ProfileFormValues) => {
       const payload = {
         displayName: data.displayName,
+        username: data.username || null,
         bio: data.bio || null,
         avatarUrl: data.avatarUrl || null,
       };
@@ -230,6 +238,30 @@ export default function SettingsPage() {
                           data-testid="input-display-name"
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={profileForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">@</span>
+                          <Input 
+                            placeholder="username" 
+                            {...field}
+                            data-testid="input-username"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Unique username used for identification (3-20 characters)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

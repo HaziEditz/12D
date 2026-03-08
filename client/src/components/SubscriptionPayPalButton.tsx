@@ -8,12 +8,14 @@ interface SubscriptionPayPalButtonProps {
   planId: string;
   amount: string;
   planName: string;
+  onSuccess?: () => void;
 }
 
 export default function SubscriptionPayPalButton({
   planId,
   amount,
   planName,
+  onSuccess,
 }: SubscriptionPayPalButtonProps) {
   const { refreshUser } = useAuth();
   const { toast } = useToast();
@@ -70,6 +72,9 @@ export default function SubscriptionPayPalButton({
           title: "Subscription Activated!",
           description: `Welcome to ${planName}! Your subscription is now active.`,
         });
+        if (onSuccess) {
+          onSuccess();
+        }
         navigate("/dashboard");
       }
     } catch (error) {

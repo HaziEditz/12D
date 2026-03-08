@@ -35,9 +35,25 @@ import {
   Lightbulb,
   TrendingUp,
   Target,
-  Tag
+  Tag,
+  DollarSign,
+  PieChart,
+  CalendarDays,
+  CreditCard
 } from "lucide-react";
-import type { Lesson, TradingTip, MarketInsight, Strategy } from "@shared/schema";
+import type { Lesson, TradingTip, MarketInsight, Strategy, User, Quiz } from "@shared/schema";
+import { Label } from "@/components/ui/label";
+import { HelpCircle } from "lucide-react";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer, 
+  Cell 
+} from 'recharts';
 
 const lessonSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -80,6 +96,173 @@ type LessonFormData = z.infer<typeof lessonSchema>;
 type TipFormData = z.infer<typeof tipSchema>;
 type InsightFormData = z.infer<typeof insightSchema>;
 type StrategyFormData = z.infer<typeof strategySchema>;
+
+function QuizEditor({ lessonId }: { lessonId: string }) {
+  const { toast } = useToast();
+  const [questions, setQuestions] = useState<any[]>([]);
+
+  const { data: quiz, isLoading } = useQuery<Quiz | null>({
+    queryKey: ["/api/admin/quizzes", lessonId],
+    enabled: !!lessonId,
+  });
+
+  const [lastLoadedLessonId, setLastLoadedLessonId] = useState<string | null>(null);
+  
+  if (quiz && lastLoadedLessonId !== lessonId) {
+    setQuestions((quiz.questions as any[]) || []);
+    setLastLoadedLessonId(lessonId);
+  } else if (!quiz && !isLoading && lastLoadedLessonId !== lessonId) {
+    setQuestions([]);
+    setLastLoadedLessonId(lessonId);
+  }
+
+  const saveQuizMutation = useMutation({
+    mutationFn: (data: { lessonId: string; questions: any[] }) =>
+      apiRequest("POST", "/api/admin/quizzes", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/quizzes", lessonId] });
+      toast({ title: "Quiz saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save quiz", variant: "destructive" });
+    },
+  });
+
+  const addQuestion = () => {
+    setQuestions([
+      ...questions,
+      {
+        question: "",
+        options: ["", "", "", ""],
+        correctIndex: 0,
+        explanation: "",
+      },
+    ]);
+  };
+
+  const removeQuestion = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+  };
+
+  const updateQuestion = (index: number, field: string, value: any) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    setQuestions(newQuestions);
+  };
+
+  const updateOption = (qIndex: number, oIndex: number, value: string) => {
+    const newQuestions = [...questions];
+    newQuestions[qIndex].options[oIndex] = value;
+    setQuestions(newQuestions);
+  };
+
+  if (isLoading) return <Loader2 className="h-8 w-8 animate-spin" />;
+
+  return (
+    <div className="space-y-6 mt-12 border-t pt-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-black uppercase tracking-tight">Lesson Quiz</h3>
+          <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Assessment Creator</p>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={addQuestion} className="rounded-xl font-bold">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Question
+          </Button>
+          <Button 
+            type="button" 
+            onClick={() => saveQuizMutation.mutate({ lessonId, questions })}
+            disabled={saveQuizMutation.isPending}
+            className="rounded-xl font-bold shadow-lg shadow-primary/20"
+          >
+            {saveQuizMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Quiz
+          </Button>
+        </div>
+      </div>
+
+      {questions.length === 0 ? (
+        <div className="p-12 text-center bg-muted/20 rounded-3xl border-2 border-dashed">
+          <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No questions defined for this lesson</p>
+          <Button variant="link" onClick={addQuestion} className="mt-2 text-primary font-bold">
+            Create the first question
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {questions.map((q, qIdx) => (
+            <Card key={qIdx} className="rounded-3xl border-2 overflow-hidden">
+              <CardHeader className="bg-muted/30 border-b flex flex-row items-center justify-between py-4">
+                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">
+                    {qIdx + 1}
+                  </div>
+                  Question {qIdx + 1}
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => removeQuestion(qIdx)} className="text-destructive hover:bg-destructive/10 h-8 w-8 rounded-lg">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Question Text</Label>
+                  <Input 
+                    value={q.question} 
+                    onChange={(e) => updateQuestion(qIdx, "question", e.target.value)}
+                    placeholder="e.g., What is the primary characteristic of a Doji candlestick?"
+                    className="bg-muted/20 h-12 rounded-xl border-0 font-bold" 
+                  />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  {q.options.map((opt: string, oIdx: number) => (
+                    <div key={oIdx} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Option {oIdx + 1}</Label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="radio" 
+                            name={`correct-${qIdx}`} 
+                            checked={q.correctIndex === oIdx}
+                            onChange={() => updateQuestion(qIdx, "correctIndex", oIdx)}
+                            className="h-3 w-3 accent-primary"
+                          />
+                          <span className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">Correct</span>
+                        </div>
+                      </div>
+                      <Input 
+                        value={opt} 
+                        onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
+                        placeholder={`Option ${oIdx + 1}`}
+                        className={`h-12 rounded-xl border-2 transition-all ${q.correctIndex === oIdx ? "border-success bg-success/5" : "bg-muted/20 border-transparent"}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Explanation (Optional)</Label>
+                  <Textarea 
+                    value={q.explanation} 
+                    onChange={(e) => updateQuestion(qIdx, "explanation", e.target.value)}
+                    placeholder="Explain why the correct answer is right..."
+                    className="bg-muted/20 min-h-[80px] rounded-xl border-0 p-4 text-sm"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          <Button type="button" variant="outline" onClick={addQuestion} className="w-full h-16 rounded-2xl border-2 border-dashed border-muted-foreground/30 text-muted-foreground hover:text-primary hover:border-primary font-bold">
+            <Plus className="h-5 w-5 mr-3" />
+            Append New Question to Assessment
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -146,7 +329,7 @@ export default function AdminPage() {
       title: "",
       summary: "",
       sentiment: "neutral",
-      sector: "Technology",
+      sector: "Macro",
       isPublished: true,
     },
   });
@@ -493,6 +676,17 @@ export default function AdminPage() {
     strategyForm.reset();
   };
 
+  const { data: financialStats, isLoading: financialLoading } = useQuery<{
+    totalUsers: number;
+    activeSubscribers: number;
+    trialUsers: number;
+    byTier: Record<string, number>;
+    recentSignups: User[];
+  }>({
+    queryKey: ["/api/admin/financial"],
+    enabled: activeTab === "financial",
+  });
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
       case "beginner": return "bg-success/10 text-success";
@@ -658,6 +852,15 @@ export default function AdminPage() {
               >
                 <Tag className={`h-5 w-5 ${activeTab === "promo-codes" ? "text-primary-foreground" : "text-orange-500"}`} />
                 <span className="font-semibold">Promo Codes</span>
+              </Button>
+              <Button
+                variant={activeTab === "financial" ? "default" : "ghost"}
+                onClick={() => setActiveTab("financial")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "financial" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-financial"
+              >
+                <DollarSign className={`h-5 w-5 ${activeTab === "financial" ? "text-primary-foreground" : "text-emerald-500"}`} />
+                <span className="font-semibold">Financials</span>
               </Button>
             </nav>
           </div>
@@ -918,6 +1121,10 @@ export default function AdminPage() {
                                   </FormItem>
                                 )}
                               />
+                              
+                              {selectedLesson && !isCreatingLesson && (
+                                <QuizEditor lessonId={selectedLesson.id} />
+                              )}
                             </form>
                           </Form>
                         </div>
@@ -1602,6 +1809,210 @@ export default function AdminPage() {
             </TabsContent>
             <TabsContent value="promo-codes" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
               <PromoCodesTab />
+            </TabsContent>
+
+            <TabsContent value="financial" className="h-full w-full m-0 p-0 flex flex-col overflow-auto data-[state=active]:flex bg-muted/5">
+              <div className="max-w-7xl mx-auto w-full p-8 space-y-8">
+                <div>
+                  <h2 className="text-3xl font-black tracking-tight">Financial Intelligence</h2>
+                  <p className="text-muted-foreground font-medium mt-1">Real-time revenue metrics and subscriber growth analytics</p>
+                </div>
+
+                {financialLoading ? (
+                  <div className="grid md:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(i => (
+                      <Card key={i}>
+                        <CardContent className="pt-6">
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-8 w-16" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : financialStats ? (
+                  <>
+                    <div className="grid md:grid-cols-4 gap-6">
+                      <Card className="border-2 shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Active Subs</p>
+                            <CreditCard className="h-4 w-4 text-primary" />
+                          </div>
+                          <p className="text-3xl font-black" data-testid="text-financial-active-subs">{financialStats.activeSubscribers}</p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-2 uppercase tracking-tighter">Total paid accounts</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-2 shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Monthly Rev</p>
+                            <DollarSign className="h-4 w-4 text-emerald-500" />
+                          </div>
+                          <p className="text-3xl font-black" data-testid="text-financial-revenue">
+                            ${(
+                              (financialStats.byTier.school || 0) * 8.49 +
+                              (financialStats.byTier.casual || 0) * 14.99 +
+                              (financialStats.byTier.premium || 0) * 24.99
+                            ).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-2 uppercase tracking-tighter">Estimated MRR</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-2 shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Trial Users</p>
+                            <CalendarDays className="h-4 w-4 text-orange-500" />
+                          </div>
+                          <p className="text-3xl font-black" data-testid="text-financial-trial-users">{financialStats.trialUsers}</p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-2 uppercase tracking-tighter">Potential conversions</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-2 shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Total Users</p>
+                            <Users className="h-4 w-4 text-blue-500" />
+                          </div>
+                          <p className="text-3xl font-black" data-testid="text-financial-total-users">{financialStats.totalUsers}</p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-2 uppercase tracking-tighter">Platform reach</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-8">
+                      <Card className="border-2 shadow-sm p-6">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <PieChart className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-black text-lg">Revenue by Tier</h3>
+                            <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">MRR Distribution</p>
+                          </div>
+                        </div>
+                        <div className="h-[300px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={[
+                              { name: 'School', value: (financialStats.byTier.school || 0) * 8.49, count: financialStats.byTier.school || 0 },
+                              { name: 'Casual', value: (financialStats.byTier.casual || 0) * 14.99, count: financialStats.byTier.casual || 0 },
+                              { name: 'Premium', value: (financialStats.byTier.premium || 0) * 24.99, count: financialStats.byTier.premium || 0 }
+                            ]}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
+                              <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fontWeight: 'bold' }} 
+                              />
+                              <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fontWeight: 'bold' }} 
+                                tickFormatter={(val) => `$${val}`}
+                              />
+                              <RechartsTooltip 
+                                cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                              />
+                              <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={60}>
+                                {[0, 1, 2].map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#8b5cf6'][index]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 mt-8">
+                          <div className="text-center">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">School</p>
+                            <p className="font-black">${((financialStats.byTier.school || 0) * 8.49).toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Casual</p>
+                            <p className="font-black">${((financialStats.byTier.casual || 0) * 14.99).toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Premium</p>
+                            <p className="font-black">${((financialStats.byTier.premium || 0) * 24.99).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </Card>
+
+                      <Card className="border-2 shadow-sm p-6 overflow-hidden flex flex-col">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-orange-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-black text-lg">Recent Signups</h3>
+                            <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Latest Platform Entries</p>
+                          </div>
+                        </div>
+                        <ScrollArea className="flex-1 -mx-6 px-6">
+                          <div className="space-y-4">
+                            {financialStats.recentSignups.map((user) => (
+                              <div key={user.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/20 transition-all">
+                                <div className="flex items-center gap-4">
+                                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                                    {user.displayName.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-sm">{user.displayName}</p>
+                                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">{user.email}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <Badge className="h-5 text-[10px] px-2 font-black uppercase tracking-tighter">
+                                    {user.membershipTier || 'Free'}
+                                  </Badge>
+                                  <p className="text-[10px] text-muted-foreground mt-1 font-bold">
+                                    {user.trialStartDate ? new Date(user.trialStartDate).toLocaleDateString() : 'No date'}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </Card>
+                    </div>
+
+                    <Card className="border-2 shadow-sm p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-lg">Special Accounts</h3>
+                          <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Promo & School Managed</p>
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-8">
+                        <div className="p-6 rounded-2xl bg-orange-500/5 border border-orange-500/10">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-black text-orange-600 dark:text-orange-400">Promo Code Users</h4>
+                            <Tag className="h-5 w-5 text-orange-500" />
+                          </div>
+                          <p className="text-4xl font-black">
+                            {financialStats.recentSignups.filter(u => u.subscriptionId?.startsWith("PROMO-")).length}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-2 font-medium">Active promotional subscriptions</p>
+                        </div>
+                        <div className="p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-black text-blue-600 dark:text-blue-400">School Managed</h4>
+                            <Users className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <p className="text-4xl font-black">
+                            {financialStats.recentSignups.filter(u => u.subscriptionId?.startsWith("SCHOOL-")).length}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-2 font-medium">Institutional license seats</p>
+                        </div>
+                      </div>
+                    </Card>
+                  </>
+                ) : null}
+              </div>
             </TabsContent>
           </Tabs>
         </main>

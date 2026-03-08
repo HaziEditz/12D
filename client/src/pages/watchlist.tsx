@@ -17,8 +17,12 @@ import {
   RefreshCw,
   Loader2,
   Wifi,
-  WifiOff
+  WifiOff,
+  Bell
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getStockLogoUrl } from "@/lib/stock-logos";
+import { PriceAlertDialog } from "@/components/price-alert-dialog";
 
 interface WatchlistItem {
   symbol: string;
@@ -332,57 +336,73 @@ export default function WatchlistPage() {
               <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <span className="font-bold text-primary">{item.symbol.slice(0, 2)}</span>
-                    </div>
+                    <Avatar className="h-12 w-12 rounded-lg" data-testid={`avatar-stock-${item.symbol.toLowerCase()}`}>
+                      <AvatarImage 
+                        src={getStockLogoUrl(item.symbol) || ""} 
+                        alt={item.symbol} 
+                        className="object-contain p-2 bg-white"
+                      />
+                      <AvatarFallback className="bg-primary/10 font-bold text-primary rounded-lg">
+                        {item.symbol.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <h3 className="font-semibold" data-testid={`text-symbol-${item.symbol.toLowerCase()}`}>{item.symbol}</h3>
                       <p className="text-sm text-muted-foreground">{item.name}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      {item.isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          <span className="text-muted-foreground">Loading...</span>
-                        </div>
-                      ) : item.hasError ? (
-                        <div className="flex items-center gap-2">
-                          <WifiOff className="h-4 w-4 text-destructive" />
-                          <span className="text-muted-foreground text-sm">Unavailable</span>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-xl font-bold" data-testid={`text-price-${item.symbol.toLowerCase()}`}>
-                            ${item.price.toFixed(2)}
-                          </p>
-                          <div className="flex items-center gap-1 justify-end">
-                            {item.change >= 0 ? (
-                              <TrendingUp className="h-4 w-4 text-success" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4 text-destructive" />
-                            )}
-                            <Badge 
-                              variant="outline" 
-                              className={item.change >= 0 ? "text-success border-success" : "text-destructive border-destructive"}
-                            >
-                              {item.change >= 0 ? "+" : ""}{item.changePercent.toFixed(2)}%
-                            </Badge>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        {item.isLoading ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            <span className="text-muted-foreground">Loading...</span>
                           </div>
-                        </>
-                      )}
+                        ) : item.hasError ? (
+                          <div className="flex items-center gap-2">
+                            <WifiOff className="h-4 w-4 text-destructive" />
+                            <span className="text-muted-foreground text-sm">Unavailable</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-xl font-bold" data-testid={`text-price-${item.symbol.toLowerCase()}`}>
+                              ${item.price.toFixed(2)}
+                            </p>
+                            <div className="flex items-center gap-1 justify-end">
+                              {item.change >= 0 ? (
+                                <TrendingUp className="h-4 w-4 text-success" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4 text-destructive" />
+                              )}
+                              <Badge 
+                                variant="outline" 
+                                className={item.change >= 0 ? "text-success border-success" : "text-destructive border-destructive"}
+                              >
+                                {item.change >= 0 ? "+" : ""}{item.changePercent.toFixed(2)}%
+                              </Badge>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {!item.isLoading && !item.hasError && (
+                          <PriceAlertDialog 
+                            symbol={item.symbol} 
+                            currentPrice={item.price} 
+                            type="watchlist"
+                          />
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFromWatchlist(item.symbol)}
+                          className="text-muted-foreground"
+                          data-testid={`button-remove-${item.symbol.toLowerCase()}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFromWatchlist(item.symbol)}
-                      className="text-muted-foreground"
-                      data-testid={`button-remove-${item.symbol.toLowerCase()}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
                 </div>
               </CardContent>
             </Card>

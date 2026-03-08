@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SpinnerInput } from "@/components/spinner-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
@@ -28,8 +29,12 @@ import {
   Target,
   Shield,
   Percent,
-  Layers
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  Bell
 } from "lucide-react";
+import { PriceAlertDialog } from "@/components/price-alert-dialog";
 import { createChart, ColorType, CandlestickData, Time, CandlestickSeries } from "lightweight-charts";
 import type { Trade } from "@shared/schema";
 
@@ -112,7 +117,17 @@ function generateCandlestickData(count: number, basePrice: number, timeframe: st
   const volatilityMultiplier = Math.sqrt(interval / 60000);
   const volatility = baseVolatility * volatilityMultiplier;
   
-  for (let i = count; i >= 0; i--) {
+  // Determine how many candles to generate based on timeframe
+  // 1m: 30 days ~ 43200 candles (but let's limit to 1000 for performance)
+  // 5m: 30 days ~ 8640 candles
+  // 1h: 30 days ~ 720 candles
+  // 1d: 1 year ~ 365 candles
+  let candleCount = count;
+  if (timeframe === "1d") candleCount = Math.max(count, 365);
+  else if (timeframe === "1h") candleCount = Math.max(count, 720);
+  else candleCount = Math.max(count, 1000); // 1m and 5m
+
+  for (let i = candleCount; i >= 0; i--) {
     const time = (now - i * interval) as Time;
     const change = (Math.random() - 0.5) * 2 * volatility * price;
     const open = price;
@@ -381,6 +396,8 @@ export default function SimulatorPage() {
           timeVisible: true,
           secondsVisible: false,
         },
+        handleScroll: true,
+        handleScale: true,
       });
 
       const series = chart.addSeries(CandlestickSeries, {
@@ -392,10 +409,9 @@ export default function SimulatorPage() {
         wickDownColor: 'hsl(0, 72%, 51%)',
       });
 
-      // Only show the last 150 candles for better performance and visibility
-      const visibleData = candleData.slice(-150);
-      series.setData(visibleData);
-      chart.timeScale().fitContent();
+      // Show all generated candles but start view at the end
+      series.setData(candleData);
+      chart.timeScale().scrollToPosition(0, false);
 
       chartRef.current = chart;
       seriesRef.current = series;
@@ -622,6 +638,18 @@ export default function SimulatorPage() {
     return sum + pnl;
   }, 0) ?? 0;
 
+  const handleJumpToPast = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().scrollToPosition(-1000, true);
+    }
+  };
+
+  const handleJumpToPresent = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().scrollToRealTime();
+    }
+  };
+
   return (
     <Paywall featureName="the Trading Simulator">
       <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4">
@@ -688,9 +716,42 @@ export default function SimulatorPage() {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Activity className="h-4 w-4 text-success animate-pulse" />
-                Live
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleJumpToPast}
+                    data-testid="button-jump-past"
+                    className="h-8"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Past
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleJumpToPresent}
+                    data-testid="button-jump-present"
+                    className="h-8"
+                  >
+                    Present
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <Tabs value={timeframe} onValueChange={setTimeframe}>
+                  <TabsList className="h-8">
+                    <TabsTrigger value="1m" className="text-xs px-2">1m</TabsTrigger>
+                    <TabsTrigger value="5m" className="text-xs px-2">5m</TabsTrigger>
+                    <TabsTrigger value="1h" className="text-xs px-2">1h</TabsTrigger>
+                    <TabsTrigger value="1d" className="text-xs px-2">1d</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Activity className="h-4 w-4 text-success animate-pulse" />
+                  Live
+                </div>
               </div>
             </div>
             <div ref={chartContainerRef} className="w-full h-[400px]" data-testid="chart-container" />
@@ -777,31 +838,14 @@ export default function SimulatorPage() {
 
             <div>
               <Label className="text-sm font-medium mb-2 block">How many units?</Label>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => setQuantity(prev => String(Math.max(0.1, parseFloat(prev) - 0.1).toFixed(1)))}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="text-center"
-                  step="0.1"
-                  min="0.1"
-                  data-testid="input-quantity"
-                />
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => setQuantity(prev => String((parseFloat(prev) + 0.1).toFixed(1)))}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <SpinnerInput
+                value={parseFloat(quantity) || 0}
+                onChange={(val) => setQuantity(val.toFixed(1))}
+                min={0.1}
+                step={0.1}
+                data-testid="input-quantity"
+                className="w-full justify-between"
+              />
             </div>
 
             {(orderType === "limit" || orderType === "stop") && (
@@ -1059,16 +1103,23 @@ export default function SimulatorPage() {
                           Cancel
                         </Button>
                       ) : (
-                        <Button
-                          variant={pnl >= 0 ? "default" : "destructive"}
-                          size="sm"
-                          className="h-7 px-3 text-xs"
-                          onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: tradePrice })}
-                          data-testid={`button-close-${trade.id}`}
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Close
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <PriceAlertDialog
+                            symbol={trade.symbol}
+                            currentPrice={tradePrice}
+                            type="simulator"
+                          />
+                          <Button
+                            variant={pnl >= 0 ? "default" : "destructive"}
+                            size="sm"
+                            className="h-7 px-3 text-xs"
+                            onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: tradePrice })}
+                            data-testid={`button-close-${trade.id}`}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Close
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>

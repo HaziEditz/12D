@@ -19,7 +19,7 @@ if (paypalReady) {
   capturePaypalOrder = unavailable;
   loadPaypalDefault = unavailable;
 }
-import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema, insertChatMessageSchema } from "@shared/schema";
+import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema, insertChatMessageSchema, updateProfileSchema } from "@shared/schema";
 import type { User, Trade } from "@shared/schema";
 import memorystore from "memorystore";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -395,16 +395,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   passport.use(
     new LocalStrategy(
-      { usernameField: "email" },
-      async (email, password, done) => {
+      { usernameField: "identifier" },
+      async (identifier, password, done) => {
         try {
-          const user = await storage.getUserByEmail(email);
+          let user = await storage.getUserByEmail(identifier);
           if (!user) {
-            return done(null, false, { message: "Invalid email or password" });
+            const byUsername = await storage.getUserByUsername(identifier);
+            if (byUsername) user = byUsername;
+          }
+          if (!user) {
+            return done(null, false, { message: "Invalid email, username, or password" });
           }
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) {
-            return done(null, false, { message: "Invalid email or password" });
+            return done(null, false, { message: "Invalid email, username, or password" });
           }
           return done(null, user);
         } catch (error) {
@@ -450,9 +454,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(403).json({ message: "Forbidden" });
   };
 
+  async function seedMarketInsights() {
+    const count = await storage.getMarketInsightsCount();
+    if (count >= 5) return;
+    const insights = [
+      { title: "Federal Reserve Policy Shift", summary: "The Fed's pivot signals potential rate cuts ahead, historically favorable for equities and rate-sensitive sectors like tech and real estate.", sector: "policy", sentiment: "bullish" },
+      { title: "AI Sector Momentum", summary: "AI infrastructure spending accelerates, creating multi-year tailwinds for chipmakers and cloud providers, though elevated valuations require selective stock-picking.", sector: "sector", sentiment: "bullish" },
+      { title: "Oil Market Supply Tension", summary: "OPEC+ cuts provide a price floor around $75-80/bbl for Brent crude while geopolitical risks and Chinese demand remain key variables.", sector: "commodities", sentiment: "neutral" },
+      { title: "Bitcoin Halving Cycle", summary: "The fourth halving and growing institutional adoption via spot ETFs create a favorable demand-supply dynamic, though regulatory uncertainty adds volatility risk.", sector: "crypto", sentiment: "bullish" },
+      { title: "Emerging Markets Divergence", summary: "India outperforms on domestic growth while China struggles with property debt; selective EM exposure beats broad index funds in this environment.", sector: "macro", sentiment: "neutral" },
+      { title: "European Recession Risk", summary: "Eurozone stagnation persists as Germany contracts for a second year; ECB easing ahead of the Fed may compress the euro but benefit USD-revenue exporters.", sector: "macro", sentiment: "bearish" },
+      { title: "Healthcare Innovation Wave", summary: "GLP-1 drugs and next-gen gene therapies are driving a healthcare renaissance with defensive growth characteristics and a projected $150B anti-obesity market by 2030.", sector: "sector", sentiment: "bullish" },
+      { title: "Bond Market Signals", summary: "The prolonged yield curve inversion may normalize as the Fed cuts rates, positioning long-duration Treasuries for strong total returns in a risk-off scenario.", sector: "macro", sentiment: "neutral" },
+      { title: "Small Cap Opportunity", summary: "The Russell 2000 trades at its widest discount to the S&P 500 in decades; rate cuts could unlock significant outperformance in this rate-sensitive cohort.", sector: "technical", sentiment: "bullish" },
+      { title: "Corporate Earnings Resilience", summary: "S&P 500 margins remain above pre-pandemic norms despite compression fears, with earnings breadth broadening beyond the Magnificent Seven mega-caps.", sector: "macro", sentiment: "bullish" },
+      { title: "Uranium Bull Market", summary: "Nuclear energy's policy tailwind and a severely undersupplied long-term contract market are driving uranium prices to multi-year highs with leveraged upside in miners.", sector: "commodities", sentiment: "bullish" },
+      { title: "Consumer Spending Bifurcation", summary: "High-income consumers drive luxury and travel spending while lower-income households face rising credit delinquencies, rewarding premium and value brands over mid-tier.", sector: "macro", sentiment: "neutral" },
+      { title: "Japanese Equity Breakout", summary: "Corporate governance reforms and yen weakness push Japanese equities to 30-year highs, though BOJ normalization risk and yen appreciation could weigh on exporters.", sector: "macro", sentiment: "bullish" },
+      { title: "Cyber Security Spending Acceleration", summary: "AI-driven attacks force non-discretionary security budget increases; cloud-native platforms are taking share from legacy hardware in a structurally growing market.", sector: "sector", sentiment: "bullish" },
+      { title: "Real Estate Market Reset", summary: "Elevated office vacancies and rate-locked homeowners suppress CRE values and transaction volume; meaningful rate declines could unlock significant pent-up residential demand.", sector: "macro", sentiment: "bearish" },
+    ];
+    for (const insight of insights) {
+      await storage.createMarketInsight({ ...insight, isPublished: true });
+    }
+  }
+
   // Ensure admin exists and seed achievements
   await ensureAdminUser();
   await seedAchievements();
+  await seedMarketInsights();
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -535,11 +565,66 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/lessons/:id/complete", requireAuth, async (req, res) => {
     const user = req.user as User;
     await storage.updateLessonProgress(user.id, req.params.id, true);
-    
-    // Check and award achievements after completing a lesson
     await checkAndAwardAchievements(user.id);
-    
     res.json({ success: true });
+  });
+
+  app.get("/api/lessons/:id/quiz", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getQuizByLessonId(req.params.id);
+      if (!quiz) return res.status(404).json({ message: "No quiz for this lesson" });
+      const user = req.user as User;
+      const best = await storage.getBestQuizAttempt(user.id, req.params.id);
+      res.json({ quiz, bestAttempt: best || null });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/lessons/:id/quiz/attempt", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { score, total } = req.body;
+      const attempt = await storage.createQuizAttempt({ userId: user.id, lessonId: req.params.id, score, total });
+      res.json(attempt);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/price-alerts", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const alerts = await storage.getPriceAlertsByUser(user.id);
+    res.json(alerts);
+  });
+
+  app.post("/api/price-alerts", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const alert = await storage.createPriceAlert({ ...req.body, userId: user.id });
+      res.json(alert);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/price-alerts/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.deletePriceAlert(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/schools", async (req, res) => {
+    try {
+      const allSchools = await storage.getSchools();
+      res.json(allSchools.map(s => ({ id: s.id, name: s.name })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // Trades routes
@@ -916,7 +1001,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Leaderboard
   app.get("/api/leaderboard", async (req, res) => {
-    const leaderboard = await storage.getLeaderboard();
+    const scope = req.query.scope as string | undefined;
+    const userId = req.user?.id;
+    const leaderboard = await storage.getLeaderboard(scope, userId);
     const safeLeaderboard = leaderboard.map(({ password, ...user }) => user);
     res.json(safeLeaderboard);
   });
@@ -1012,6 +1099,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       );
 
       res.json(quotes);
+
+      // Background: Check price alerts
+      try {
+        const activeAlerts = await storage.getActivePriceAlerts();
+        if (activeAlerts.length > 0) {
+          for (const quote of quotes) {
+            if (quote.error) continue;
+            
+            const relevantAlerts = activeAlerts.filter(a => a.symbol === quote.symbol);
+            for (const alert of relevantAlerts) {
+              let isTriggered = false;
+              if (alert.direction === "above" && quote.price >= alert.targetPrice) {
+                isTriggered = true;
+              } else if (alert.direction === "below" && quote.price <= alert.targetPrice) {
+                isTriggered = true;
+              }
+
+              if (isTriggered) {
+                await storage.triggerPriceAlert(alert.id);
+                await storage.createNotification({
+                  userId: alert.userId,
+                  type: "price_alert",
+                  title: `Price Alert: ${alert.symbol}`,
+                  message: `${alert.symbol} has gone ${alert.direction} $${alert.targetPrice} (Current: $${quote.price})`,
+                  data: { symbol: alert.symbol, price: quote.price, alertId: alert.id },
+                  isRead: false
+                });
+              }
+            }
+          }
+        }
+      } catch (alertError) {
+        console.error("Error checking price alerts:", alertError);
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch stock quotes" });
     }
@@ -1043,6 +1164,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  app.get("/api/admin/quizzes/:lessonId", requireAdmin, async (req, res) => {
+    try {
+      const quiz = await storage.getQuizByLessonId(req.params.lessonId);
+      res.json(quiz || null);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
+    try {
+      const { lessonId, questions } = req.body;
+      const existing = await storage.getQuizByLessonId(lessonId);
+      if (existing) {
+        const updated = await storage.updateQuiz(existing.id, { questions });
+        return res.json(updated);
+      }
+      const quiz = await storage.createQuiz({ lessonId, questions });
+      res.json(quiz);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.delete("/api/admin/quizzes/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteQuiz(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
   });
 
   app.delete("/api/admin/lessons/:id", requireAdmin, async (req, res) => {
@@ -1096,6 +1244,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json(assignment);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/teacher/assignments/:id/progress", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const assignment = await storage.getAssignmentById(req.params.id);
+      if (!assignment || assignment.teacherId !== user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const progress = await storage.getAssignmentProgress(req.params.id);
+      res.json(progress);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -1256,6 +1418,92 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Classroom routes (for students)
+  app.get("/api/classroom", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const classes = await storage.getClassesByStudent(user.id);
+      if (!classes.length) return res.json({ enrolled: false });
+      const cls = classes[0];
+      const teacher = await storage.getUserById(cls.teacherId);
+      const classmates = await storage.getStudentsByClass(cls.id);
+      res.json({
+        enrolled: true,
+        class: cls,
+        teacher: teacher ? { id: teacher.id, displayName: teacher.displayName } : null,
+        classmates: classmates.map(({ password: _, ...s }) => s),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const classes = await storage.getClassesByStudent(user.id);
+      if (!classes.length) return res.status(404).json({ message: "No class found" });
+      
+      const cls = classes[0];
+      const teacher = await storage.getUserById(cls.teacherId);
+      const classmates = await storage.getStudentsByClass(cls.id);
+      
+      res.json({
+        class: cls,
+        teacher: teacher ? { id: teacher.id, displayName: teacher.displayName } : null,
+        classmates: classmates.map(c => ({ id: c.id, displayName: c.displayName, totalProfit: c.totalProfit })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/assignments", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const classes = await storage.getClassesByStudent(user.id);
+      if (!classes.length) return res.json([]);
+      
+      const classIds = classes.map(c => c.id);
+      const allAssignments: Assignment[] = [];
+      for (const classId of classIds) {
+        const classAssignments = await storage.getAssignmentsByClass(classId);
+        allAssignments.push(...classAssignments);
+      }
+      
+      const studentProgress = await storage.getAssignmentProgressForStudent(user.id);
+      
+      const assignmentsWithProgress = allAssignments.map(assignment => {
+        const progress = studentProgress.find(p => p.assignmentId === assignment.id);
+        return {
+          ...assignment,
+          progress: progress || { completed: false, currentValue: 0 }
+        };
+      });
+      
+      res.json(assignmentsWithProgress);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/classroom/assignments/:id/progress", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { currentValue, completed } = req.body;
+      const progress = await storage.updateAssignmentProgress({
+        assignmentId: req.params.id,
+        studentId: user.id,
+        currentValue: currentValue || 0,
+        completed: completed || false,
+        completedAt: completed ? new Date() : null,
+      });
+      res.json(progress);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // PayPal routes with error handling
   app.get("/setup", async (req, res) => {
     try {
@@ -1395,13 +1643,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.patch("/api/user/profile", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const { displayName, bio, avatarUrl } = req.body;
-      
+      const data = updateProfileSchema.parse(req.body);
+
       const updates: Partial<User> = {};
-      if (displayName !== undefined) updates.displayName = displayName;
-      if (bio !== undefined) updates.bio = bio;
-      if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-      
+      if (data.displayName !== undefined) updates.displayName = data.displayName;
+      if (data.bio !== undefined) updates.bio = data.bio;
+      if (data.avatarUrl !== undefined) updates.avatarUrl = data.avatarUrl;
+
+      if (data.username !== undefined) {
+        if (data.username) {
+          const existing = await storage.getUserByUsername(data.username);
+          if (existing && existing.id !== user.id) {
+            return res.status(400).json({ message: "Username already taken" });
+          }
+        }
+        updates.username = data.username;
+      }
+
       await storage.updateUser(user.id, updates);
       const updatedUser = await storage.getUserById(user.id);
       if (!updatedUser) {
@@ -1797,6 +2055,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/financial", requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getFinancialStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

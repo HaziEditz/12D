@@ -22,6 +22,7 @@ const notificationIcons: Record<string, typeof Bell> = {
   trade_closed: TrendingUp,
   chat_message: MessageCircle,
   achievement_unlocked: Award,
+  price_alert: Bell,
 };
 
 const notificationRoutes: Record<string, string> = {
@@ -31,6 +32,7 @@ const notificationRoutes: Record<string, string> = {
   trade_closed: "/simulator",
   chat_message: "/friends",
   achievement_unlocked: "/achievements",
+  price_alert: "/simulator",
 };
 
 export function NotificationBell() {

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { SpinnerInput } from "@/components/spinner-input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Paywall } from "@/components/paywall";
@@ -241,7 +242,13 @@ export default function DashboardPage() {
                       <FormItem>
                         <FormLabel>Quantity</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" data-testid="input-quantity" {...field} />
+                          <SpinnerInput
+                            value={field.value}
+                            onChange={(val) => field.onChange(val)}
+                            min={0.01}
+                            step={0.1}
+                            data-testid="input-quantity"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
