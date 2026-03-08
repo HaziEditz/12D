@@ -43,6 +43,7 @@ import SchoolHub from "@/pages/school/hub";
 import SchoolStudentDashboard from "@/pages/school/student-dashboard";
 import SchoolTeacherDashboard from "@/pages/school/teacher-dashboard";
 import SchoolFunZone from "@/pages/school/fun-zone";
+import SchoolPlanPortal from "@/pages/school-plan-portal";
 
 function Router() {
   const { user } = useAuth();
@@ -76,6 +77,7 @@ function Router() {
       <Route path="/teacher" component={TeacherPage} />
       <Route path="/classroom" component={user?.role === "teacher" ? TeacherDashboard : ClassroomPage} />
       <Route path="/fun-zone" component={FunZonePage} />
+      <Route path="/school-plan" component={SchoolPlanPortal} />
       <Route path="/school/student" component={SchoolStudentDashboard} />
       <Route path="/school/teacher" component={SchoolTeacherDashboard} />
       <Route path="/school/fun-zone" component={SchoolFunZone} />
@@ -89,6 +91,7 @@ function AppContent() {
   const [location] = useLocation();
   const isAdminPage = location.startsWith("/admin");
   const isSchoolPage = location.startsWith("/school");
+  const isSchoolPlanPage = location === "/school-plan";
 
   if (isAdminPage) {
     return (
@@ -99,7 +102,7 @@ function AppContent() {
     );
   }
 
-  if (isSchoolPage) {
+  if (isSchoolPage || isSchoolPlanPage) {
     return (
       <>
         <Router />

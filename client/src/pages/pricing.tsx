@@ -264,10 +264,10 @@ export default function Pricing() {
                       className="w-full"
                       variant={plan.popular ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setShowSchoolModal(true)}
+                      onClick={() => navigate("/school-plan")}
                       data-testid={`button-subscribe-${plan.id}`}
                     >
-                      Subscribe to School
+                      Enter School World →
                     </Button>
                   ) : (
                     <SubscriptionPayPalButton
