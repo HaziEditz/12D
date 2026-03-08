@@ -74,6 +74,10 @@ The School System is a completely separate, immersive visual environment at `/sc
 - `/school/student` — Age-adapted student dashboard (`pages/school/student-dashboard.tsx`)
 - `/school/teacher` — Teacher Command Centre (`pages/school/teacher-dashboard.tsx`)
 - `/school/fun-zone` — Age-adapted Fun Zone with mini-games (`pages/school/fun-zone.tsx`)
+- `/school/simulator` — School-themed trading simulator with 5 chart themes & 3 layouts (`pages/school/simulator.tsx`)
+- `/school/leaderboard` — Class-scoped + global leaderboard with medals (`pages/school/leaderboard.tsx`)
+- `/school/lessons` — School-themed lesson grid with progress bars (`pages/school/lessons.tsx`)
+- `/school/chat` — Per-class group chat; teachers can post announcements (`pages/school/chat.tsx`)
 
 ### Age Groups (defined in `shared/schema.ts`)
 - `primary` (ages 6–10): Colorful, large emojis, coin animations, simple words
@@ -81,11 +85,22 @@ The School System is a completely separate, immersive visual environment at `/sc
 - `high_school` (ages 14–18): Full interface — charts, trades, complex assignments
 
 ### School Features
+- **Join Code Enrollment**: `POST /api/classroom/join` with `{ joinCode }` — students enter teacher-given code to join class. Register page shows join code step after signup. Hub shows join code prompt for students with no class.
 - **Classroom Tokens**: Stored as `classroomTokens` on users table; awarded by Fun Zone games
 - **Market Events**: Teachers post boom/crash/news/tip events to classes
 - **Assignments**: profit_target, lesson_completion, portfolio_balance types with student progress tracking
+- **Class Group Chat**: `classGroupMessages` table (classId, senderId, content, messageType). `GET/POST /api/classroom/chat`. Teacher can post announcements (pinned card styling). Polls every 3s.
 - **Class Leaderboard**: Rankings scoped to class via `/api/leaderboard?scope=class`
 - **Fun Zone Games**: Age-adapted mini-games (Coin Rain, Piggy Bank Builder, Stock Guesser, Budget Boss, Finance Quiz, Market Prediction, Investment Quiz, Strategy Challenge)
+- **Simulator Settings**: Persisted to `localStorage["school-sim-settings"]` — theme (default/neon/ocean/sunset/matrix), layout (standard/compact/wide), showGrid, showVolume
+
+## Casual Plan Features
+
+Users with `membershipTier === "casual"` get distinct features:
+- **Portfolio Analysis** at `/casual/portfolio` (`pages/casual-portfolio-analysis.tsx`) — P&L history, sector breakdown, risk metrics (win rate, risk/reward, expectancy, profit factor, max drawdown), cumulative P&L sparkline
+- **Friends** — prominently shown in navbar for casual users
+- **`casual-world` CSS class** — applied to the root div in AppContent for casual users; defines `--casual-accent` CSS variable
+- Navbar: Friends and Portfolio buttons highlighted in purple for casual users (both desktop and mobile/dropdown)
 
 ## External Dependencies
 

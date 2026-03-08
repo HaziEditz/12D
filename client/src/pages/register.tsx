@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { School } from "@shared/schema";
-import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, Check } from "lucide-react";
+import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, Check, ArrowRight, KeyRound } from "lucide-react";
 
 const ORBS = [
   { size: 280, x: "80%", y: "-5%", color: "hsl(199 89% 38%)", delay: 1 },
@@ -26,6 +27,9 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [showJoinCode, setShowJoinCode] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
@@ -50,11 +54,12 @@ export default function RegisterPage() {
     try {
       await register(data);
       setRegisterSuccess(true);
-      toast({ title: "Account created!", description: isTeacher ? "Heading to school plans…" : "Welcome to 12Digits!" });
-      setTimeout(() => {
-        if (isTeacher) setLocation("/school-plan");
-        else setLocation("/dashboard");
-      }, 900);
+      toast({ title: "Account created!", description: isTeacher ? "Heading to school setup…" : "Welcome to 12Digits!" });
+      if (isTeacher) {
+        setTimeout(() => setLocation("/school-plan"), 900);
+      } else {
+        setTimeout(() => setShowJoinCode(true), 600);
+      }
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -62,6 +67,27 @@ export default function RegisterPage() {
         variant: "destructive",
       });
       setIsLoading(false);
+    }
+  };
+
+  const handleJoinClass = async () => {
+    if (!joinCode.trim()) {
+      setLocation("/dashboard");
+      return;
+    }
+    setJoinLoading(true);
+    try {
+      await apiRequest("POST", "/api/classroom/join", { joinCode: joinCode.toUpperCase().trim() });
+      toast({ title: "Joined your class!", description: "Entering school world…" });
+      setTimeout(() => setLocation("/school"), 800);
+    } catch (error) {
+      toast({
+        title: "Invalid join code",
+        description: "Check your code and try again, or skip to continue.",
+        variant: "destructive",
+      });
+    } finally {
+      setJoinLoading(false);
     }
   };
 
@@ -85,8 +111,52 @@ export default function RegisterPage() {
         />
       ))}
 
+      {/* Join Code Step */}
+      {showJoinCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md">
+          <div className="w-full max-w-sm mx-4 bg-card border border-border rounded-2xl p-8 shadow-2xl" style={{ animation: "slide-in-left 0.4s ease-out" }}>
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center mb-3">
+                <KeyRound className="w-7 h-7 text-teal-400" />
+              </div>
+              <h2 className="text-xl font-black text-foreground">Join Your Class</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enter the join code your teacher gave you. You can skip this and join later.
+              </p>
+            </div>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && handleJoinClass()}
+              placeholder="e.g. X5N09P"
+              maxLength={8}
+              data-testid="input-join-code"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-center text-2xl font-black tracking-widest text-foreground placeholder-muted-foreground/40 focus:border-teal-500/50 outline-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setLocation("/dashboard")}
+                data-testid="button-skip-join"
+                className="flex-1 py-3 rounded-xl bg-muted text-muted-foreground font-bold text-sm hover:bg-muted/80 transition-all"
+              >
+                Skip for now
+              </button>
+              <button
+                onClick={handleJoinClass}
+                disabled={joinLoading}
+                data-testid="button-join-class"
+                className="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {joinLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowRight className="h-4 w-4" /> Join Class</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success overlay */}
-      {registerSuccess && (
+      {registerSuccess && !showJoinCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md fade-in">
           <div className="flex flex-col items-center gap-4">
             <div className="relative">

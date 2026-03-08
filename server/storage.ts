@@ -4,7 +4,7 @@ import {
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
   friendships, chatMessages, watchlistItems, journalEntries, notifications, promoCodes,
-  quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores,
+  quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores, classGroupMessages,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -19,7 +19,8 @@ import {
   type Quiz, type InsertQuiz, type QuizAttempt, type InsertQuizAttempt,
   type PriceAlert, type InsertPriceAlert,
   type ClassroomEvent, type InsertClassroomEvent,
-  type FunZoneScore, type InsertFunZoneScore
+  type FunZoneScore, type InsertFunZoneScore,
+  type ClassGroupMessage, type InsertClassGroupMessage
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -95,6 +96,11 @@ export interface IStorage {
   getStudentsByClass(classId: string): Promise<User[]>;
   removeStudentFromClass(classId: string, studentId: string): Promise<void>;
   getClassesByStudent(studentId: string): Promise<Class[]>;
+
+  // Class Group Chat
+  getClassGroupMessages(classId: string, limit?: number): Promise<(ClassGroupMessage & { senderName: string })[]>;
+  createClassGroupMessage(data: InsertClassGroupMessage): Promise<ClassGroupMessage>;
+  getClassGroupMessageCount(classId: string, since?: Date): Promise<number>;
   
   // Achievements
   createAchievement(data: InsertAchievement): Promise<Achievement>;
@@ -555,6 +561,33 @@ export class DatabaseStorage implements IStorage {
     if (classIds.length === 0) return [];
     const allClasses = await db.select().from(classes);
     return allClasses.filter(c => classIds.includes(c.id));
+  }
+
+  // Class Group Chat
+  async getClassGroupMessages(classId: string, limit = 100): Promise<(ClassGroupMessage & { senderName: string })[]> {
+    const messages = await db.select().from(classGroupMessages)
+      .where(eq(classGroupMessages.classId, classId))
+      .orderBy(asc(classGroupMessages.createdAt))
+      .limit(limit);
+    const senderIds = [...new Set(messages.map(m => m.senderId))];
+    const senders = senderIds.length > 0 ? await db.select({ id: users.id, displayName: users.displayName, role: users.role }).from(users) : [];
+    return messages.map(m => ({
+      ...m,
+      senderName: senders.find(s => s.id === m.senderId)?.displayName ?? "Unknown",
+      senderRole: senders.find(s => s.id === m.senderId)?.role ?? "student",
+    }));
+  }
+
+  async createClassGroupMessage(data: InsertClassGroupMessage): Promise<ClassGroupMessage> {
+    const [msg] = await db.insert(classGroupMessages).values(data).returning();
+    return msg;
+  }
+
+  async getClassGroupMessageCount(classId: string, since?: Date): Promise<number> {
+    const msgs = since
+      ? await db.select().from(classGroupMessages).where(and(eq(classGroupMessages.classId, classId), sql`${classGroupMessages.createdAt} > ${since}`))
+      : await db.select().from(classGroupMessages).where(eq(classGroupMessages.classId, classId));
+    return msgs.length;
   }
 
   // Achievements

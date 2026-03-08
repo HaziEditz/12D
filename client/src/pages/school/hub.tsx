@@ -1,19 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SchoolLayout from "@/layouts/school-layout";
 import { getLevelInfo } from "@/lib/levels";
-import { Button } from "@/components/ui/button";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   GraduationCap, Gamepad2, BookOpen, Trophy, Zap,
-  Coins, Star, TrendingUp, Users, ChevronRight, Sparkles
+  Coins, Star, TrendingUp, Users, ChevronRight, Sparkles, KeyRound, ArrowRight, Loader2
 } from "lucide-react";
 import { Link } from "wouter";
 
 export default function SchoolHub() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [joinCode, setJoinCode] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
   const isTeacher = user?.role === "teacher";
 
   const { data: classData } = useQuery<any>({
@@ -31,6 +36,21 @@ export default function SchoolHub() {
   const levelInfo = getLevelInfo(user?.xp ?? 0);
   const tokens = (user as any)?.classroomTokens ?? 0;
 
+  const handleJoinClass = async () => {
+    if (!joinCode.trim()) return;
+    setJoinLoading(true);
+    try {
+      await apiRequest("POST", "/api/classroom/join", { joinCode: joinCode.toUpperCase().trim() });
+      await qc.invalidateQueries({ queryKey: ["/api/classroom"] });
+      toast({ title: "🎉 Joined your class!", description: "Welcome to the school world!" });
+      setJoinCode("");
+    } catch (error: any) {
+      toast({ title: "Invalid join code", description: error.message, variant: "destructive" });
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
   const studentActions = [
     {
       emoji: "🏫",
@@ -41,26 +61,40 @@ export default function SchoolHub() {
       big: true,
     },
     {
+      emoji: "📊",
+      title: "Simulator",
+      desc: "Practice trading in a safe environment",
+      href: "/school/simulator",
+      color: isPrimary ? "from-green-400 to-emerald-500" : "from-emerald-600 to-teal-700",
+      big: true,
+    },
+    {
       emoji: "🎮",
       title: "Fun Zone",
       desc: "Play games and earn tokens",
       href: "/school/fun-zone",
       color: isPrimary ? "from-purple-400 to-violet-500" : "from-purple-500 to-violet-600",
-      big: true,
     },
     {
       emoji: "📚",
       title: "Lessons",
       desc: "Learn and complete quizzes",
-      href: "/lessons",
+      href: "/school/lessons",
       color: isPrimary ? "from-blue-400 to-indigo-500" : "from-blue-500 to-indigo-600",
     },
     {
       emoji: "🏆",
       title: "Leaderboard",
       desc: "See how you rank",
-      href: "/leaderboard",
+      href: "/school/leaderboard",
       color: isPrimary ? "from-amber-400 to-orange-500" : "from-amber-500 to-orange-600",
+    },
+    {
+      emoji: "💬",
+      title: "Class Chat",
+      desc: "Talk with your teacher and classmates",
+      href: "/school/chat",
+      color: isPrimary ? "from-rose-400 to-pink-500" : "from-slate-600 to-slate-700",
     },
   ];
 
@@ -74,24 +108,25 @@ export default function SchoolHub() {
       big: true,
     },
     {
-      emoji: "📊",
-      title: "Analytics",
-      desc: "Track class performance",
-      href: "/school/teacher",
+      emoji: "💬",
+      title: "Class Chat",
+      desc: "Message your students",
+      href: "/school/chat",
       color: "from-purple-500 to-violet-600",
+      big: true,
     },
     {
       emoji: "📚",
       title: "Browse Lessons",
       desc: "Preview lesson content",
-      href: "/lessons",
+      href: "/school/lessons",
       color: "from-blue-500 to-indigo-600",
     },
     {
       emoji: "🏆",
       title: "Leaderboard",
       desc: "See student rankings",
-      href: "/leaderboard",
+      href: "/school/leaderboard",
       color: "from-amber-500 to-orange-600",
     },
   ];
@@ -173,6 +208,41 @@ export default function SchoolHub() {
             ))}
           </div>
         </div>
+
+        {/* Join Code Prompt — student with no class */}
+        {!isTeacher && !classData?.class && (
+          <div className="rounded-2xl p-6 bg-teal-500/10 border border-teal-500/30">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center shrink-0">
+                <KeyRound className="h-6 w-6 text-teal-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-black text-white text-base">Join Your Class</h3>
+                <p className="text-sm text-slate-400 mt-0.5">Enter the join code your teacher gave you to unlock class features.</p>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === "Enter" && handleJoinClass()}
+                  placeholder="JOIN CODE"
+                  maxLength={8}
+                  data-testid="input-hub-join-code"
+                  className="w-32 bg-background border border-border rounded-xl px-3 py-2 text-center font-black tracking-widest text-white placeholder-slate-600 focus:border-teal-500/50 outline-none text-sm"
+                />
+                <button
+                  onClick={handleJoinClass}
+                  disabled={joinLoading || !joinCode.trim()}
+                  data-testid="button-hub-join"
+                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-bold text-sm flex items-center gap-2 transition-all"
+                >
+                  {joinLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowRight className="h-4 w-4" />Join</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats / Info Row */}
         {!isTeacher && classData?.class && (

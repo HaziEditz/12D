@@ -43,7 +43,12 @@ import SchoolHub from "@/pages/school/hub";
 import SchoolStudentDashboard from "@/pages/school/student-dashboard";
 import SchoolTeacherDashboard from "@/pages/school/teacher-dashboard";
 import SchoolFunZone from "@/pages/school/fun-zone";
+import SchoolSimulator from "@/pages/school/simulator";
+import SchoolLeaderboard from "@/pages/school/leaderboard";
+import SchoolLessons from "@/pages/school/lessons";
+import SchoolChat from "@/pages/school/chat";
 import SchoolPlanPortal from "@/pages/school-plan-portal";
+import CasualPortfolioAnalysis from "@/pages/casual-portfolio-analysis";
 
 function Router() {
   const { user } = useAuth();
@@ -78,10 +83,15 @@ function Router() {
       <Route path="/classroom" component={user?.role === "teacher" ? TeacherDashboard : ClassroomPage} />
       <Route path="/fun-zone" component={FunZonePage} />
       <Route path="/school-plan" component={SchoolPlanPortal} />
+      <Route path="/school/simulator" component={SchoolSimulator} />
+      <Route path="/school/leaderboard" component={SchoolLeaderboard} />
+      <Route path="/school/lessons" component={SchoolLessons} />
+      <Route path="/school/chat" component={SchoolChat} />
       <Route path="/school/student" component={SchoolStudentDashboard} />
       <Route path="/school/teacher" component={SchoolTeacherDashboard} />
       <Route path="/school/fun-zone" component={SchoolFunZone} />
       <Route path="/school" component={SchoolHub} />
+      <Route path="/casual/portfolio" component={CasualPortfolioAnalysis} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -89,9 +99,12 @@ function Router() {
 
 function AppContent() {
   const [location] = useLocation();
+  const { user } = useAuth();
   const isAdminPage = location.startsWith("/admin");
   const isSchoolPage = location.startsWith("/school");
   const isSchoolPlanPage = location === "/school-plan";
+  const isCasualPage = location.startsWith("/casual");
+  const isCasualUser = user?.membershipTier === "casual";
 
   if (isAdminPage) {
     return (
@@ -112,7 +125,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen bg-background${(isCasualPage || isCasualUser) ? " casual-world" : ""}`}>
       <TrialBanner />
       <Navbar />
       <Router />

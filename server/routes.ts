@@ -1501,9 +1501,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/classroom/join", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { joinCode } = req.body;
+      if (!joinCode) return res.status(400).json({ message: "Join code is required" });
+      const cls = await storage.getClassByJoinCode(joinCode.toUpperCase().trim());
+      if (!cls) return res.status(404).json({ message: "Invalid join code. Please check and try again." });
+      const existing = await storage.getClassesByStudent(user.id);
+      if (existing.find(c => c.id === cls.id)) {
+        return res.json({ class: cls, alreadyEnrolled: true });
+      }
+      await storage.addStudentToClass({ classId: cls.id, studentId: user.id });
+      await storage.updateUser(user.id, { teacherId: cls.teacherId, membershipTier: "school", membershipStatus: "active" });
+      res.json({ class: cls, alreadyEnrolled: false });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/classroom/events", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
+      if (user.role === "teacher" || user.role === "admin") {
+        const teacherClasses = await storage.getClassesByTeacher(user.id);
+        const classId = req.query.classId as string | undefined;
+        if (classId) {
+          const events = await storage.getClassroomEvents(classId);
+          return res.json(events);
+        }
+        const allEvents = [];
+        for (const cls of teacherClasses) {
+          const events = await storage.getClassroomEvents(cls.id);
+          allEvents.push(...events);
+        }
+        return res.json(allEvents);
+      }
       const classStudent = await storage.getClassesByStudent(user.id);
       if (!classStudent.length) return res.json([]);
       const events = await storage.getClassroomEvents(classStudent[0].id);
@@ -1531,6 +1564,73 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (user.role !== "teacher" && user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
       await storage.deleteClassroomEvent(req.params.id);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/chat", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        classId = req.query.classId as string;
+        if (!classId) {
+          const teacherClasses = await storage.getClassesByTeacher(user.id);
+          classId = teacherClasses[0]?.id;
+        }
+      } else {
+        const studentClasses = await storage.getClassesByStudent(user.id);
+        classId = studentClasses[0]?.id;
+      }
+      if (!classId) return res.json([]);
+      const messages = await storage.getClassGroupMessages(classId, 200);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/classroom/chat", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content, messageType, classId: reqClassId } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Message cannot be empty" });
+      let classId = reqClassId;
+      if (!classId) {
+        if (user.role === "teacher" || user.role === "admin") {
+          const teacherClasses = await storage.getClassesByTeacher(user.id);
+          classId = teacherClasses[0]?.id;
+        } else {
+          const studentClasses = await storage.getClassesByStudent(user.id);
+          classId = studentClasses[0]?.id;
+        }
+      }
+      if (!classId) return res.status(400).json({ message: "No classroom found" });
+      const type = (user.role === "teacher" || user.role === "admin") && messageType === "announcement" ? "announcement" : "message";
+      const msg = await storage.createClassGroupMessage({ classId, senderId: user.id, content: content.trim(), messageType: type });
+      const sender = await storage.getUserById(user.id);
+      res.json({ ...msg, senderName: sender?.displayName ?? "Unknown", senderRole: user.role });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/chat/unread", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        const teacherClasses = await storage.getClassesByTeacher(user.id);
+        classId = teacherClasses[0]?.id;
+      } else {
+        const studentClasses = await storage.getClassesByStudent(user.id);
+        classId = studentClasses[0]?.id;
+      }
+      if (!classId) return res.json({ count: 0 });
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const count = await storage.getClassGroupMessageCount(classId, since);
+      res.json({ count });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -139,6 +139,30 @@ export function Navbar() {
                 </Button>
               </Link>
             )}
+            {user?.membershipTier === "casual" && (
+              <>
+                <Link href="/friends">
+                  <Button
+                    variant={location === "/friends" ? "secondary" : "ghost"}
+                    className="gap-2 font-semibold border border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 hover:border-purple-500/50"
+                    data-testid="link-friends"
+                  >
+                    <Users className="h-4 w-4" />
+                    Friends
+                  </Button>
+                </Link>
+                <Link href="/casual/portfolio">
+                  <Button
+                    variant={location.startsWith("/casual") ? "secondary" : "ghost"}
+                    className="gap-2 font-semibold border border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 hover:border-purple-500/50"
+                    data-testid="link-casual-portfolio"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Portfolio
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         )}
 
@@ -269,6 +293,27 @@ export function Navbar() {
                       </DropdownMenuItem>
                     </>
                   )}
+                  {user?.membershipTier === "casual" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1 text-xs text-muted-foreground flex items-center gap-1">
+                        <Star className="h-3 w-3 text-purple-400" />
+                        Casual Plan
+                      </div>
+                      <DropdownMenuItem asChild>
+                        <Link href="/friends" className="flex items-center gap-2 cursor-pointer" data-testid="link-dropdown-friends">
+                          <Users className="h-4 w-4 text-purple-400" />
+                          Friends
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/casual/portfolio" className="flex items-center gap-2 cursor-pointer" data-testid="link-dropdown-casual-portfolio">
+                          <BarChart3 className="h-4 w-4 text-purple-400" />
+                          Portfolio Analysis
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   {user?.role === "admin" && (
                     <>
                       <DropdownMenuSeparator />
@@ -352,6 +397,25 @@ export function Navbar() {
                 </Link>
               );
             })}
+            {user?.membershipTier === "casual" && (
+              <>
+                <div className="border-t border-border pt-2 mt-1">
+                  <p className="text-xs text-muted-foreground px-2 py-1 flex items-center gap-1">
+                    <Star className="h-3 w-3 text-purple-400" /> Casual Plan
+                  </p>
+                  <Link href="/friends" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant={location === "/friends" ? "secondary" : "ghost"} className="w-full justify-start gap-2 text-purple-400">
+                      <Users className="h-4 w-4" /> Friends
+                    </Button>
+                  </Link>
+                  <Link href="/casual/portfolio" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant={location.startsWith("/casual") ? "secondary" : "ghost"} className="w-full justify-start gap-2 text-purple-400">
+                      <BarChart3 className="h-4 w-4" /> Portfolio Analysis
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

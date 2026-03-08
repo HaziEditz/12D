@@ -261,6 +261,15 @@ export const funZoneScores = pgTable("fun_zone_scores", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const classGroupMessages = pgTable("class_group_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  content: text("content").notNull(),
+  messageType: text("message_type").default("message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true });
@@ -283,6 +292,7 @@ export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit(
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertClassroomEventSchema = createInsertSchema(classroomEvents).omit({ id: true, createdAt: true });
 export const insertFunZoneScoreSchema = createInsertSchema(funZoneScores).omit({ id: true, createdAt: true });
+export const insertClassGroupMessageSchema = createInsertSchema(classGroupMessages).omit({ id: true, createdAt: true });
 
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -380,6 +390,8 @@ export type InsertClassroomEvent = z.infer<typeof insertClassroomEventSchema>;
 export type ClassroomEvent = typeof classroomEvents.$inferSelect;
 export type InsertFunZoneScore = z.infer<typeof insertFunZoneScoreSchema>;
 export type FunZoneScore = typeof funZoneScores.$inferSelect;
+export type InsertClassGroupMessage = z.infer<typeof insertClassGroupMessageSchema>;
+export type ClassGroupMessage = typeof classGroupMessages.$inferSelect;
 
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),
