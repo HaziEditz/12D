@@ -505,16 +505,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User, info: any) => {
-      if (err) return next(err);
-      if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
+  app.post("/api/auth/login", async (req, res, next) => {
+    try {
+      const { identifier, email, password } = req.body;
+      const lookup = identifier || email;
+      if (!lookup || !password) {
+        return res.status(400).json({ message: "Email/username and password are required" });
+      }
+      let user = await storage.getUserByEmail(lookup);
+      if (!user) {
+        user = await storage.getUserByUsername(lookup);
+      }
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email, username, or password" });
+      }
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email, username, or password" });
+      }
       req.login(user, (err) => {
         if (err) return next(err);
-        const { password: _, ...safeUser } = user;
+        const { password: _, ...safeUser } = user!;
         res.json({ user: safeUser });
       });
-    })(req, res, next);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.post("/api/auth/logout", (req, res) => {
