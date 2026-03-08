@@ -25,6 +25,8 @@ export default function LoginPage() {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const redirectTo = new URLSearchParams(window.location.search).get("redirect");
+
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
@@ -42,6 +44,10 @@ export default function LoginPage() {
       setLoginSuccess(true);
       toast({ title: "Welcome back!", description: "Entering your world…" });
       setTimeout(() => {
+        if (redirectTo) {
+          setLocation(redirectTo);
+          return;
+        }
         const role = (user as any)?.role;
         const tier = (user as any)?.membershipTier;
         if (role === "teacher" || role === "student" || tier === "school") {

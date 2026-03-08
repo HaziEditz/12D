@@ -32,6 +32,8 @@ export default function RegisterPage() {
   const [joinLoading, setJoinLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const redirectTo = new URLSearchParams(window.location.search).get("redirect");
+
   const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
     queryKey: ["/api/schools"],
   });
@@ -54,8 +56,10 @@ export default function RegisterPage() {
     try {
       await register(data);
       setRegisterSuccess(true);
-      toast({ title: "Account created!", description: isTeacher ? "Heading to school setup…" : "Welcome to 12Digits!" });
-      if (isTeacher) {
+      toast({ title: "Account created!", description: redirectTo ? "Returning to your quote…" : (isTeacher ? "Heading to school setup…" : "Welcome to 12Digits!") });
+      if (redirectTo) {
+        setTimeout(() => setLocation(redirectTo), 900);
+      } else if (isTeacher) {
         setTimeout(() => setLocation("/school-plan"), 900);
       } else {
         setTimeout(() => setShowJoinCode(true), 600);
