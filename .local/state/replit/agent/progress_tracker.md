@@ -10,3 +10,5 @@
 [x] 10. Enhanced admin panel with "Unlimited Uses" toggle for easier school promo code management
 [x] 11. Created and tested SCHOOL_UNLIMITED promo code with null maxUses - works perfectly!
 [x] 12. Migration to Replit environment verified - app running on port 5000, all packages installed
+[x] 13. Promo codes updated: sbhsontop (school), 12digits! (casual), tradersarecool (premium)
+[x] 14. PayPal quota system foundation added - school endpoint updated with seat payment support

@@ -54,6 +54,22 @@ async function ensureAdminUser() {
   }
 }
 
+// Seed default promo codes (idempotent - will insert or update)
+async function seedPromoCodes() {
+  const promoCodesToSeed = [
+    { code: "sbhsontop", tier: "school", description: "School plan promo code", maxUses: null, isActive: true },
+    { code: "12digits!", tier: "casual", description: "Casual plan promo code", maxUses: null, isActive: true },
+    { code: "tradersarecool", tier: "premium", description: "12Digits+ premium plan promo code", maxUses: null, isActive: true },
+  ];
+
+  for (const promoData of promoCodesToSeed) {
+    const existing = await storage.getPromoCodeByCode(promoData.code);
+    if (!existing) {
+      await storage.createPromoCode(promoData);
+    }
+  }
+}
+
 // Seed achievements (idempotent - will insert or update)
 async function seedAchievements() {
   const achievementsList = [
@@ -484,6 +500,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Ensure admin exists and seed achievements
   await ensureAdminUser();
+  await seedPromoCodes();
   await seedAchievements();
   await seedMarketInsights();
 
