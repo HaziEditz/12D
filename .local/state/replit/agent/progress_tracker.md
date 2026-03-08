@@ -6,3 +6,6 @@
 [x] 6. Fixed production deployment database schema sync - added db:push to build script
 [x] 7. Fixed session storage for Render - switched from MemoryStore to PostgreSQL-backed sessions
 [x] 8. Migration to Replit environment completed - project running successfully on port 5000
+[x] 9. Verified promo codes system is fully functional with create/update/delete/redeem endpoints
+[x] 10. Enhanced admin panel with "Unlimited Uses" toggle for easier school promo code management
+[x] 11. Created and tested SCHOOL_UNLIMITED promo code with null maxUses - works perfectly!

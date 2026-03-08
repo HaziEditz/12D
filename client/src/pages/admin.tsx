@@ -2030,20 +2030,24 @@ function PromoCodesTab() {
     code: z.string().min(1, "Code is required"),
     tier: z.string().min(1, "Tier is required"),
     description: z.string().optional(),
+    isUnlimited: z.boolean().default(true),
     maxUses: z.coerce.number().nullable().optional(),
     isActive: z.boolean().default(true),
   });
 
   const form = useForm<z.infer<typeof promoSchema>>({
     resolver: zodResolver(promoSchema),
-    defaultValues: { code: "", tier: "school", description: "", maxUses: undefined, isActive: true },
+    defaultValues: { code: "", tier: "school", description: "", isUnlimited: true, maxUses: undefined, isActive: true },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/promo-codes", data),
+    mutationFn: (data: any) => {
+      const { isUnlimited, ...rest } = data;
+      return apiRequest("POST", "/api/admin/promo-codes", isUnlimited ? { ...rest, maxUses: null } : rest);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
-      form.reset({ code: "", tier: "school", description: "", maxUses: undefined, isActive: true });
+      form.reset({ code: "", tier: "school", description: "", isUnlimited: true, maxUses: undefined, isActive: true });
       toast({ title: "Promo code created" });
     },
     onError: () => toast({ title: "Failed to create promo code", variant: "destructive" }),
@@ -2103,13 +2107,21 @@ function PromoCodesTab() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="maxUses" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Max Uses (optional)</FormLabel>
-                  <FormControl><Input {...field} type="number" placeholder="Unlimited" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} data-testid="input-promo-max-uses" /></FormControl>
-                  <FormMessage />
+              <FormField control={form.control} name="isUnlimited" render={({ field }) => (
+                <FormItem className="flex items-center gap-3">
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-promo-unlimited" /></FormControl>
+                  <FormLabel>Unlimited Uses</FormLabel>
                 </FormItem>
               )} />
+              {!form.watch("isUnlimited") && (
+                <FormField control={form.control} name="maxUses" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Max Uses</FormLabel>
+                    <FormControl><Input {...field} type="number" placeholder="e.g. 100" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} data-testid="input-promo-max-uses" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
               <FormField control={form.control} name="isActive" render={({ field }) => (
                 <FormItem className="flex items-center gap-3">
                   <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-promo-active" /></FormControl>
