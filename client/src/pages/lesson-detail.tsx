@@ -49,6 +49,7 @@ export default function LessonDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lessons/progress"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/achievements"] });
       playLessonCompleteSound();
       toast({
         title: "Lesson Complete!",

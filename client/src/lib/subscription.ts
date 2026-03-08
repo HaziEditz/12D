@@ -20,7 +20,9 @@ export function isTrialExpired(user: User | null): boolean {
 export function hasActiveSubscription(user: User | null): boolean {
   if (!user) return false;
   if (user.role === "admin") return true;
-  return user.membershipStatus === "active" && !!user.subscriptionId;
+  if (user.membershipStatus === "active" && !!user.subscriptionId) return true;
+  if (user.membershipStatus === "active" && user.membershipTier === "school") return true;
+  return false;
 }
 
 export function canAccessPremiumFeatures(user: User | null): boolean {

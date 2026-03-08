@@ -13,6 +13,7 @@ import { Bell, Check, UserPlus, TrendingUp, MessageCircle, Award, X } from "luci
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Notification } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
 
 const notificationIcons: Record<string, typeof Bell> = {
   friend_request: UserPlus,
@@ -23,7 +24,17 @@ const notificationIcons: Record<string, typeof Bell> = {
   achievement_unlocked: Award,
 };
 
+const notificationRoutes: Record<string, string> = {
+  friend_request: "/friends",
+  friend_accepted: "/friends",
+  trade_executed: "/simulator",
+  trade_closed: "/simulator",
+  chat_message: "/friends",
+  achievement_unlocked: "/achievements",
+};
+
 export function NotificationBell() {
+  const [, navigate] = useLocation();
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     refetchInterval: 30000,
@@ -63,6 +74,10 @@ export function NotificationBell() {
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
+    }
+    const route = notificationRoutes[notification.type];
+    if (route) {
+      navigate(route);
     }
   };
 

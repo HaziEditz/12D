@@ -34,7 +34,8 @@ import {
   ArrowLeft,
   Lightbulb,
   TrendingUp,
-  Target
+  Target,
+  Tag
 } from "lucide-react";
 import type { Lesson, TradingTip, MarketInsight, Strategy } from "@shared/schema";
 
@@ -648,6 +649,15 @@ export default function AdminPage() {
               >
                 <Target className={`h-5 w-5 ${activeTab === "strategies" ? "text-primary-foreground" : "text-destructive"}`} />
                 <span className="font-semibold">Strategies</span>
+              </Button>
+              <Button
+                variant={activeTab === "promo-codes" ? "default" : "ghost"}
+                onClick={() => setActiveTab("promo-codes")}
+                className={`w-full justify-start gap-4 h-12 rounded-xl transition-all ${activeTab === "promo-codes" ? "shadow-lg shadow-primary/20" : ""}`}
+                data-testid="tab-promo-codes"
+              >
+                <Tag className={`h-5 w-5 ${activeTab === "promo-codes" ? "text-primary-foreground" : "text-orange-500"}`} />
+                <span className="font-semibold">Promo Codes</span>
               </Button>
             </nav>
           </div>
@@ -1590,8 +1600,167 @@ export default function AdminPage() {
                 </div>
               </div>
             </TabsContent>
+            <TabsContent value="promo-codes" className="h-full w-full m-0 p-0 flex flex-col overflow-hidden data-[state=active]:flex">
+              <PromoCodesTab />
+            </TabsContent>
           </Tabs>
         </main>
+      </div>
+    </div>
+  );
+}
+
+function PromoCodesTab() {
+  const { toast } = useToast();
+
+  const { data: codes = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/promo-codes"] });
+
+  const promoSchema = z.object({
+    code: z.string().min(1, "Code is required"),
+    tier: z.string().min(1, "Tier is required"),
+    description: z.string().optional(),
+    maxUses: z.coerce.number().nullable().optional(),
+    isActive: z.boolean().default(true),
+  });
+
+  const form = useForm<z.infer<typeof promoSchema>>({
+    resolver: zodResolver(promoSchema),
+    defaultValues: { code: "", tier: "school", description: "", maxUses: undefined, isActive: true },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/promo-codes", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      form.reset({ code: "", tier: "school", description: "", maxUses: undefined, isActive: true });
+      toast({ title: "Promo code created" });
+    },
+    onError: () => toast({ title: "Failed to create promo code", variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/admin/promo-codes/${id}`, { isActive }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/promo-codes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      toast({ title: "Promo code deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
+  });
+
+  const tierColors: Record<string, string> = { school: "bg-blue-100 text-blue-800", casual: "bg-green-100 text-green-800", premium: "bg-purple-100 text-purple-800" };
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      <div className="w-96 border-r flex flex-col bg-muted/5 shrink-0">
+        <div className="p-6 border-b">
+          <h2 className="text-lg font-bold">Create Promo Code</h2>
+        </div>
+        <ScrollArea className="flex-1 p-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
+              <FormField control={form.control} name="code" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Code</FormLabel>
+                  <FormControl><Input {...field} placeholder="e.g. WELCOME2024" data-testid="input-promo-code" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="tier" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tier</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger data-testid="select-promo-tier"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="school">School</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="premium">12Digits+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (optional)</FormLabel>
+                  <FormControl><Input {...field} placeholder="e.g. Welcome discount" data-testid="input-promo-description" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="maxUses" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Max Uses (optional)</FormLabel>
+                  <FormControl><Input {...field} type="number" placeholder="Unlimited" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} data-testid="input-promo-max-uses" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="isActive" render={({ field }) => (
+                <FormItem className="flex items-center gap-3">
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-promo-active" /></FormControl>
+                  <FormLabel>Active</FormLabel>
+                </FormItem>
+              )} />
+              <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-create-promo">
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-2" />Create Code</>}
+              </Button>
+            </form>
+          </Form>
+        </ScrollArea>
+      </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-6 border-b">
+          <h2 className="text-lg font-bold">Promo Codes ({codes.length})</h2>
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-3">
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)
+            ) : codes.length === 0 ? (
+              <div className="text-center py-16" data-testid="empty-promo-codes">
+                <Tag className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
+                <p className="text-sm font-bold text-muted-foreground">No Promo Codes</p>
+              </div>
+            ) : codes.map((code: any) => (
+              <Card key={code.id} className="rounded-xl" data-testid={`card-promo-${code.id}`}>
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono font-bold text-base" data-testid={`text-promo-code-${code.id}`}>{code.code}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tierColors[code.tier] || "bg-gray-100 text-gray-800"}`}>{code.tier}</span>
+                      {!code.isActive && <Badge variant="secondary">Inactive</Badge>}
+                    </div>
+                    {code.description && <p className="text-sm text-muted-foreground truncate">{code.description}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Used: {code.usedCount ?? 0}{code.maxUses ? ` / ${code.maxUses}` : " / ∞"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={code.isActive}
+                      onCheckedChange={(v) => toggleMutation.mutate({ id: code.id, isActive: v })}
+                      data-testid={`switch-active-${code.id}`}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(code.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-promo-${code.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

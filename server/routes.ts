@@ -546,7 +546,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/trades/limits", requireAuth, async (req, res) => {
     const user = req.user as User;
     const DEMO_DAILY_TRADE_LIMIT = 5;
-    const isTrialUser = !user.subscriptionId && user.membershipStatus !== "active" && user.role !== "admin";
+    const isTrialUser = user.membershipStatus !== "active" && user.role !== "admin";
     
     if (!isTrialUser) {
       return res.json({ isLimited: false, remaining: -1, limit: -1 });
@@ -636,7 +636,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Check if user is on trial (demo) and enforce trade limits
       const DEMO_DAILY_TRADE_LIMIT = 5;
-      const isTrialUser = !user.subscriptionId && user.membershipStatus !== "active" && user.role !== "admin";
+      const isTrialUser = user.membershipStatus !== "active" && user.role !== "admin";
       
       if (isTrialUser) {
         const today = new Date().toISOString().split('T')[0];
@@ -1219,6 +1219,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         membershipTier: "school",
         membershipStatus: "active",
         teacherId: user.id,
+        subscriptionId: `SCHOOL-MANAGED-${Date.now()}`,
       });
       
       // Add student to class
@@ -1289,41 +1290,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { promoCode } = req.body;
       const user = req.user as User;
 
-      // Define valid promo codes and their tiers
-      const promoCodes: Record<string, { tier: string; message: string }> = {
-        "12DIGITS!": { tier: "school", message: "Promo code redeemed! You now have free School Plan access." },
-        "CASUAL!": { tier: "casual", message: "Promo code redeemed! You now have free Casual Plan access." },
-        "12DIGITS+": { tier: "premium", message: "Promo code redeemed! You now have free 12Digits+ Premium access." },
-      };
-
-      const promoConfig = promoCodes[promoCode];
-      if (!promoConfig) {
-        return res.status(400).json({ error: "Invalid promo code" });
+      const promoRecord = await storage.getPromoCodeByCode(promoCode);
+      if (!promoRecord || !promoRecord.isActive) {
+        return res.status(400).json({ error: "Invalid or expired promo code" });
       }
 
-      // Define tier hierarchy for upgrades (premium > casual > school based on pricing)
-      const tierRank: Record<string, number> = {
-        "school": 1,
-        "casual": 2,
-        "premium": 3,
-      };
+      if (promoRecord.maxUses !== null && promoRecord.maxUses !== undefined && (promoRecord.usedCount ?? 0) >= promoRecord.maxUses) {
+        return res.status(400).json({ error: "This promo code has reached its usage limit" });
+      }
 
+      const tierRank: Record<string, number> = { school: 1, casual: 2, premium: 3 };
       const currentTierRank = user.membershipTier ? (tierRank[user.membershipTier] || 0) : 0;
-      const newTierRank = tierRank[promoConfig.tier] || 0;
+      const newTierRank = tierRank[promoRecord.tier] || 0;
 
-      // Check if user already has the same or higher tier
       if (user.membershipStatus === "active" && currentTierRank >= newTierRank) {
         return res.status(400).json({ error: "You already have this tier or a higher membership" });
       }
 
-      // Activate free subscription based on promo code
       await storage.updateUser(user.id, {
-        membershipTier: promoConfig.tier,
+        membershipTier: promoRecord.tier,
         membershipStatus: "active",
-        subscriptionId: `PROMO-${promoCode}-${Date.now()}`,
+        subscriptionId: `PROMO-${promoRecord.code}-${Date.now()}`,
       });
 
-      res.json({ success: true, message: promoConfig.message });
+      await storage.incrementPromoCodeUsed(promoRecord.id);
+
+      const tierNames: Record<string, string> = { school: "School Plan", casual: "Casual Plan", premium: "12Digits+ Premium" };
+      res.json({ success: true, message: `Promo code redeemed! You now have free ${tierNames[promoRecord.tier] || promoRecord.tier} access.` });
     } catch (error) {
       console.error("Promo redemption error:", error);
       res.status(500).json({ error: "Failed to redeem promo code" });
@@ -1770,6 +1763,43 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/admin/promo-codes", requireAdmin, async (req, res) => {
+    try {
+      const codes = await storage.getPromoCodes();
+      res.json(codes);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/promo-codes", requireAdmin, async (req, res) => {
+    try {
+      const code = await storage.createPromoCode(req.body);
+      res.json(code);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/promo-codes/:id", requireAdmin, async (req, res) => {
+    try {
+      const code = await storage.updatePromoCode(req.params.id, req.body);
+      if (!code) return res.status(404).json({ message: "Promo code not found" });
+      res.json(code);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/promo-codes/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deletePromoCode(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Middleware for features requiring any paid membership (casual, school, premium) or trial
   const requirePaidMembership = (req: Request, res: Response, next: NextFunction) => {
     const user = req.user as User;
@@ -1781,7 +1811,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return next();
     }
     // Active subscription
-    if (user.membershipStatus === "active" && user.subscriptionId) {
+    if (user.membershipStatus === "active") {
       return next();
     }
     // Check trial period (14 days)
@@ -1808,7 +1838,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return next();
     }
     // Premium tier subscription
-    if (user.membershipTier === "premium" && user.membershipStatus === "active" && user.subscriptionId) {
+    if (user.membershipTier === "premium" && user.membershipStatus === "active") {
       return next();
     }
     // Check trial period (14 days) - trial users get premium access

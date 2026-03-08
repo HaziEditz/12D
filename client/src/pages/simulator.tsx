@@ -209,6 +209,7 @@ export default function SimulatorPage() {
       refetchTrades();
       refreshUser();
       playTradeSound();
+      queryClient.invalidateQueries({ queryKey: ["/api/user/achievements"] });
       toast({ title: "Trade closed" });
     },
     onError: () => {
@@ -368,7 +369,7 @@ export default function SimulatorPage() {
       const chart = createChart(chartContainerRef.current, {
         layout: {
           background: { type: ColorType.Solid, color: 'transparent' },
-          textColor: 'hsl(var(--foreground))',
+          textColor: getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#ffffff',
         },
         grid: {
           vertLines: { color: 'hsl(var(--border))' },

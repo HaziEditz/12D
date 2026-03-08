@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,8 @@ import {
   ChevronRight,
   Filter,
   Lock,
-  Sparkles
+  Sparkles,
+  X
 } from "lucide-react";
 import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
@@ -24,6 +26,9 @@ import { isTrialUser } from "@/lib/subscription";
 export default function LessonsPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
@@ -100,11 +105,79 @@ export default function LessonsPage() {
             Master trading through our comprehensive curriculum
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button 
+          variant={showFilter ? "default" : "outline"} 
+          className="gap-2"
+          onClick={() => setShowFilter(!showFilter)}
+          data-testid="button-filter-lessons"
+        >
           <Filter className="h-4 w-4" />
           Filter
+          {(filterDifficulty !== "all" || filterCategory !== "all") && (
+            <Badge className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
+              {[filterDifficulty !== "all", filterCategory !== "all"].filter(Boolean).length}
+            </Badge>
+          )}
         </Button>
       </div>
+
+      {showFilter && (
+        <Card className="mb-4 border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-wrap gap-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Difficulty</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["all", "beginner", "intermediate", "advanced"].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setFilterDifficulty(d)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                        filterDifficulty === d 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                      data-testid={`filter-difficulty-${d}`}
+                    >
+                      {d === "all" ? "All" : d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Category</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["all", "basics", "technical-analysis", "risk-management", "psychology", "strategies"].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setFilterCategory(c)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                        filterCategory === c 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                      data-testid={`filter-category-${c}`}
+                    >
+                      {c === "all" ? "All" : c.replace("-", " ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(filterDifficulty !== "all" || filterCategory !== "all") && (
+                <div className="flex items-end">
+                  <button
+                    onClick={() => { setFilterDifficulty("all"); setFilterCategory("all"); }}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="h-3 w-3" /> Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-8">
         <CardContent className="pt-6">
@@ -176,7 +249,11 @@ export default function LessonsPage() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {lessons?.map((lesson) => {
+        {lessons?.filter(lesson => {
+          const diffMatch = filterDifficulty === "all" || lesson.difficulty.toLowerCase() === filterDifficulty;
+          const catMatch = filterCategory === "all" || lesson.category.toLowerCase() === filterCategory;
+          return diffMatch && catMatch;
+        }).map((lesson) => {
           const isCompleted = completedLessonIds.has(lesson.id);
           const isLocked = isLessonLocked(lesson);
           return (

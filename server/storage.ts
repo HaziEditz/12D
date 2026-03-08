@@ -3,7 +3,7 @@ import { eq, desc, asc, and, isNull, ilike, or, sql } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
-  friendships, chatMessages, watchlistItems, journalEntries, notifications,
+  friendships, chatMessages, watchlistItems, journalEntries, notifications, promoCodes,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -13,7 +13,8 @@ import {
   type Friendship, type InsertFriendship, type Strategy, type InsertStrategy,
   type ChatMessage, type InsertChatMessage,
   type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry,
-  type Notification, type InsertNotification
+  type Notification, type InsertNotification,
+  type PromoCode, type InsertPromoCode
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -156,6 +157,13 @@ export interface IStorage {
   markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
   deleteNotification(id: string, userId: string): Promise<void>;
+
+  createPromoCode(data: InsertPromoCode): Promise<PromoCode>;
+  getPromoCodes(): Promise<PromoCode[]>;
+  getPromoCodeByCode(code: string): Promise<PromoCode | undefined>;
+  updatePromoCode(id: string, data: Partial<PromoCode>): Promise<PromoCode | undefined>;
+  deletePromoCode(id: string): Promise<void>;
+  incrementPromoCodeUsed(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -832,6 +840,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNotification(id: string, userId: string): Promise<void> {
     await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async createPromoCode(data: InsertPromoCode): Promise<PromoCode> {
+    const [code] = await db.insert(promoCodes).values({ ...data, code: data.code.toUpperCase() }).returning();
+    return code;
+  }
+
+  async getPromoCodes(): Promise<PromoCode[]> {
+    return await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
+  }
+
+  async getPromoCodeByCode(code: string): Promise<PromoCode | undefined> {
+    const [result] = await db.select().from(promoCodes).where(eq(promoCodes.code, code.toUpperCase()));
+    return result;
+  }
+
+  async updatePromoCode(id: string, data: Partial<PromoCode>): Promise<PromoCode | undefined> {
+    const [result] = await db.update(promoCodes).set(data).where(eq(promoCodes.id, id)).returning();
+    return result;
+  }
+
+  async deletePromoCode(id: string): Promise<void> {
+    await db.delete(promoCodes).where(eq(promoCodes.id, id));
+  }
+
+  async incrementPromoCodeUsed(id: string): Promise<void> {
+    await db.update(promoCodes).set({ usedCount: sql`${promoCodes.usedCount} + 1` }).where(eq(promoCodes.id, id));
   }
 
   async checkAndAwardAchievements(userId: string): Promise<void> {

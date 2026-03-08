@@ -1,4 +1,5 @@
-import { PremiumPaywall } from "@/components/paywall";
+import { Paywall } from "@/components/paywall";
+import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,15 @@ interface NewsItem {
   title: string;
   summary: string;
   source: string;
-  time: string;
+  hoursAgo: number;
   sentiment: "bullish" | "bearish" | "neutral";
   category: string;
   symbols: string[];
   url: string;
+}
+
+function getNewsTime(hoursAgo: number): string {
+  return formatDistanceToNow(new Date(Date.now() - hoursAgo * 3600 * 1000), { addSuffix: true });
 }
 
 const mockNews: NewsItem[] = [
@@ -36,7 +41,7 @@ const mockNews: NewsItem[] = [
     title: "NVIDIA Reports Record Q4 Revenue, Beats Expectations",
     summary: "NVIDIA announced quarterly revenue of $22.1 billion, a 265% increase year-over-year, driven by strong demand for AI chips and data center products.",
     source: "Reuters",
-    time: "2 hours ago",
+    hoursAgo: 2,
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["NVDA"],
@@ -47,7 +52,7 @@ const mockNews: NewsItem[] = [
     title: "Federal Reserve Signals Potential Rate Cuts in 2024",
     summary: "Fed Chair Powell indicated that the central bank may begin cutting interest rates in the coming months as inflation continues to cool.",
     source: "Bloomberg",
-    time: "3 hours ago",
+    hoursAgo: 3,
     sentiment: "bullish",
     category: "Economic",
     symbols: ["SPY", "QQQ"],
@@ -58,7 +63,7 @@ const mockNews: NewsItem[] = [
     title: "Apple Faces Antitrust Investigation in EU",
     summary: "European regulators have opened a formal investigation into Apple's App Store policies, potentially leading to significant fines.",
     source: "Financial Times",
-    time: "4 hours ago",
+    hoursAgo: 4,
     sentiment: "bearish",
     category: "Regulatory",
     symbols: ["AAPL"],
@@ -69,7 +74,7 @@ const mockNews: NewsItem[] = [
     title: "Tesla Deliveries Miss Expectations in Q4",
     summary: "Tesla reported Q4 deliveries of 484,507 vehicles, below analyst expectations of 490,000, citing production challenges.",
     source: "CNBC",
-    time: "5 hours ago",
+    hoursAgo: 5,
     sentiment: "bearish",
     category: "Earnings",
     symbols: ["TSLA"],
@@ -80,7 +85,7 @@ const mockNews: NewsItem[] = [
     title: "Microsoft Cloud Revenue Surges 30% on AI Demand",
     summary: "Microsoft's Azure cloud platform posted 30% revenue growth, with CEO Satya Nadella highlighting strong enterprise AI adoption.",
     source: "Wall Street Journal",
-    time: "6 hours ago",
+    hoursAgo: 6,
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["MSFT"],
@@ -91,7 +96,7 @@ const mockNews: NewsItem[] = [
     title: "Oil Prices Rise Amid Middle East Tensions",
     summary: "Crude oil futures climbed 3% as geopolitical tensions in the Middle East raised concerns about supply disruptions.",
     source: "MarketWatch",
-    time: "7 hours ago",
+    hoursAgo: 7,
     sentiment: "neutral",
     category: "Commodities",
     symbols: ["USO", "XLE"],
@@ -102,7 +107,7 @@ const mockNews: NewsItem[] = [
     title: "Amazon Announces $10B Investment in Logistics Network",
     summary: "Amazon plans to invest $10 billion to expand its delivery network, aiming to enable same-day delivery for more products.",
     source: "CNBC",
-    time: "8 hours ago",
+    hoursAgo: 8,
     sentiment: "bullish",
     category: "Corporate",
     symbols: ["AMZN"],
@@ -113,7 +118,7 @@ const mockNews: NewsItem[] = [
     title: "Banking Sector Faces Pressure from Commercial Real Estate",
     summary: "Regional banks report increased loan loss provisions as commercial real estate values continue to decline.",
     source: "Bloomberg",
-    time: "9 hours ago",
+    hoursAgo: 9,
     sentiment: "bearish",
     category: "Sector",
     symbols: ["KRE", "XLF"],
@@ -184,7 +189,7 @@ function NewsCard({ news }: { news: NewsItem }) {
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="w-3 h-3" />
-                {news.time}
+                {getNewsTime(news.hoursAgo)}
               </div>
               <span className="text-xs text-muted-foreground">{news.source}</span>
               <Badge variant="outline" className="text-xs">{news.category}</Badge>
@@ -301,8 +306,8 @@ function NewsFeedContent() {
 
 export default function NewsPage() {
   return (
-    <PremiumPaywall featureName="Market News Feed">
+    <Paywall featureName="Market News Feed">
       <NewsFeedContent />
-    </PremiumPaywall>
+    </Paywall>
   );
 }

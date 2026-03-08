@@ -74,6 +74,7 @@ export default function Pricing() {
   const [promoCode, setPromoCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [showPromoInput, setShowPromoInput] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   const handleRedeemPromo = async () => {
     if (!promoCode.trim()) {
@@ -136,6 +137,21 @@ export default function Pricing() {
               {status.daysRemaining} days left in your trial
             </Badge>
           )}
+
+          <div className="flex items-center justify-center gap-3 mt-6" data-testid="billing-toggle">
+            <span className={`text-sm font-medium ${!isAnnual ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
+            <button
+              onClick={() => setIsAnnual(!isAnnual)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAnnual ? "bg-primary" : "bg-muted"}`}
+              data-testid="button-billing-toggle"
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isAnnual ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+            <span className={`text-sm font-medium ${isAnnual ? "text-foreground" : "text-muted-foreground"}`}>
+              Annual
+              <Badge className="ml-2 bg-green-500 text-white text-xs">Save 17%</Badge>
+            </span>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -167,8 +183,22 @@ export default function Pricing() {
                   <CardTitle className="text-xl">{plan.name}</CardTitle>
                   <CardDescription>{plan.description}</CardDescription>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold">${plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
+                    {isAnnual ? (
+                      <>
+                        <div>
+                          <span className="text-4xl font-bold">${(plan.price * 10 / 12).toFixed(2)}</span>
+                          <span className="text-muted-foreground">/month</span>
+                        </div>
+                        <p className="text-sm text-green-600 font-medium mt-1">
+                          Billed ${(plan.price * 10).toFixed(2)}/year
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-bold">${plan.price}</span>
+                        <span className="text-muted-foreground">{plan.period}</span>
+                      </>
+                    )}
                   </div>
                 </CardHeader>
                 
@@ -219,7 +249,7 @@ export default function Pricing() {
                   ) : (
                     <SubscriptionPayPalButton
                       planId={plan.id}
-                      amount={plan.price.toString()}
+                      amount={isAnnual ? (plan.price * 10).toFixed(2) : plan.price.toString()}
                       planName={plan.name}
                     />
                   )}

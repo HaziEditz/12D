@@ -42,39 +42,60 @@ export function AvatarUploader({
 
     setIsUploading(true);
 
+    const toBase64 = (f: File): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+
     try {
-      const response = await fetch("/api/objects/upload", {
-        method: "POST",
-        credentials: "include",
-      });
+      let avatarPath: string | null = null;
 
-      if (!response.ok) {
-        throw new Error("Failed to get upload URL");
+      try {
+        const response = await fetch("/api/objects/upload", {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (!response.ok) throw new Error("No upload URL");
+
+        const { uploadURL, objectPath } = await response.json();
+
+        const uploadResponse = await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+
+        if (!uploadResponse.ok) throw new Error("Upload failed");
+
+        const avatarResponse = await fetch("/api/user/avatar", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ avatarURL: objectPath }),
+        });
+
+        if (avatarResponse.ok) {
+          const data = await avatarResponse.json();
+          avatarPath = data.avatarPath;
+        }
+      } catch {
+        const base64 = await toBase64(file);
+        const profileResponse = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ avatarUrl: base64 }),
+        });
+        if (profileResponse.ok) {
+          avatarPath = base64;
+        }
       }
 
-      const { uploadURL, objectPath } = await response.json();
-
-      const uploadResponse = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload file");
-      }
-
-      const avatarResponse = await fetch("/api/user/avatar", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ avatarURL: objectPath }),
-      });
-
-      if (avatarResponse.ok) {
-        const { avatarPath } = await avatarResponse.json();
+      if (avatarPath) {
         onUploadComplete(avatarPath);
       }
     } catch (error) {
