@@ -65,6 +65,28 @@ Preferred communication style: Simple, everyday language.
 └── migrations/          # Database migrations
 ```
 
+## School System (School World)
+
+The School System is a completely separate, immersive visual environment at `/school/*` routes. It has its own layout (`client/src/layouts/school-layout.tsx`) with distinct sidebar, branding, and CSS theme (`school-world` class in `index.css`). The main navbar shows a "School World" button for users with `membershipTier === "school"`. School pages skip the main Navbar entirely (handled in `AppContent` in `App.tsx`).
+
+### Routes
+- `/school` — Hub/entry page (`pages/school/hub.tsx`)
+- `/school/student` — Age-adapted student dashboard (`pages/school/student-dashboard.tsx`)
+- `/school/teacher` — Teacher Command Centre (`pages/school/teacher-dashboard.tsx`)
+- `/school/fun-zone` — Age-adapted Fun Zone with mini-games (`pages/school/fun-zone.tsx`)
+
+### Age Groups (defined in `shared/schema.ts`)
+- `primary` (ages 6–10): Colorful, large emojis, coin animations, simple words
+- `intermediate` (ages 11–13): Badges, progress bars, portfolio basics
+- `high_school` (ages 14–18): Full interface — charts, trades, complex assignments
+
+### School Features
+- **Classroom Tokens**: Stored as `classroomTokens` on users table; awarded by Fun Zone games
+- **Market Events**: Teachers post boom/crash/news/tip events to classes
+- **Assignments**: profit_target, lesson_completion, portfolio_balance types with student progress tracking
+- **Class Leaderboard**: Rankings scoped to class via `/api/leaderboard?scope=class`
+- **Fun Zone Games**: Age-adapted mini-games (Coin Rain, Piggy Bank Builder, Stock Guesser, Budget Boss, Finance Quiz, Market Prediction, Investment Quiz, Strategy Challenge)
+
 ## External Dependencies
 
 ### Payment Processing

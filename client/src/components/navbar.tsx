@@ -127,6 +127,18 @@ export function Navbar() {
                 </Link>
               );
             })}
+            {(user?.role === "student" || user?.role === "teacher") && user?.membershipTier === "school" && (
+              <Link href="/school">
+                <Button
+                  variant={location.startsWith("/school") ? "secondary" : "ghost"}
+                  className="gap-2 font-semibold border border-teal-500/30 text-teal-500 hover:text-teal-400 hover:bg-teal-500/10 hover:border-teal-500/50"
+                  data-testid="link-school-world"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  School World
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
@@ -249,35 +261,10 @@ export function Navbar() {
                   {(user?.role === "student" || user?.role === "teacher") && user?.membershipTier === "school" && (
                     <>
                       <DropdownMenuSeparator />
-                      <div className="px-2 py-1 text-xs text-muted-foreground flex items-center gap-1">
-                        <GraduationCap className="h-3 w-3 text-primary" />
-                        School
-                      </div>
-                      {user?.role === "student" && (
-                        <DropdownMenuItem asChild>
-                          <Link href="/classroom" className="flex items-center gap-2 cursor-pointer" data-testid="link-student-classroom">
-                            <GraduationCap className="h-4 w-4" />
-                            My Classroom
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
-                      {user?.role === "teacher" && (
-                        <DropdownMenuItem asChild>
-                          <Link href="/classroom" className="flex items-center gap-2 cursor-pointer" data-testid="link-teacher-classroom">
-                            <GraduationCap className="h-4 w-4" />
-                            Teacher Dashboard
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
                       <DropdownMenuItem asChild>
-                        <Link href="/fun-zone" className="flex items-center gap-2 cursor-pointer" data-testid="link-fun-zone">
-                          <Gamepad2 className="h-4 w-4 text-primary" />
-                          Fun Zone
-                          {(user as any)?.classroomTokens > 0 && (
-                            <span className="ml-auto flex items-center gap-0.5 text-xs text-amber-500 font-semibold">
-                              <Coins className="h-3 w-3" />{(user as any).classroomTokens}
-                            </span>
-                          )}
+                        <Link href="/school" className="flex items-center gap-2 cursor-pointer font-semibold" data-testid="link-school-world-dropdown">
+                          <GraduationCap className="h-4 w-4 text-teal-500" />
+                          <span className="text-teal-500">School World</span>
                         </Link>
                       </DropdownMenuItem>
                     </>
