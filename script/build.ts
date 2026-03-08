@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, mkdir, readFile } from "fs/promises";
+import { execSync } from "child_process";
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
@@ -47,6 +48,17 @@ async function buildAll() {
     minify: false,
     logLevel: "info",
   });
+
+  // Sync database schema in production deployments
+  if (process.env.NODE_ENV === "production" || process.env.RENDER === "true") {
+    console.log("syncing database schema...");
+    try {
+      execSync("npm run db:push", { stdio: "inherit" });
+      console.log("✓ Database schema synced");
+    } catch (err) {
+      console.warn("⚠ Database schema sync skipped (may run on startup)");
+    }
+  }
 
   console.log("✓ Build complete");
 }
