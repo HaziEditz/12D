@@ -150,20 +150,6 @@ export default function LandingPage() {
             </a>
           </div>
 
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto">
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-white">5K+</div>
-              <div className="text-sm text-white/60">Active Traders</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-white">50+</div>
-              <div className="text-sm text-white/60">Lessons</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-white">1M+</div>
-              <div className="text-sm text-white/60">Trades Made</div>
-            </div>
-          </div>
         </div>
       </section>
 

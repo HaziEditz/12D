@@ -381,10 +381,13 @@ export default function SimulatorPage() {
     const createChartInstance = () => {
       if (!chartContainerRef.current) return;
 
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor = isDark ? 'hsl(210, 20%, 90%)' : 'hsl(0, 0%, 15%)';
+
       const chart = createChart(chartContainerRef.current, {
         layout: {
           background: { type: ColorType.Solid, color: 'transparent' },
-          textColor: getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#ffffff',
+          textColor,
         },
         grid: {
           vertLines: { color: 'hsl(var(--border))' },

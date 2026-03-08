@@ -31,6 +31,8 @@ const notificationRoutes: Record<string, string> = {
   trade_executed: "/simulator",
   trade_closed: "/simulator",
   chat_message: "/friends",
+  classroom_message: "/school/chat",
+  assignment: "/school/student",
   achievement_unlocked: "/achievements",
   price_alert: "/simulator",
 };

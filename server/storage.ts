@@ -866,7 +866,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Simulated Prices
-  private simulatedPrices: Record<string, number> = {};
+  private simulatedPrices: Record<string, number> = {
+    AAPL: 185.50,
+    MSFT: 415.20,
+    GOOGL: 175.80,
+    AMZN: 198.30,
+    META: 520.40,
+    TSLA: 248.60,
+    NVDA: 875.30,
+    BTC: 43250.00,
+    ETH: 2580.00,
+    SPY: 508.75,
+    QQQ: 437.20,
+    NFLX: 625.80,
+    AMD: 178.40,
+    DIS: 112.60,
+    COIN: 185.30,
+  };
 
   async getSimulatedPrices(): Promise<Record<string, number>> {
     return this.simulatedPrices;

@@ -68,10 +68,11 @@ export function Navbar() {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
     { href: "/achievements", label: "Achievements", icon: Award, premium: false },
+    { href: "/strategies", label: "Strategies", icon: Library, premium: false },
+    { href: "/risk-calculator", label: "Risk Calc", icon: Calculator, premium: false },
     { href: "/watchlist", label: "Watchlist", icon: Star, premium: false },
     { href: "/tips", label: "Tips", icon: Lightbulb, premium: false },
     { href: "/command-center", label: "Terminal", icon: Zap, premium: true },
-    { href: "/strategies", label: "Strategies", icon: Library, premium: true },
     { href: "/analytics", label: "Analytics", icon: BarChart3, premium: true },
   ];
 
@@ -80,7 +81,6 @@ export function Navbar() {
     { href: "/journal", label: "Trade Journal", icon: BookOpenText },
     { href: "/news", label: "News Feed", icon: Newspaper },
     { href: "/calendar", label: "Calendar", icon: Calendar },
-    { href: "/risk-calculator", label: "Risk Calc", icon: Calculator },
   ];
 
   const getInitials = (name: string) => {

@@ -49,21 +49,41 @@ export default function LessonsPage() {
     queryKey: ["/api/lessons"],
   });
 
+  const normalizeCategory = (cat: string): string => {
+    const raw = cat.toLowerCase().trim();
+    const map: Record<string, string> = {
+      "technical analysis": "technical",
+      "technical-analysis": "technical",
+      "fundamental analysis": "fundamental",
+      "fundamental-analysis": "fundamental",
+      "risk management": "risk",
+      "risk-management": "risk",
+      "chart patterns": "charts",
+      "chart-patterns": "charts",
+      "portfolio management": "portfolio",
+      "portfolio-management": "portfolio",
+      "news trading": "news",
+      "news-trading": "news",
+    };
+    return map[raw] ?? raw;
+  };
+
   const categories = [
     { id: "all", label: "All", icon: LayoutGrid },
     { id: "basics", label: "Basics", icon: BookOpen },
-    { id: "technical-analysis", label: "Technical Analysis", icon: BarChart3 },
-    { id: "risk-management", label: "Risk Management", icon: Briefcase },
+    { id: "technical", label: "Technical Analysis", icon: BarChart3 },
+    { id: "fundamental", label: "Fundamentals", icon: Newspaper },
     { id: "psychology", label: "Psychology", icon: Brain },
+    { id: "advanced", label: "Advanced", icon: Sparkles },
     { id: "strategies", label: "Strategies", icon: Zap },
+    { id: "risk", label: "Risk Management", icon: Briefcase },
     { id: "options", label: "Options", icon: TrendingUp },
     { id: "crypto", label: "Crypto", icon: Coins },
     { id: "forex", label: "Forex", icon: Globe },
     { id: "economics", label: "Economics", icon: GraduationCap },
-    { id: "fundamental-analysis", label: "Fundamental", icon: Newspaper },
-    { id: "chart-patterns", label: "Chart Patterns", icon: BarChart3 },
-    { id: "portfolio-management", label: "Portfolio", icon: Briefcase },
-    { id: "news-trading", label: "News Trading", icon: Newspaper },
+    { id: "charts", label: "Chart Patterns", icon: BarChart3 },
+    { id: "portfolio", label: "Portfolio", icon: Briefcase },
+    { id: "news", label: "News Trading", icon: Newspaper },
   ];
 
   const sortOptions = [
@@ -93,7 +113,7 @@ export default function LessonsPage() {
   const filteredAndSortedLessons = (lessons ?? [])
     .filter(lesson => {
       const diffMatch = filterDifficulty === "all" || lesson.difficulty.toLowerCase() === filterDifficulty;
-      const catMatch = filterCategory === "all" || lesson.category.toLowerCase() === filterCategory;
+      const catMatch = filterCategory === "all" || normalizeCategory(lesson.category) === filterCategory;
       return diffMatch && catMatch;
     })
     .sort((a, b) => {

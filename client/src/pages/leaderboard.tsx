@@ -41,7 +41,7 @@ function getMembershipBadge(tier: string | null | undefined, status: string | nu
 export default function LeaderboardPage() {
   const [scope, setScope] = useState<string>("global");
   const { data: leaderboard, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/leaderboard", { scope }],
+    queryKey: [`/api/leaderboard?scope=${scope}`],
   });
 
   const getInitials = (name: string) => {

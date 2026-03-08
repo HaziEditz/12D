@@ -143,7 +143,7 @@ export default function Pricing() {
             Choose Your Plan
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Start your 14-day free trial today. No credit card required. Cancel anytime.
+            Choose the plan that's right for you. Cancel anytime.
           </p>
           {status.status === "trial" && (
             <Badge variant="secondary" className="mt-4">
@@ -327,7 +327,7 @@ export default function Pricing() {
 
         <div className="mt-12 text-center text-muted-foreground">
           <p className="text-sm">
-            All plans include a 14-day free trial. Secure payments powered by PayPal.
+            Secure checkout. Cancel anytime.
           </p>
         </div>
       </div>

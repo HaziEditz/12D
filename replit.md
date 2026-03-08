@@ -9,9 +9,13 @@
 - Watchlist - Track favorite stocks with price monitoring
 - Trading Tips - Daily tips and market insights
 
+**All Logged-In Features** (all tiers):
+- Strategies - Strategy library (no paywall, accessible to all users)
+- Risk Calculator - Accessible from main navbar for all users
+
 **Premium Features** (12Digits+ or Trial Users):
-- Command Center (Terminal), Strategies, Analytics
-- Trade Journal, News Feed, Economic Calendar, Risk Calculator
+- Command Center (Terminal), Analytics
+- Trade Journal, News Feed, Economic Calendar
 - Friends System - Connect with other traders, send/accept friend requests
 
 ## User Preferences
@@ -47,6 +51,16 @@ Preferred communication style: Simple, everyday language.
 - **Session Storage**: In-memory store (memorystore package)
 - **Role System**: Three roles - student, teacher, admin
 - **Default Admin**: Hardcoded admin user created on startup (admin@12digits.com / 12digits!)
+- **Trial Access**: 14-day trial is available to new teacher/casual/premium users only. Students (role=student) do NOT receive a trial — they must be enrolled in a class by a teacher to gain access.
+
+### Simulated Stock Prices
+- Prices stored in-memory in `storage.ts` (`simulatedPrices: Record<string,number>`)
+- Default seed prices set on startup: AAPL ($185.50), MSFT ($415.20), BTC ($43,250), etc.
+- Updated via `POST /api/simulated-prices/update`; retrieved via `GET /api/simulated-prices`
+
+### Simulator Chart
+- Uses lightweight-charts (TradingView library) for candlestick charts
+- Text color explicitly set based on dark/light mode detection (`document.documentElement.classList.contains('dark')`) to ensure timestamp visibility in both modes
 
 ### Project Structure
 ```

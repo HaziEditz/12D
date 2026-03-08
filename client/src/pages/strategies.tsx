@@ -1,4 +1,3 @@
-import { Paywall } from "@/components/paywall";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -347,9 +346,5 @@ function StrategyContent() {
 }
 
 export default function StrategiesPage() {
-  return (
-    <Paywall featureName="Strategy Library">
-      <StrategyContent />
-    </Paywall>
-  );
+  return <StrategyContent />;
 }

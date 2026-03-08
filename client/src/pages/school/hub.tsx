@@ -6,6 +6,7 @@ import SchoolLayout from "@/layouts/school-layout";
 import { getLevelInfo } from "@/lib/levels";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   GraduationCap, Gamepad2, BookOpen, Trophy, Zap,
   Coins, Star, TrendingUp, Users, ChevronRight, Sparkles, KeyRound, ArrowRight, Loader2
