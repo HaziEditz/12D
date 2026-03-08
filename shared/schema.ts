@@ -404,7 +404,7 @@ export const registerSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
   role: z.enum(userRoles).optional(),
   schoolId: z.string().optional().nullable(),
-  schoolEmail: z.string().email("Invalid school email").optional().nullable(),
+  schoolEmail: z.union([z.string().email("Invalid school email"), z.literal(""), z.null()]).optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

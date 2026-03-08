@@ -80,6 +80,9 @@ export interface IStorage {
   getSchoolByAdmin(adminUserId: string): Promise<School | undefined>;
   updateSchool(id: string, data: Partial<School>): Promise<School | undefined>;
   
+  // Schools
+  getSchools(): Promise<School[]>;
+
   // Classes
   createClass(data: InsertClass): Promise<Class>;
   getClassesByTeacher(teacherId: string): Promise<Class[]>;
@@ -495,6 +498,10 @@ export class DatabaseStorage implements IStorage {
   async updateSchool(id: string, data: Partial<School>): Promise<School | undefined> {
     const [school] = await db.update(schools).set(data).where(eq(schools.id, id)).returning();
     return school;
+  }
+
+  async getSchools(): Promise<School[]> {
+    return db.select().from(schools);
   }
 
   // Classes
