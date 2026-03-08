@@ -4,3 +4,4 @@
 [x] 4. Fixed build script for Render deployment - changed to external dependencies
 [x] 5. Import completed and deployment fix applied
 [x] 6. Fixed production deployment database schema sync - added db:push to build script
+[x] 7. Fixed session storage for Render - switched from MemoryStore to PostgreSQL-backed sessions

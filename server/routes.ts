@@ -5,6 +5,8 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
+import { pool } from "./db";
+import ConnectPgSimple from "connect-pg-simple";
 let createPaypalOrder: any, capturePaypalOrder: any, loadPaypalDefault: any;
 const paypalReady = !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 if (paypalReady) {
@@ -21,11 +23,10 @@ if (paypalReady) {
 }
 import { insertUserSchema, insertLessonSchema, insertTradeSchema, insertPortfolioItemSchema, insertAssignmentSchema, insertClassSchema, insertChatMessageSchema, updateProfileSchema } from "@shared/schema";
 import type { User, Trade } from "@shared/schema";
-import memorystore from "memorystore";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupWebSocket } from "./websocket";
 
-const MemoryStore = memorystore(session);
+const pgSession = ConnectPgSimple(session);
 
 declare global {
   namespace Express {
@@ -373,8 +374,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       secret: process.env.SESSION_SECRET || "12digits-secret-key-change-in-prod",
       resave: false,
       saveUninitialized: false,
-      store: new MemoryStore({
-        checkPeriod: 86400000,
+      store: new pgSession({
+        pool: pool,
+        tableName: "session",
+        createTableIfMissing: true,
       }),
       cookie: {
         maxAge: 24 * 60 * 60 * 1000,
