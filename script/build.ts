@@ -1,64 +1,54 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
-
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times
-const allowlist = [
-  "@google/generative-ai",
-  "axios",
-  "connect-pg-simple",
-  "cors",
-  "date-fns",
-  "drizzle-orm",
-  "drizzle-zod",
-  "express",
-  "express-rate-limit",
-  "express-session",
-  "jsonwebtoken",
-  "memorystore",
-  "multer",
-  "nanoid",
-  "nodemailer",
-  "openai",
-  "passport",
-  "passport-local",
-  "pg",
-  "stripe",
-  "uuid",
-  "ws",
-  "xlsx",
-  "zod",
-  "zod-validation-error",
-];
+import { rm, mkdir, readFile } from "fs/promises";
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
+  await mkdir("dist", { recursive: true });
 
   console.log("building client...");
   await viteBuild();
 
   console.log("building server...");
+
+  // Read package.json to get all dependencies as externals
+  // This forces Render to have dependencies installed, avoiding bundle bloat
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
   const allDeps = [
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
+  // All Node.js built-ins
+  const nodeBuiltins = [
+    "assert", "async_hooks", "buffer", "child_process", "cluster",
+    "console", "constants", "crypto", "dgram", "dns", "domain",
+    "events", "fs", "fs/promises", "http", "http2", "https",
+    "inspector", "module", "net", "os", "path", "perf_hooks",
+    "process", "punycode", "querystring", "readline", "repl",
+    "stream", "string_decoder", "sys", "timers", "tls",
+    "trace_events", "tty", "url", "util", "v8", "vm",
+    "worker_threads", "zlib",
+  ];
+
+  // Transpile server code with all deps external
+  // This means dependencies must be installed at runtime
   await esbuild({
     entryPoints: ["server/index.ts"],
     platform: "node",
+    target: "node18",
     bundle: true,
     format: "esm",
     outfile: "dist/index.mjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
-    minify: true,
-    external: externals,
+    external: [...allDeps, ...nodeBuiltins],
+    minify: false,
     logLevel: "info",
   });
+
+  console.log("✓ Build complete");
 }
 
 buildAll().catch((err) => {
