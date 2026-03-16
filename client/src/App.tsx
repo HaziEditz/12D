@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -100,17 +99,6 @@ function Router() {
   );
 }
 
-function StudentGuard() {
-  const [location, navigate] = useLocation();
-  const { user } = useAuth();
-  const isSchoolPage = location.startsWith("/school") || location === "/school-plan";
-  useEffect(() => {
-    if (user?.role === "student" && !isSchoolPage) {
-      navigate("/school");
-    }
-  }, [user?.role, isSchoolPage, navigate]);
-  return null;
-}
 
 function AppContent() {
   const [location] = useLocation();
@@ -141,7 +129,6 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen bg-background${(isCasualPage || isCasualUser) ? " casual-world" : ""}`}>
-      <StudentGuard />
       <TrialBanner />
       <Navbar />
       <Router />
