@@ -14,7 +14,7 @@ import {
   Coins, TrendingUp, TrendingDown, Briefcase, ShoppingBag, Gavel,
   Clock, CheckCircle2, ArrowUpRight, ArrowDownRight, Loader2, Star,
   Receipt, PiggyBank, Trophy, Medal, Crown, Zap, Home, Building2,
-  BarChart3, Wallet, ChevronRight
+  BarChart3, Wallet, ChevronRight, CreditCard, AlertTriangle, TrendingDown as LoanIcon
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -32,12 +32,17 @@ const TX_ICONS: Record<string, { icon: any; color: string }> = {
   savings_deposit: { icon: PiggyBank, color: "text-blue-400" },
   savings_withdrawal: { icon: PiggyBank, color: "text-orange-400" },
   savings_interest: { icon: TrendingUp, color: "text-emerald-400" },
+  loan: { icon: CreditCard, color: "text-amber-400" },
+  loan_repayment: { icon: CreditCard, color: "text-red-400" },
+  asset_income: { icon: Home, color: "text-blue-400" },
+  asset_maintenance: { icon: Home, color: "text-red-400" },
 };
 
 const ASSET_TYPE_ICONS: Record<string, { icon: any; color: string; label: string }> = {
   property: { icon: Home, color: "text-blue-400", label: "Property" },
   business: { icon: Building2, color: "text-amber-400", label: "Business" },
   investment: { icon: BarChart3, color: "text-emerald-400", label: "Investment" },
+  vehicle: { icon: Zap, color: "text-purple-400", label: "Vehicle" },
 };
 const RANK_ICONS = [Crown, Medal, Trophy];
 
@@ -50,6 +55,7 @@ export default function SchoolEconomy() {
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [savingsDialogOpen, setSavingsDialogOpen] = useState(false);
+  const [repayAmounts, setRepayAmounts] = useState<Record<string, string>>({});
 
   const { data: classData } = useQuery<any>({ queryKey: ["/api/classroom"] });
   const classId = classData?.class?.id;
@@ -106,11 +112,17 @@ export default function SchoolEconomy() {
     queryFn: () => fetch(`/api/economy/my-assets?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
+  const { data: myLoans = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/loans", classId],
+    queryFn: () => fetch(`/api/economy/loans?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!classId,
+  });
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["/api/economy/balance", classId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/net-worth", classId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/my-assets", classId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/loans", classId] });
   };
 
   const bidMutation = useMutation({
@@ -144,6 +156,17 @@ export default function SchoolEconomy() {
     onError: (e: any) => toast({ title: "Purchase failed", description: e.message, variant: "destructive" }),
   });
 
+  const repayMutation = useMutation({
+    mutationFn: ({ loanId, amount }: { loanId: string; amount: number }) =>
+      apiRequest("POST", `/api/economy/loans/${loanId}/repay`, { classId, amount }),
+    onSuccess: (_data, vars) => {
+      invalidateAll();
+      setRepayAmounts(p => { const n = { ...p }; delete n[vars.loanId]; return n; });
+      toast({ title: "Loan repayment successful!" });
+    },
+    onError: (e: any) => toast({ title: "Repayment failed", description: e.message, variant: "destructive" }),
+  });
+
   const depositMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/economy/savings/deposit", { classId, amount }),
     onSuccess: () => { invalidateAll(); toast({ title: "Deposited to savings!" }); setDepositAmount(""); setSavingsDialogOpen(false); },
@@ -162,9 +185,9 @@ export default function SchoolEconomy() {
   const savingsBalance = economyData?.savingsBalance ?? 0;
   const transactions: any[] = economyData?.transactions ?? [];
   const myJobs: any[] = economyData?.myJobs ?? [];
-  const purchases: any[] = economyData?.purchases ?? [];
   const netWorthTotal = netWorth?.total ?? 0;
-  const assetValue = netWorth?.assetValue ?? 0;
+  const activeLoans = (myLoans as any[]).filter((l: any) => l.isActive);
+  const totalLoanBalance = activeLoans.reduce((s: number, l: any) => s + l.balance, 0);
 
   const activeAuctions = auctions.filter((a: any) => a.isActive && new Date(a.endDate) > new Date());
   const closedAuctions = auctions.filter((a: any) => !a.isActive || new Date(a.endDate) <= new Date());
@@ -175,7 +198,7 @@ export default function SchoolEconomy() {
 
   const navSections = [
     { id: "wallet", label: "💰 Wallet" },
-    { id: "assets", label: "🏠 Assets", count: myAssets.length },
+    { id: "assets", label: "🏠 Assets", count: (myAssets as any[]).length },
     { id: "auctions", label: "🔨 Auctions", count: activeAuctions.length },
     { id: "store", label: "🛍️ Store" },
     { id: "leaderboard", label: "🏆 Rankings" },
@@ -209,35 +232,45 @@ export default function SchoolEconomy() {
                 </div>
                 <p className="text-white/70 mt-0.5 text-sm">{currencyName}</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 flex-wrap">
                 {myRank > 0 && (
-                  <div className="bg-white/15 rounded-2xl px-4 py-3 text-white text-center">
+                  <div className="bg-white/15 rounded-2xl px-3 py-2.5 text-white text-center">
                     <p className="text-xs text-white/60">Rank</p>
-                    <p className="text-2xl font-black">#{myRank}</p>
+                    <p className="text-xl font-black">#{myRank}</p>
                   </div>
                 )}
-                {netWorthTotal > 0 && (
-                  <div className="bg-white/15 rounded-2xl px-4 py-3 text-white text-center">
+                {netWorthTotal !== 0 && (
+                  <div className="bg-white/15 rounded-2xl px-3 py-2.5 text-white text-center">
                     <p className="text-xs text-white/60">Net Worth</p>
-                    <p className="text-2xl font-black">{currencySymbol}{netWorthTotal.toLocaleString()}</p>
+                    <p className="text-xl font-black">{currencySymbol}{netWorthTotal.toLocaleString()}</p>
+                  </div>
+                )}
+                {totalLoanBalance > 0 && (
+                  <div className="bg-red-500/30 rounded-2xl px-3 py-2.5 text-white text-center">
+                    <p className="text-xs text-red-200">Debt</p>
+                    <p className="text-xl font-black text-red-200">{currencySymbol}{totalLoanBalance.toLocaleString()}</p>
                   </div>
                 )}
               </div>
             </div>
             {/* Net Worth Breakdown */}
             {netWorth && (
-              <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="bg-white/15 rounded-xl p-2.5 text-white">
                   <p className="text-xs text-white/60">💰 Cash</p>
-                  <p className="font-bold text-sm">{currencySymbol}{netWorth.cash?.toLocaleString() ?? 0}</p>
+                  <p className="font-bold text-sm">{currencySymbol}{(netWorth.cash ?? 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white/15 rounded-xl p-2.5 text-white">
                   <p className="text-xs text-white/60">🏦 Savings</p>
-                  <p className="font-bold text-sm">{currencySymbol}{netWorth.savings?.toLocaleString() ?? 0}</p>
+                  <p className="font-bold text-sm">{currencySymbol}{(netWorth.savings ?? 0).toLocaleString()}</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-2.5 text-white">
+                  <p className="text-xs text-white/60">📈 Simulator</p>
+                  <p className="font-bold text-sm">${(netWorth.simulatorBalance ?? 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white/15 rounded-xl p-2.5 text-white">
                   <p className="text-xs text-white/60">🏠 Assets</p>
-                  <p className="font-bold text-sm">{currencySymbol}{netWorth.assetValue?.toLocaleString() ?? 0}</p>
+                  <p className="font-bold text-sm">{currencySymbol}{(netWorth.assetValue ?? 0).toLocaleString()}</p>
                 </div>
               </div>
             )}
@@ -279,6 +312,57 @@ export default function SchoolEconomy() {
                   </div>
                 </div>
               )}
+
+              {/* Outstanding Loans */}
+              {activeLoans.length > 0 && (
+                <div className="rounded-2xl p-5 bg-red-500/5 border border-red-500/20">
+                  <h2 className="text-base font-black text-white mb-3 flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-red-400" /> Outstanding Loans
+                    <Badge className="bg-red-500/20 text-red-300 border-0 text-xs">{currencySymbol}{totalLoanBalance.toLocaleString()} owed</Badge>
+                  </h2>
+                  <div className="space-y-3">
+                    {activeLoans.map((loan: any) => {
+                      const repayAmt = repayAmounts[loan.id] ?? "";
+                      const canRepay = balance >= Number(repayAmt) && Number(repayAmt) > 0;
+                      const pctPaid = loan.principal > 0 ? Math.round(((loan.principal - loan.balance) / loan.principal) * 100) : 0;
+                      return (
+                        <div key={loan.id} className="rounded-xl p-4 bg-red-500/10 border border-red-500/20" data-testid={`loan-card-${loan.id}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-bold text-white text-sm">Loan • {loan.interestRate}% interest</p>
+                              <p className="text-xs text-slate-400">Borrowed {format(new Date(loan.createdAt), "MMM d, yyyy")}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-red-300">{currencySymbol}{loan.balance.toLocaleString()}</p>
+                              <p className="text-xs text-slate-500">of {currencySymbol}{loan.principal.toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-white/10 rounded-full mb-3 overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pctPaid}%` }} />
+                          </div>
+                          <div className="flex gap-2">
+                            <Input type="number" min={1} max={Math.min(balance, loan.balance)} placeholder={`Up to ${currencySymbol}${Math.min(balance, loan.balance)}`}
+                              value={repayAmt} onChange={e => setRepayAmounts(p => ({ ...p, [loan.id]: e.target.value }))}
+                              className="bg-white/5 border-white/20 text-white text-sm h-8 flex-1" data-testid={`input-repay-${loan.id}`} />
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                              disabled={!canRepay || repayMutation.isPending}
+                              onClick={() => repayMutation.mutate({ loanId: loan.id, amount: Number(repayAmt) })}
+                              data-testid={`button-repay-${loan.id}`}>
+                              {repayMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Repay"}
+                            </Button>
+                          </div>
+                          {loan.dueDate && (
+                            <p className={`text-xs mt-2 font-semibold ${new Date(loan.dueDate) < new Date() ? "text-red-400" : "text-slate-400"}`}>
+                              {new Date(loan.dueDate) < new Date() ? "⚠️ Overdue" : "Due"} {format(new Date(loan.dueDate), "MMM d, yyyy")}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* My Jobs */}
               {myJobs.length > 0 && (
                 <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
@@ -295,6 +379,7 @@ export default function SchoolEconomy() {
                   </div>
                 </div>
               )}
+
               {/* Transactions */}
               <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
                 <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
@@ -343,7 +428,7 @@ export default function SchoolEconomy() {
                     <PiggyBank className="h-4 w-4 text-emerald-400" /> Savings
                   </h2>
                   {settings?.savingsInterestRate > 0 && (
-                    <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">{settings.savingsInterestRate}%</Badge>
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">{settings.savingsInterestRate}% interest</Badge>
                   )}
                 </div>
                 <p className="text-2xl font-black text-emerald-300 mb-3">{currencySymbol}{savingsBalance.toLocaleString()}</p>
@@ -384,12 +469,13 @@ export default function SchoolEconomy() {
                   </DialogContent>
                 </Dialog>
               </div>
+
               {/* Bills */}
-              {expenses.length > 0 && (
+              {(expenses as any[]).length > 0 && (
                 <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
                   <h2 className="text-sm font-black text-white mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-red-400" /> Bills</h2>
                   <div className="space-y-2">
-                    {expenses.map((exp: any) => (
+                    {(expenses as any[]).map((exp: any) => (
                       <div key={exp.id} className="flex justify-between items-center rounded-xl p-2.5 bg-red-500/10 border border-red-500/20">
                         <div><p className="font-semibold text-white text-xs">{exp.name}</p><p className="text-xs text-slate-500 capitalize">{exp.frequency}</p></div>
                         <span className="text-red-400 font-bold text-sm">{currencySymbol}{exp.amount}</span>
@@ -398,6 +484,7 @@ export default function SchoolEconomy() {
                   </div>
                 </div>
               )}
+
               {/* My Assets Quick View */}
               {(myAssets as any[]).length > 0 && (
                 <div className="rounded-2xl p-4 bg-blue-500/5 border border-blue-500/20">
@@ -414,6 +501,14 @@ export default function SchoolEconomy() {
                   <button onClick={() => setActiveSection("assets")} className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors">
                     View all <ChevronRight className="h-3 w-3" />
                   </button>
+                </div>
+              )}
+
+              {/* Paid-off Loans (history) */}
+              {(myLoans as any[]).filter((l: any) => !l.isActive).length > 0 && (
+                <div className="rounded-2xl p-4 bg-white/3 border border-white/8">
+                  <h2 className="text-sm font-black text-white mb-2 flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Paid Off Loans</h2>
+                  <p className="text-xs text-slate-500">{(myLoans as any[]).filter((l: any) => !l.isActive).length} loan(s) fully repaid</p>
                 </div>
               )}
             </div>
@@ -481,16 +576,18 @@ export default function SchoolEconomy() {
                 </h2>
                 <div className="space-y-3">
                   {[
-                    { label: "💰 Cash Balance", value: netWorth.cash ?? 0, color: "bg-teal-500" },
-                    { label: "🏦 Savings Account", value: netWorth.savings ?? 0, color: "bg-emerald-500" },
-                    { label: "🏠 Asset Portfolio", value: netWorth.assetValue ?? 0, color: "bg-blue-500" },
-                  ].map(({ label, value, color }) => {
-                    const pct = netWorth.total > 0 ? Math.round((value / netWorth.total) * 100) : 0;
+                    { label: "💰 Cash Balance", value: netWorth.cash ?? 0, color: "bg-teal-500", prefix: currencySymbol },
+                    { label: "🏦 Savings Account", value: netWorth.savings ?? 0, color: "bg-emerald-500", prefix: currencySymbol },
+                    { label: "📈 Simulator Portfolio", value: netWorth.simulatorBalance ?? 0, color: "bg-cyan-500", prefix: "$" },
+                    { label: "🏠 Asset Portfolio", value: netWorth.assetValue ?? 0, color: "bg-blue-500", prefix: currencySymbol },
+                  ].map(({ label, value, color, prefix }) => {
+                    const gross = (netWorth.cash ?? 0) + (netWorth.savings ?? 0) + (netWorth.simulatorBalance ?? 0) + (netWorth.assetValue ?? 0);
+                    const pct = gross > 0 ? Math.round((value / gross) * 100) : 0;
                     return (
                       <div key={label}>
                         <div className="flex justify-between text-sm mb-1">
                           <span className="text-slate-300">{label}</span>
-                          <span className="font-bold text-white">{currencySymbol}{value.toLocaleString()} <span className="text-slate-500 font-normal text-xs">({pct}%)</span></span>
+                          <span className="font-bold text-white">{prefix}{value.toLocaleString()} <span className="text-slate-500 font-normal text-xs">({pct}%)</span></span>
                         </div>
                         <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                           <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
@@ -498,9 +595,17 @@ export default function SchoolEconomy() {
                       </div>
                     );
                   })}
+                  {(netWorth.loanBalance ?? 0) > 0 && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-red-400">💸 Outstanding Loans (debt)</span>
+                        <span className="font-bold text-red-400">-{currencySymbol}{(netWorth.loanBalance ?? 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-3 pt-3 border-t border-white/10 flex justify-between items-center">
                     <span className="text-white font-black">Total Net Worth</span>
-                    <span className="text-xl font-black text-teal-300">{currencySymbol}{netWorth.total?.toLocaleString() ?? 0}</span>
+                    <span className={`text-xl font-black ${netWorth.total >= 0 ? "text-teal-300" : "text-red-400"}`}>{netWorth.total < 0 ? "-" : ""}{currencySymbol}{Math.abs(netWorth.total ?? 0).toLocaleString()}</span>
                   </div>
                 </div>
               </div>

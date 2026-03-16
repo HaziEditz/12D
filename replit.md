@@ -111,7 +111,8 @@ The School System is a completely separate, immersive visual environment at `/sc
   - Students: earn coins from lessons (50), quizzes (25 if ≥60%), assignments (100); manage savings with interest; bid in auctions; buy from store; purchase assets (property/business/investment) that add to net worth and generate passive income; view net worth breakdown and class leaderboard.
   - Teachers (via EconomyTab in teacher dashboard): create/delete jobs, expenses, auctions, store items, assets, challenges; trigger economy events (bonus/fine/fine-percent/interest); award coins to students; process asset income; configure currency name/symbol/rewards.
   - Simulator profits auto-convert to economy coins via `/api/economy/convert-profit` (configurable rate in economy settings).
-  - Net worth = cash + savings + asset portfolio value (NOT simulator balance).
+  - Net worth = cash + savings + simulator balance + asset portfolio value - outstanding loan balances. Simulator balance shown separately in net worth breakdown as USD ($).
+  - **Loans**: Teachers issue loans (`POST /api/economy/loans`) to students with configurable amount, interest rate %, and due date. Students repay via `/api/economy/loans/:id/repay`. Teachers trigger interest accrual via `/api/economy/loans/apply-interest`. Outstanding loans appear in student wallet tab and reduce net worth. Paid-off loans shown in history. `economy_loans` table: id, classId, studentId, principal, balance, interestRate, isActive, dueDate.
   - API prefix: `/api/economy/*`. Routes include assets, my-assets, net-worth, net-worth-leaderboard, process-asset-income.
   - Student economy page: `/school/economy` (5 tabs: Wallet, Assets, Auctions, Store, Rankings).
 

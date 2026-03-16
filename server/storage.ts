@@ -7,7 +7,7 @@ import {
   quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores, classGroupMessages,
   classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
-  classroomStoreItems, classroomStorePurchases, classroomChallenges,
+  classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
   classroomAssets, studentAssets,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
@@ -1584,27 +1584,78 @@ export class DatabaseStorage implements IStorage {
     return { incomeCount, maintenanceCount };
   }
 
-  async getStudentNetWorth(classId: string, studentId: string): Promise<{ cash: number; savings: number; assetValue: number; simulatorBalance: number; total: number }> {
+  async getStudentNetWorth(classId: string, studentId: string): Promise<{ cash: number; savings: number; assetValue: number; simulatorBalance: number; loanBalance: number; total: number }> {
     const cash = await this.getStudentBalance(classId, studentId);
     const savings = await this.getSavingsBalance(studentId, classId);
     const ownedAssets = await this.getStudentAssets(classId, studentId);
     const assetValue = ownedAssets.reduce((sum, sa) => sum + (sa.asset.value ?? 0), 0);
     const user = await this.getUserById(studentId);
     const simulatorBalance = user?.simulatorBalance ?? 0;
-    const total = cash + savings + assetValue;
-    return { cash, savings, assetValue, simulatorBalance, total };
+    const loans = await this.getStudentLoans(classId, studentId);
+    const loanBalance = loans.filter(l => l.isActive).reduce((sum, l) => sum + l.balance, 0);
+    const total = Math.round(cash + savings + assetValue + simulatorBalance - loanBalance);
+    return { cash, savings, assetValue, simulatorBalance: Math.round(simulatorBalance), loanBalance, total };
   }
 
-  async getClassNetWorthLeaderboard(classId: string): Promise<{ id: string; displayName: string; netWorth: number; cash: number; assetValue: number }[]> {
+  async getClassNetWorthLeaderboard(classId: string): Promise<{ id: string; displayName: string; netWorth: number; cash: number; assetValue: number; simulatorBalance: number }[]> {
     const enrollments = await db.select({ studentId: classStudents.studentId, displayName: users.displayName })
       .from(classStudents).innerJoin(users, eq(classStudents.studentId, users.id))
       .where(eq(classStudents.classId, classId));
     const result = [];
     for (const e of enrollments) {
       const nw = await this.getStudentNetWorth(classId, e.studentId);
-      result.push({ id: e.studentId, displayName: e.displayName, netWorth: nw.total, cash: nw.cash, assetValue: nw.assetValue });
+      result.push({ id: e.studentId, displayName: e.displayName, netWorth: nw.total, cash: nw.cash, assetValue: nw.assetValue, simulatorBalance: nw.simulatorBalance });
     }
     return result.sort((a, b) => b.netWorth - a.netWorth);
+  }
+
+  // ─── Loans ──────────────────────────────────────────────────────
+  async getStudentLoans(classId: string, studentId: string) {
+    return db.select().from(economyLoans)
+      .where(and(eq(economyLoans.classId, classId), eq(economyLoans.studentId, studentId)))
+      .orderBy(desc(economyLoans.createdAt));
+  }
+
+  async getClassLoans(classId: string) {
+    return db.select({ loan: economyLoans, displayName: users.displayName })
+      .from(economyLoans)
+      .innerJoin(users, eq(economyLoans.studentId, users.id))
+      .where(eq(economyLoans.classId, classId))
+      .orderBy(desc(economyLoans.createdAt));
+  }
+
+  async issueLoan(classId: string, studentId: string, amount: number, interestRate: number, dueDate?: Date) {
+    const [loan] = await db.insert(economyLoans).values({
+      classId, studentId, principal: amount, balance: amount, interestRate, isActive: true, dueDate: dueDate ?? null,
+    }).returning();
+    await this.addCurrencyTransaction({ classId, studentId, amount, type: "loan", description: `Loan received: ${amount} coins (${interestRate}% interest)` });
+    return loan;
+  }
+
+  async repayLoan(classId: string, studentId: string, loanId: string, amount: number) {
+    const [loan] = await db.select().from(economyLoans).where(and(eq(economyLoans.id, loanId), eq(economyLoans.studentId, studentId)));
+    if (!loan || !loan.isActive) throw new Error("Loan not found or already paid off");
+    const balance = await this.getStudentBalance(classId, studentId);
+    if (balance < amount) throw new Error("Insufficient balance");
+    const repayAmount = Math.min(amount, loan.balance);
+    const newBalance = loan.balance - repayAmount;
+    await db.update(economyLoans).set({ balance: newBalance, isActive: newBalance > 0 }).where(eq(economyLoans.id, loanId));
+    await this.addCurrencyTransaction({ classId, studentId, amount: -repayAmount, type: "loan_repayment", description: `Loan repayment: ${repayAmount} coins` });
+    return { repaid: repayAmount, remaining: newBalance };
+  }
+
+  async applyLoanInterest(classId: string) {
+    const activeLoans = await db.select().from(economyLoans).where(and(eq(economyLoans.classId, classId), eq(economyLoans.isActive, true)));
+    let count = 0;
+    for (const loan of activeLoans) {
+      const interest = Math.round(loan.balance * loan.interestRate / 100);
+      if (interest > 0) {
+        const newBalance = loan.balance + interest;
+        await db.update(economyLoans).set({ balance: newBalance }).where(eq(economyLoans.id, loan.id));
+        count++;
+      }
+    }
+    return { count };
   }
 }
 

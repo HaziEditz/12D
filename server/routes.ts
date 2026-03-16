@@ -3167,6 +3167,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) { res.status(500).json({ message: error.message }); }
   });
 
+  // ─── Loans ────────────────────────────────────────────────────
+  app.get("/api/economy/loans", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId } = req.query as { classId: string };
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      if (user.role === "teacher") {
+        const loans = await storage.getClassLoans(classId);
+        res.json(loans);
+      } else {
+        const loans = await storage.getStudentLoans(classId, user.id);
+        res.json(loans);
+      }
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/loans", requireTeacher, async (req, res) => {
+    try {
+      const { classId, studentId, amount, interestRate, dueDate } = req.body;
+      if (!classId || !studentId || !amount) return res.status(400).json({ message: "classId, studentId, and amount required" });
+      const loan = await storage.issueLoan(classId, studentId, Number(amount), Number(interestRate ?? 10), dueDate ? new Date(dueDate) : undefined);
+      res.json(loan);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/loans/apply-interest", requireTeacher, async (req, res) => {
+    try {
+      const { classId } = req.body;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const result = await storage.applyLoanInterest(classId);
+      res.json(result);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/loans/:id/repay", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId, amount } = req.body;
+      if (!classId || !amount) return res.status(400).json({ message: "classId and amount required" });
+      const result = await storage.repayLoan(classId, user.id, req.params.id, Number(amount));
+      res.json(result);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
   // Background achievement check loop
   setInterval(async () => {
     try {

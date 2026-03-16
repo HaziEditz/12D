@@ -558,11 +558,27 @@ export const studentAssets = pgTable("student_assets", {
   lastMaintenancePaidAt: timestamp("last_maintenance_paid_at"),
 });
 
+// Student loans issued by teacher
+export const economyLoans = pgTable("economy_loans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  principal: integer("principal").notNull(),
+  balance: integer("balance").notNull(),
+  interestRate: integer("interest_rate").notNull().default(10), // percentage
+  isActive: boolean("is_active").default(true),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertClassroomAssetSchema = createInsertSchema(classroomAssets).omit({ id: true, createdAt: true });
 export const insertStudentAssetSchema = createInsertSchema(studentAssets).omit({ id: true, purchasedAt: true });
+export const insertEconomyLoanSchema = createInsertSchema(economyLoans).omit({ id: true, createdAt: true });
 export type ClassroomAsset = typeof classroomAssets.$inferSelect;
 export type InsertClassroomAsset = z.infer<typeof insertClassroomAssetSchema>;
 export type StudentAsset = typeof studentAssets.$inferSelect;
+export type EconomyLoan = typeof economyLoans.$inferSelect;
+export type InsertEconomyLoan = z.infer<typeof insertEconomyLoanSchema>;
 
 export const insertClassroomEconomySettingsSchema = createInsertSchema(classroomEconomySettings).omit({ id: true, createdAt: true });
 export const insertClassroomCurrencyTransactionSchema = createInsertSchema(classroomCurrencyTransactions).omit({ id: true, createdAt: true });

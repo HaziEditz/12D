@@ -25,7 +25,7 @@ import {
   Users, GraduationCap, Target, Zap, Plus, Search,
   BarChart3, TrendingUp, Coins, Trash2, CheckCircle2,
   Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase, Trophy,
-  Home, Building2
+  Home, Building2, CreditCard
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -721,6 +721,8 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
   const [eventData, setEventData] = useState({ amount: "", percent: "", description: "", mode: "bonus" as "bonus" | "fine" | "fine_percent" | "interest" });
   const [assetDialogOpen, setAssetDialogOpen] = useState(false);
   const [assetData, setAssetData] = useState({ name: "", description: "", emoji: "🏠", type: "property", price: "", value: "", passiveIncome: "", incomeFrequency: "weekly", maintenanceCost: "", maintenanceFrequency: "weekly", maxOwners: "" });
+  const [loanDialogOpen, setLoanDialogOpen] = useState(false);
+  const [loanData, setLoanData] = useState({ studentId: "", amount: "", interestRate: "10", dueDate: "" });
 
   const { data: balances = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/balances", selectedClassId],
@@ -762,6 +764,11 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     queryFn: () => fetch(`/api/economy/assets?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!selectedClassId,
   });
+  const { data: classLoans = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/loans", selectedClassId],
+    queryFn: () => fetch(`/api/economy/loans?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
   const { data: classLeaderboard = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/leaderboard", selectedClassId],
     queryFn: () => fetch(`/api/economy/leaderboard?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
@@ -781,6 +788,7 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     qc.invalidateQueries({ queryKey: ["/api/economy/challenges", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/leaderboard", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/assets", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/loans", selectedClassId] });
   };
 
   const createAsset = async () => {
@@ -804,6 +812,28 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     const data = await r.json();
     invalidateAll();
     toast({ title: `Asset income processed!`, description: `${data.incomeCount} income payments, ${data.maintenanceCount} maintenance charges` });
+  };
+
+  const issueLoan = async () => {
+    await apiRequest("POST", "/api/economy/loans", {
+      classId: selectedClassId,
+      studentId: loanData.studentId,
+      amount: Number(loanData.amount),
+      interestRate: Number(loanData.interestRate),
+      dueDate: loanData.dueDate || undefined,
+    });
+    invalidateAll();
+    qc.invalidateQueries({ queryKey: ["/api/economy/loans", selectedClassId] });
+    toast({ title: "Loan issued!" });
+    setLoanDialogOpen(false);
+    setLoanData({ studentId: "", amount: "", interestRate: "10", dueDate: "" });
+  };
+
+  const applyLoanInterest = async () => {
+    const r = await apiRequest("POST", "/api/economy/loans/apply-interest", { classId: selectedClassId }) as any;
+    const data = await r.json();
+    qc.invalidateQueries({ queryKey: ["/api/economy/loans", selectedClassId] });
+    toast({ title: "Loan interest applied!", description: `${data.count} loan(s) updated` });
   };
 
   const saveSettings = async () => {
@@ -1371,6 +1401,95 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
           data-testid="button-trigger-event">
           {eventData.mode === "bonus" ? "Send Bonus to All" : eventData.mode === "fine" ? "Charge All Students" : eventData.mode === "fine_percent" ? "Apply % Fine to All" : "Apply Savings Interest"}
         </Button>
+      </div>
+
+      {/* Loans */}
+      <div className="rounded-2xl p-5 bg-orange-500/5 border border-orange-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-black text-white text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-orange-400" /> Student Loans
+          </h3>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={applyLoanInterest}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs" data-testid="button-apply-loan-interest">
+              <Zap className="h-3 w-3 mr-1" /> Apply Interest
+            </Button>
+            <Dialog open={loanDialogOpen} onOpenChange={setLoanDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs" data-testid="button-open-issue-loan">
+                  <Plus className="h-3 w-3 mr-1" /> Issue Loan
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#0f172a] border-white/10 max-w-sm">
+                <DialogHeader><DialogTitle className="text-white">Issue Loan to Student</DialogTitle></DialogHeader>
+                <div className="space-y-3 mt-2">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Student</p>
+                    <select value={loanData.studentId} onChange={e => setLoanData(p => ({ ...p, studentId: e.target.value }))}
+                      className="w-full h-9 rounded-md bg-white/5 border border-white/20 text-white text-sm px-2" data-testid="select-loan-student">
+                      <option value="">Select student…</option>
+                      {(balances as any[]).map((s: any) => (
+                        <option key={s.id ?? s.studentId} value={s.id ?? s.studentId}>{s.displayName ?? (s.id ?? s.studentId)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Loan Amount *</p>
+                      <Input type="number" placeholder="500" value={loanData.amount} onChange={e => setLoanData(p => ({ ...p, amount: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" data-testid="input-loan-amount" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Interest Rate %</p>
+                      <Input type="number" placeholder="10" value={loanData.interestRate} onChange={e => setLoanData(p => ({ ...p, interestRate: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" data-testid="input-loan-rate" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Due Date (optional)</p>
+                    <Input type="date" value={loanData.dueDate} onChange={e => setLoanData(p => ({ ...p, dueDate: e.target.value }))}
+                      className="bg-white/5 border-white/20 text-white" />
+                  </div>
+                  <Button onClick={issueLoan} disabled={!loanData.studentId || !loanData.amount}
+                    className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold" data-testid="button-issue-loan">
+                    Issue Loan
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Issue loans to students. Press "Apply Interest" to charge interest on all outstanding balances.</p>
+        {(classLoans as any[]).filter((l: any) => l.loan?.isActive).length === 0 ? (
+          <div className="text-center py-8 text-slate-600">
+            <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No active loans.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(classLoans as any[]).filter((l: any) => l.loan?.isActive).map((item: any) => {
+              const { loan, displayName } = item;
+              const pctPaid = loan.principal > 0 ? Math.round(((loan.principal - loan.balance) / loan.principal) * 100) : 0;
+              return (
+                <div key={loan.id} className="rounded-xl p-3 bg-white/5 border border-white/10 flex items-center gap-3" data-testid={`loan-row-${loan.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-white text-sm">{displayName}</p>
+                      <span className="text-xs text-orange-300 bg-orange-500/15 rounded-md px-1.5 py-0.5">{loan.interestRate}% interest</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pctPaid}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-black text-orange-300">{currencySymbol}{loan.balance.toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">of {currencySymbol}{loan.principal.toLocaleString()}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Challenges */}
