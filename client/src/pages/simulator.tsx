@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpinnerInput } from "@/components/spinner-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -743,15 +742,6 @@ export default function SimulatorPage() {
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <Tabs value={timeframe} onValueChange={setTimeframe}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="1m" className="text-xs px-2">1m</TabsTrigger>
-                    <TabsTrigger value="5m" className="text-xs px-2">5m</TabsTrigger>
-                    <TabsTrigger value="1h" className="text-xs px-2">1h</TabsTrigger>
-                    <TabsTrigger value="1d" className="text-xs px-2">1d</TabsTrigger>
-                  </TabsList>
-                </Tabs>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Activity className="h-4 w-4 text-success animate-pulse" />
                   Live
