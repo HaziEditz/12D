@@ -104,12 +104,33 @@ export default function SchoolSimulator() {
     onError: (e: any) => toast({ title: "Trade failed", description: e.message, variant: "destructive" }),
   });
 
+  const { data: classData } = useQuery<any>({
+    queryKey: ["/api/classroom"],
+    enabled: user?.role === "student",
+  });
+  const classId = classData?.class?.id;
+
   const closeMutation = useMutation({
-    mutationFn: async (tradeId: string) => apiRequest("POST", `/api/trades/${tradeId}/close`, { exitPrice: price }),
-    onSuccess: async () => {
+    mutationFn: async (tradeId: string) => {
+      const res = await apiRequest("PATCH", `/api/trades/${tradeId}/close`, { exitPrice: price });
+      return res.json();
+    },
+    onSuccess: async (trade: any) => {
       await qc.invalidateQueries({ queryKey: ["/api/trades?open=true"] });
       refreshUser();
-      toast({ title: "Trade closed" });
+      const profit = trade?.profit ?? 0;
+      if (profit > 0 && classId) {
+        try {
+          const r = await apiRequest("POST", "/api/economy/convert-profit", { classId, profit });
+          const data = await r.json();
+          if (data.amount > 0) {
+            toast({ title: "Trade closed!", description: `Profit converted: +${data.amount} class coins 🪙` });
+            qc.invalidateQueries({ queryKey: ["/api/economy/balance", classId] });
+            return;
+          }
+        } catch {}
+      }
+      toast({ title: "Trade closed", description: profit >= 0 ? `Profit: $${profit?.toFixed(2) ?? "0"}` : `Loss: $${Math.abs(profit ?? 0).toFixed(2)}` });
     },
     onError: (e: any) => toast({ title: "Failed to close", description: e.message, variant: "destructive" }),
   });

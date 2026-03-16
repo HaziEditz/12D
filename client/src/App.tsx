@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -103,10 +104,11 @@ function StudentGuard() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
   const isSchoolPage = location.startsWith("/school") || location === "/school-plan";
-  if (user?.role === "student" && !isSchoolPage) {
-    navigate("/school");
-    return null;
-  }
+  useEffect(() => {
+    if (user?.role === "student" && !isSchoolPage) {
+      navigate("/school");
+    }
+  }, [user?.role, isSchoolPage, navigate]);
   return null;
 }
 

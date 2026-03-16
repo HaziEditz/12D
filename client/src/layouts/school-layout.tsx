@@ -15,6 +15,7 @@ const navItems = [
   { href: "/school/student", label: "My Classroom", icon: GraduationCap, emoji: "🏫", studentOnly: true },
   { href: "/school/teacher", label: "Command Centre", icon: Zap, emoji: "⚡", teacherOnly: true },
   { href: "/school/simulator", label: "Simulator", icon: TrendingUp, emoji: "📊" },
+  { href: "/school/economy", label: "Economy", icon: Coins, emoji: "🏦", studentOnly: true },
   { href: "/school/fun-zone", label: "Fun Zone", icon: Gamepad2, emoji: "🎮" },
   { href: "/school/lessons", label: "Lessons", icon: BookOpen, emoji: "📚" },
   { href: "/school/leaderboard", label: "Leaderboard", icon: Trophy, emoji: "🏆" },
