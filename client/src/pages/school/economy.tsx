@@ -13,26 +13,32 @@ import {
 import {
   Coins, TrendingUp, TrendingDown, Briefcase, ShoppingBag, Gavel,
   Clock, CheckCircle2, ArrowUpRight, ArrowDownRight, Loader2, Star,
-  Receipt, PiggyBank, Trophy, Medal, Crown, Zap
+  Receipt, PiggyBank, Trophy, Medal, Crown, Zap, Home, Building2,
+  BarChart3, Wallet, ChevronRight
 } from "lucide-react";
 import { format } from "date-fns";
 
-const TX_ICONS: Record<string, { icon: any; color: string; label: string }> = {
-  lesson: { icon: TrendingUp, color: "text-emerald-400", label: "Lesson" },
-  quiz: { icon: Star, color: "text-amber-400", label: "Quiz" },
-  assignment: { icon: CheckCircle2, color: "text-teal-400", label: "Assignment" },
-  job: { icon: Briefcase, color: "text-blue-400", label: "Job Pay" },
-  teacher_award: { icon: Star, color: "text-yellow-400", label: "Teacher Award" },
-  simulator: { icon: TrendingUp, color: "text-cyan-400", label: "Simulator" },
-  auction: { icon: Gavel, color: "text-rose-400", label: "Auction" },
-  expense: { icon: Receipt, color: "text-red-400", label: "Expense" },
-  purchase: { icon: ShoppingBag, color: "text-purple-400", label: "Purchase" },
-  interest: { icon: TrendingUp, color: "text-green-400", label: "Interest" },
-  savings_deposit: { icon: PiggyBank, color: "text-blue-400", label: "Savings Deposit" },
-  savings_withdrawal: { icon: PiggyBank, color: "text-orange-400", label: "Savings Withdrawal" },
-  savings_interest: { icon: TrendingUp, color: "text-emerald-400", label: "Savings Interest" },
+const TX_ICONS: Record<string, { icon: any; color: string }> = {
+  lesson: { icon: TrendingUp, color: "text-emerald-400" },
+  quiz: { icon: Star, color: "text-amber-400" },
+  assignment: { icon: CheckCircle2, color: "text-teal-400" },
+  job: { icon: Briefcase, color: "text-blue-400" },
+  teacher_award: { icon: Star, color: "text-yellow-400" },
+  simulator: { icon: TrendingUp, color: "text-cyan-400" },
+  auction: { icon: Gavel, color: "text-rose-400" },
+  expense: { icon: Receipt, color: "text-red-400" },
+  purchase: { icon: ShoppingBag, color: "text-purple-400" },
+  interest: { icon: TrendingUp, color: "text-green-400" },
+  savings_deposit: { icon: PiggyBank, color: "text-blue-400" },
+  savings_withdrawal: { icon: PiggyBank, color: "text-orange-400" },
+  savings_interest: { icon: TrendingUp, color: "text-emerald-400" },
 };
 
+const ASSET_TYPE_ICONS: Record<string, { icon: any; color: string; label: string }> = {
+  property: { icon: Home, color: "text-blue-400", label: "Property" },
+  business: { icon: Building2, color: "text-amber-400", label: "Business" },
+  investment: { icon: BarChart3, color: "text-emerald-400", label: "Investment" },
+};
 const RANK_ICONS = [Crown, Medal, Trophy];
 
 export default function SchoolEconomy() {
@@ -40,7 +46,7 @@ export default function SchoolEconomy() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState<"wallet" | "auctions" | "store" | "leaderboard">("wallet");
+  const [activeSection, setActiveSection] = useState<"wallet" | "assets" | "auctions" | "store" | "leaderboard">("wallet");
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [savingsDialogOpen, setSavingsDialogOpen] = useState(false);
@@ -55,51 +61,64 @@ export default function SchoolEconomy() {
     queryFn: () => fetch(`/api/economy/balance?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/economy/settings", classId],
     queryFn: () => fetch(`/api/economy/settings?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
+  const { data: netWorth } = useQuery<any>({
+    queryKey: ["/api/economy/net-worth", classId],
+    queryFn: () => fetch(`/api/economy/net-worth?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!classId,
+  });
   const { data: expenses = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/expenses", classId],
     queryFn: () => fetch(`/api/economy/expenses?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
   const { data: auctions = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/auctions", classId],
     queryFn: () => fetch(`/api/economy/auctions?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
   const { data: storeItems = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/store", classId],
     queryFn: () => fetch(`/api/economy/store?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
   const { data: leaderboard = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/leaderboard", classId],
     queryFn: () => fetch(`/api/economy/leaderboard?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
-
   const { data: challenges = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/challenges", classId],
     queryFn: () => fetch(`/api/economy/challenges?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!classId,
   });
+  const { data: marketAssets = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/assets", classId],
+    queryFn: () => fetch(`/api/economy/assets?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!classId,
+  });
+  const { data: myAssets = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/my-assets", classId],
+    queryFn: () => fetch(`/api/economy/my-assets?classId=${classId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!classId,
+  });
 
-  const invalidateBalance = () => qc.invalidateQueries({ queryKey: ["/api/economy/balance", classId] });
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["/api/economy/balance", classId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/net-worth", classId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/my-assets", classId] });
+  };
 
   const bidMutation = useMutation({
     mutationFn: ({ auctionId, amount }: { auctionId: string; amount: number }) =>
       apiRequest("POST", `/api/economy/auctions/${auctionId}/bid`, { amount, classId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/economy/auctions", classId] });
-      invalidateBalance();
+      invalidateAll();
       toast({ title: "Bid placed!" });
     },
     onError: (e: any) => toast({ title: "Bid failed", description: e.message, variant: "destructive" }),
@@ -109,31 +128,31 @@ export default function SchoolEconomy() {
     mutationFn: (itemId: string) => apiRequest("POST", `/api/economy/store/${itemId}/buy`, { classId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/economy/store", classId] });
-      invalidateBalance();
+      invalidateAll();
       toast({ title: "Purchased!" });
+    },
+    onError: (e: any) => toast({ title: "Purchase failed", description: e.message, variant: "destructive" }),
+  });
+
+  const buyAssetMutation = useMutation({
+    mutationFn: (assetId: string) => apiRequest("POST", `/api/economy/assets/${assetId}/buy`, { classId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/economy/assets", classId] });
+      invalidateAll();
+      toast({ title: "Asset purchased!" });
     },
     onError: (e: any) => toast({ title: "Purchase failed", description: e.message, variant: "destructive" }),
   });
 
   const depositMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/economy/savings/deposit", { classId, amount }),
-    onSuccess: () => {
-      invalidateBalance();
-      toast({ title: "Deposited to savings!" });
-      setDepositAmount("");
-      setSavingsDialogOpen(false);
-    },
+    onSuccess: () => { invalidateAll(); toast({ title: "Deposited to savings!" }); setDepositAmount(""); setSavingsDialogOpen(false); },
     onError: (e: any) => toast({ title: "Deposit failed", description: e.message, variant: "destructive" }),
   });
 
   const withdrawMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/economy/savings/withdraw", { classId, amount }),
-    onSuccess: () => {
-      invalidateBalance();
-      toast({ title: "Withdrawn from savings!" });
-      setWithdrawAmount("");
-      setSavingsDialogOpen(false);
-    },
+    onSuccess: () => { invalidateAll(); toast({ title: "Withdrawn from savings!" }); setWithdrawAmount(""); setSavingsDialogOpen(false); },
     onError: (e: any) => toast({ title: "Withdraw failed", description: e.message, variant: "destructive" }),
   });
 
@@ -144,6 +163,8 @@ export default function SchoolEconomy() {
   const transactions: any[] = economyData?.transactions ?? [];
   const myJobs: any[] = economyData?.myJobs ?? [];
   const purchases: any[] = economyData?.purchases ?? [];
+  const netWorthTotal = netWorth?.total ?? 0;
+  const assetValue = netWorth?.assetValue ?? 0;
 
   const activeAuctions = auctions.filter((a: any) => a.isActive && new Date(a.endDate) > new Date());
   const closedAuctions = auctions.filter((a: any) => !a.isActive || new Date(a.endDate) <= new Date());
@@ -153,10 +174,11 @@ export default function SchoolEconomy() {
   const accentGrad = isPrimary ? "from-pink-400 to-rose-500" : "from-teal-500 to-cyan-600";
 
   const navSections = [
-    { id: "wallet", label: "💰 Wallet", count: 0 },
+    { id: "wallet", label: "💰 Wallet" },
+    { id: "assets", label: "🏠 Assets", count: myAssets.length },
     { id: "auctions", label: "🔨 Auctions", count: activeAuctions.length },
-    { id: "store", label: "🛍️ Store", count: storeItems.filter((i: any) => balance >= i.price && (i.stock === null || i.stock > 0)).length },
-    { id: "leaderboard", label: "🏆 Rankings", count: 0 },
+    { id: "store", label: "🛍️ Store" },
+    { id: "leaderboard", label: "🏆 Rankings" },
   ] as const;
 
   if (!classId) {
@@ -172,75 +194,71 @@ export default function SchoolEconomy() {
 
   return (
     <SchoolLayout>
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
 
         {/* Hero Balance Banner */}
-        <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r ${accentGrad}`}>
+        <div className={`relative overflow-hidden rounded-3xl p-6 bg-gradient-to-r ${accentGrad}`}>
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,white,transparent)]" />
           <div className="relative z-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Your Balance</p>
+                <p className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Cash Balance</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-4xl sm:text-5xl">{currencySymbol}</span>
-                  <span className="text-4xl sm:text-5xl font-black text-white">{balance.toLocaleString()}</span>
+                  <span className="text-3xl sm:text-4xl">{currencySymbol}</span>
+                  <span className="text-3xl sm:text-4xl font-black text-white">{balance.toLocaleString()}</span>
                 </div>
-                <p className="text-white/70 mt-1 text-sm">{currencyName}</p>
+                <p className="text-white/70 mt-0.5 text-sm">{currencyName}</p>
               </div>
-              {myRank > 0 && (
-                <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 text-white text-center shrink-0">
-                  <p className="text-xs text-white/60">Class Rank</p>
-                  <p className="text-3xl font-black">#{myRank}</p>
+              <div className="flex gap-3">
+                {myRank > 0 && (
+                  <div className="bg-white/15 rounded-2xl px-4 py-3 text-white text-center">
+                    <p className="text-xs text-white/60">Rank</p>
+                    <p className="text-2xl font-black">#{myRank}</p>
+                  </div>
+                )}
+                {netWorthTotal > 0 && (
+                  <div className="bg-white/15 rounded-2xl px-4 py-3 text-white text-center">
+                    <p className="text-xs text-white/60">Net Worth</p>
+                    <p className="text-2xl font-black">{currencySymbol}{netWorthTotal.toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Net Worth Breakdown */}
+            {netWorth && (
+              <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+                <div className="bg-white/15 rounded-xl p-2.5 text-white">
+                  <p className="text-xs text-white/60">💰 Cash</p>
+                  <p className="font-bold text-sm">{currencySymbol}{netWorth.cash?.toLocaleString() ?? 0}</p>
                 </div>
-              )}
-            </div>
-
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-white/15 rounded-xl p-3 text-white">
-                <p className="text-xs text-white/60">Savings</p>
-                <p className="font-bold">{currencySymbol}{savingsBalance.toLocaleString()}</p>
-                {settings?.savingsInterestRate > 0 && <p className="text-xs text-white/50">{settings.savingsInterestRate}% interest</p>}
+                <div className="bg-white/15 rounded-xl p-2.5 text-white">
+                  <p className="text-xs text-white/60">🏦 Savings</p>
+                  <p className="font-bold text-sm">{currencySymbol}{netWorth.savings?.toLocaleString() ?? 0}</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-2.5 text-white">
+                  <p className="text-xs text-white/60">🏠 Assets</p>
+                  <p className="font-bold text-sm">{currencySymbol}{netWorth.assetValue?.toLocaleString() ?? 0}</p>
+                </div>
               </div>
-              {settings && (
-                <>
-                  <div className="bg-white/15 rounded-xl p-3 text-white">
-                    <p className="text-xs text-white/60">📚 Lesson</p>
-                    <p className="font-bold">+{settings.lessonReward}</p>
-                  </div>
-                  <div className="bg-white/15 rounded-xl p-3 text-white">
-                    <p className="text-xs text-white/60">✅ Quiz</p>
-                    <p className="font-bold">+{settings.quizReward}</p>
-                  </div>
-                  <div className="bg-white/15 rounded-xl p-3 text-white">
-                    <p className="text-xs text-white/60">🎯 Assignment</p>
-                    <p className="font-bold">+{settings.assignmentReward}</p>
-                  </div>
-                </>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
         {/* Section Nav */}
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {navSections.map(({ id, label, count }) => (
-            <button
-              key={id}
-              onClick={() => setActiveSection(id as any)}
+          {navSections.map(({ id, label, count }: any) => (
+            <button key={id} onClick={() => setActiveSection(id as any)}
               className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeSection === id ? "bg-teal-600 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}
-              data-testid={`nav-${id}`}
-            >
+              data-testid={`nav-${id}`}>
               {label}{count > 0 ? ` (${count})` : ""}
             </button>
           ))}
         </div>
 
-        {/* === WALLET SECTION === */}
+        {/* ══ WALLET ══ */}
         {activeSection === "wallet" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="lg:col-span-2 space-y-5">
-
               {/* Active Challenges */}
               {activeChallenges.length > 0 && (
                 <div className="rounded-2xl p-5 bg-amber-500/5 border border-amber-500/20">
@@ -256,35 +274,31 @@ export default function SchoolEconomy() {
                           {c.description && <p className="text-xs text-slate-400">{c.description}</p>}
                         </div>
                         {c.rewardAmount > 0 && <span className="text-amber-300 font-bold text-sm shrink-0">{currencySymbol}{c.rewardAmount}</span>}
-                        {c.endDate && <span className="text-xs text-slate-500 shrink-0">ends {format(new Date(c.endDate), "MMM d")}</span>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               {/* My Jobs */}
               {myJobs.length > 0 && (
                 <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
                   <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 text-blue-400" /> My Classroom Jobs
+                    <Briefcase className="h-4 w-4 text-blue-400" /> My Jobs
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {myJobs.map((job: any) => (
                       <div key={job.id} className="rounded-xl p-4 bg-blue-500/10 border border-blue-500/20">
                         <p className="font-bold text-white text-sm">{job.jobTitle}</p>
                         <p className="text-xs text-slate-400 mt-0.5">Pay: <span className="text-blue-300 font-semibold">{currencySymbol}{job.payAmount}</span> / {job.payFrequency}</p>
-                        {job.lastPaidAt && <p className="text-xs text-slate-500 mt-1">Last paid: {format(new Date(job.lastPaidAt), "MMM d")}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              {/* Transaction History */}
+              {/* Transactions */}
               <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
                 <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-slate-400" /> Transaction History
+                  <Clock className="h-4 w-4 text-slate-400" /> Transactions
                 </h2>
                 {balanceLoading ? (
                   <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-slate-500" /></div>
@@ -294,13 +308,13 @@ export default function SchoolEconomy() {
                     <p className="text-sm">No transactions yet. Complete lessons to start earning!</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {transactions.map((tx: any) => {
                       const info = TX_ICONS[tx.type] ?? TX_ICONS.lesson;
                       const Icon = info.icon;
                       const isPositive = tx.amount > 0;
                       return (
-                        <div key={tx.id} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0" data-testid={`tx-row-${tx.id}`}>
+                        <div key={tx.id} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 shrink-0">
                             <Icon className={`h-4 w-4 ${info.color}`} />
                           </div>
@@ -308,9 +322,9 @@ export default function SchoolEconomy() {
                             <p className="text-sm font-semibold text-white truncate">{tx.description}</p>
                             <p className="text-xs text-slate-500">{format(new Date(tx.createdAt), "MMM d, h:mm a")}</p>
                           </div>
-                          <div className={`flex items-center gap-1 font-bold text-sm shrink-0 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                            {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                            {isPositive ? "+" : ""}{tx.amount} {currencySymbol}
+                          <div className={`flex items-center gap-0.5 font-bold text-sm shrink-0 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+                            {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                            {isPositive ? "+" : ""}{tx.amount}
                           </div>
                         </div>
                       );
@@ -322,203 +336,284 @@ export default function SchoolEconomy() {
 
             {/* Right Column */}
             <div className="space-y-5">
-              {/* Savings Account */}
+              {/* Savings */}
               <div className="rounded-2xl p-5 bg-emerald-500/5 border border-emerald-500/20">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-base font-black text-white flex items-center gap-2">
+                  <h2 className="text-sm font-black text-white flex items-center gap-2">
                     <PiggyBank className="h-4 w-4 text-emerald-400" /> Savings
                   </h2>
                   {settings?.savingsInterestRate > 0 && (
-                    <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">{settings.savingsInterestRate}% interest</Badge>
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">{settings.savingsInterestRate}%</Badge>
                   )}
                 </div>
-                <div className="mb-4">
-                  <p className="text-2xl font-black text-emerald-300">{currencySymbol}{savingsBalance.toLocaleString()}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Earns interest when teacher applies it</p>
-                </div>
+                <p className="text-2xl font-black text-emerald-300 mb-3">{currencySymbol}{savingsBalance.toLocaleString()}</p>
                 <Dialog open={savingsDialogOpen} onOpenChange={setSavingsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm" data-testid="button-open-savings">
-                      Manage Savings
-                    </Button>
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm" data-testid="button-open-savings">Manage Savings</Button>
                   </DialogTrigger>
                   <DialogContent className="bg-[#0f172a] border-white/10">
                     <DialogHeader><DialogTitle className="text-white">Savings Account</DialogTitle></DialogHeader>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4 text-center">
-                        <div className="bg-white/5 rounded-xl p-3">
-                          <p className="text-xs text-slate-400">Wallet</p>
-                          <p className="text-xl font-black text-white">{currencySymbol}{balance}</p>
-                        </div>
-                        <div className="bg-emerald-500/10 rounded-xl p-3">
-                          <p className="text-xs text-slate-400">Savings</p>
-                          <p className="text-xl font-black text-emerald-300">{currencySymbol}{savingsBalance}</p>
-                        </div>
+                        <div className="bg-white/5 rounded-xl p-3"><p className="text-xs text-slate-400">Cash</p><p className="text-xl font-black text-white">{currencySymbol}{balance}</p></div>
+                        <div className="bg-emerald-500/10 rounded-xl p-3"><p className="text-xs text-slate-400">Savings</p><p className="text-xl font-black text-emerald-300">{currencySymbol}{savingsBalance}</p></div>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-400 font-semibold mb-1">Deposit to Savings</p>
+                        <p className="text-xs text-slate-400 font-semibold mb-1">Deposit</p>
                         <div className="flex gap-2">
                           <Input type="number" placeholder="Amount" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
                             className="bg-white/5 border-white/20 text-white text-sm" max={balance} data-testid="input-deposit" />
                           <Button onClick={() => depositMutation.mutate(Number(depositAmount))} disabled={!depositAmount || Number(depositAmount) <= 0 || Number(depositAmount) > balance || depositMutation.isPending}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shrink-0" data-testid="button-deposit">
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold" data-testid="button-deposit">
                             {depositMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Deposit"}
                           </Button>
                         </div>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-400 font-semibold mb-1">Withdraw from Savings</p>
+                        <p className="text-xs text-slate-400 font-semibold mb-1">Withdraw</p>
                         <div className="flex gap-2">
                           <Input type="number" placeholder="Amount" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
                             className="bg-white/5 border-white/20 text-white text-sm" max={savingsBalance} data-testid="input-withdraw" />
                           <Button onClick={() => withdrawMutation.mutate(Number(withdrawAmount))} disabled={!withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > savingsBalance || withdrawMutation.isPending}
-                            variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold shrink-0" data-testid="button-withdraw">
+                            variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold" data-testid="button-withdraw">
                             {withdrawMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Withdraw"}
                           </Button>
                         </div>
                       </div>
-                      {settings?.savingsInterestRate > 0 && (
-                        <p className="text-xs text-slate-500 text-center">Your savings earn {settings.savingsInterestRate}% interest when your teacher applies it.</p>
-                      )}
                     </div>
                   </DialogContent>
                 </Dialog>
               </div>
-
-              {/* Active Expenses */}
+              {/* Bills */}
               {expenses.length > 0 && (
                 <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
-                  <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-red-400" /> Upcoming Bills
-                  </h2>
+                  <h2 className="text-sm font-black text-white mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-red-400" /> Bills</h2>
                   <div className="space-y-2">
                     {expenses.map((exp: any) => (
-                      <div key={exp.id} className="rounded-xl p-3 bg-red-500/10 border border-red-500/20">
-                        <div className="flex justify-between items-start">
-                          <p className="font-semibold text-white text-sm">{exp.name}</p>
-                          <span className="text-red-400 font-bold text-sm">{currencySymbol}{exp.amount}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5 capitalize">{exp.frequency}</p>
+                      <div key={exp.id} className="flex justify-between items-center rounded-xl p-2.5 bg-red-500/10 border border-red-500/20">
+                        <div><p className="font-semibold text-white text-xs">{exp.name}</p><p className="text-xs text-slate-500 capitalize">{exp.frequency}</p></div>
+                        <span className="text-red-400 font-bold text-sm">{currencySymbol}{exp.amount}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              {/* My Purchases */}
-              {purchases.length > 0 && (
-                <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
-                  <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
-                    <ShoppingBag className="h-4 w-4 text-purple-400" /> My Purchases
-                  </h2>
-                  <div className="space-y-2">
-                    {purchases.slice(0, 5).map((p: any) => (
-                      <div key={p.id} className="flex items-center gap-2 text-sm">
-                        <span className="text-lg">{p.emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold text-xs truncate">{p.itemName}</p>
-                          <p className="text-slate-500 text-xs">{format(new Date(p.purchasedAt), "MMM d")}</p>
-                        </div>
-                        <span className="text-purple-400 font-bold text-xs">{currencySymbol}{p.price}</span>
+              {/* My Assets Quick View */}
+              {(myAssets as any[]).length > 0 && (
+                <div className="rounded-2xl p-4 bg-blue-500/5 border border-blue-500/20">
+                  <h2 className="text-sm font-black text-white mb-3 flex items-center gap-2"><Home className="h-4 w-4 text-blue-400" /> My Assets</h2>
+                  <div className="space-y-1.5">
+                    {(myAssets as any[]).slice(0, 3).map((sa: any) => (
+                      <div key={sa.id} className="flex items-center gap-2 text-xs">
+                        <span className="text-base">{sa.asset?.emoji}</span>
+                        <p className="text-white font-semibold flex-1 truncate">{sa.asset?.name}</p>
+                        {sa.asset?.passiveIncome > 0 && <span className="text-emerald-400 font-bold">+{currencySymbol}{sa.asset.passiveIncome}</span>}
                       </div>
                     ))}
                   </div>
+                  <button onClick={() => setActiveSection("assets")} className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                    View all <ChevronRight className="h-3 w-3" />
+                  </button>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* === AUCTIONS SECTION === */}
+        {/* ══ ASSETS ══ */}
+        {activeSection === "assets" && (
+          <div className="space-y-6">
+            {/* My Owned Assets */}
+            {(myAssets as any[]).length > 0 && (
+              <div>
+                <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-blue-400" /> Your Portfolio
+                  <Badge className="bg-blue-500/20 text-blue-300 border-0">{(myAssets as any[]).length} owned</Badge>
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(myAssets as any[]).map((sa: any) => {
+                    const asset = sa.asset;
+                    const typeInfo = ASSET_TYPE_ICONS[asset?.type] ?? ASSET_TYPE_ICONS.property;
+                    const Icon = typeInfo.icon;
+                    return (
+                      <div key={sa.id} className="rounded-2xl p-5 bg-blue-500/5 border border-blue-500/20" data-testid={`my-asset-${sa.id}`}>
+                        <div className="flex items-start gap-3 mb-3">
+                          <span className="text-3xl">{asset?.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-white">{asset?.name}</p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Icon className={`h-3 w-3 ${typeInfo.color}`} />
+                              <span className={`text-xs font-semibold ${typeInfo.color}`}>{typeInfo.label}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-white/5 rounded-lg p-2">
+                            <p className="text-slate-400">Value</p>
+                            <p className="font-bold text-white">{currencySymbol}{(asset?.value ?? 0).toLocaleString()}</p>
+                          </div>
+                          {asset?.passiveIncome > 0 && (
+                            <div className="bg-emerald-500/10 rounded-lg p-2">
+                              <p className="text-slate-400">Income</p>
+                              <p className="font-bold text-emerald-300">+{currencySymbol}{asset.passiveIncome}<span className="text-slate-500 font-normal">/{asset.incomeFrequency}</span></p>
+                            </div>
+                          )}
+                          {asset?.maintenanceCost > 0 && (
+                            <div className="bg-red-500/10 rounded-lg p-2">
+                              <p className="text-slate-400">Maintenance</p>
+                              <p className="font-bold text-red-300">-{currencySymbol}{asset.maintenanceCost}<span className="text-slate-500 font-normal">/{asset.maintenanceFrequency}</span></p>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Purchased {format(new Date(sa.purchasedAt), "MMM d, yyyy")}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Net Worth breakdown */}
+            {netWorth && (
+              <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+                <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-teal-400" /> Net Worth Breakdown
+                </h2>
+                <div className="space-y-3">
+                  {[
+                    { label: "💰 Cash Balance", value: netWorth.cash ?? 0, color: "bg-teal-500" },
+                    { label: "🏦 Savings Account", value: netWorth.savings ?? 0, color: "bg-emerald-500" },
+                    { label: "🏠 Asset Portfolio", value: netWorth.assetValue ?? 0, color: "bg-blue-500" },
+                  ].map(({ label, value, color }) => {
+                    const pct = netWorth.total > 0 ? Math.round((value / netWorth.total) * 100) : 0;
+                    return (
+                      <div key={label}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-300">{label}</span>
+                          <span className="font-bold text-white">{currencySymbol}{value.toLocaleString()} <span className="text-slate-500 font-normal text-xs">({pct}%)</span></span>
+                        </div>
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                          <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="mt-3 pt-3 border-t border-white/10 flex justify-between items-center">
+                    <span className="text-white font-black">Total Net Worth</span>
+                    <span className="text-xl font-black text-teal-300">{currencySymbol}{netWorth.total?.toLocaleString() ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Asset Marketplace */}
+            <div>
+              <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-amber-400" /> Asset Marketplace
+              </h2>
+              {(marketAssets as any[]).length === 0 ? (
+                <div className="text-center py-16 text-slate-500">
+                  <Home className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p>No assets available yet. Ask your teacher to add some!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(marketAssets as any[]).map((asset: any) => {
+                    const typeInfo = ASSET_TYPE_ICONS[asset.type] ?? ASSET_TYPE_ICONS.property;
+                    const Icon = typeInfo.icon;
+                    const canAfford = balance >= asset.price;
+                    const alreadyOwned = (myAssets as any[]).some((sa: any) => sa.assetId === asset.id);
+                    const atCapacity = asset.maxOwners !== null && asset.maxOwners <= 0;
+                    return (
+                      <div key={asset.id} className={`rounded-2xl p-5 border flex flex-col gap-3 ${canAfford && !alreadyOwned && !atCapacity ? "bg-amber-500/5 border-amber-500/20" : "bg-white/3 border-white/8"}`} data-testid={`asset-${asset.id}`}>
+                        <div className="flex items-start gap-3">
+                          <span className="text-3xl">{asset.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-white">{asset.name}</p>
+                            <div className="flex items-center gap-1"><Icon className={`h-3 w-3 ${typeInfo.color}`} /><span className={`text-xs font-semibold ${typeInfo.color}`}>{typeInfo.label}</span></div>
+                          </div>
+                        </div>
+                        {asset.description && <p className="text-xs text-slate-400">{asset.description}</p>}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-white/5 rounded-lg p-2"><p className="text-slate-400">Net Worth +</p><p className="font-bold text-white">{currencySymbol}{asset.value.toLocaleString()}</p></div>
+                          {asset.passiveIncome > 0 && <div className="bg-emerald-500/10 rounded-lg p-2"><p className="text-slate-400">Income</p><p className="font-bold text-emerald-300">+{currencySymbol}{asset.passiveIncome}/{asset.incomeFrequency}</p></div>}
+                          {asset.maintenanceCost > 0 && <div className="bg-red-500/10 rounded-lg p-2"><p className="text-slate-400">Upkeep</p><p className="font-bold text-red-300">-{currencySymbol}{asset.maintenanceCost}/{asset.maintenanceFrequency}</p></div>}
+                        </div>
+                        <div className="flex items-center justify-between mt-auto">
+                          <span className="font-black text-lg text-amber-300">{currencySymbol}{asset.price.toLocaleString()}</span>
+                          {asset.maxOwners !== null && <span className="text-xs text-slate-500">{asset.maxOwners} max owners</span>}
+                        </div>
+                        <Button size="sm" className={`w-full font-bold text-sm ${alreadyOwned ? "bg-white/10 text-slate-400" : canAfford && !atCapacity ? "bg-amber-500 hover:bg-amber-400 text-black" : "bg-white/5 text-slate-500"}`}
+                          disabled={alreadyOwned || !canAfford || atCapacity || buyAssetMutation.isPending}
+                          onClick={() => buyAssetMutation.mutate(asset.id)}
+                          data-testid={`button-buy-asset-${asset.id}`}>
+                          {alreadyOwned ? "Owned" : atCapacity ? "Sold Out" : !canAfford ? "Can't Afford" : buyAssetMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Purchase"}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══ AUCTIONS ══ */}
         {activeSection === "auctions" && (
           <div className="space-y-6">
             {activeAuctions.length === 0 && closedAuctions.length === 0 ? (
-              <div className="text-center py-16 text-slate-500">
-                <Gavel className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>No auctions yet. Check back later!</p>
-              </div>
+              <div className="text-center py-16 text-slate-500"><Gavel className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No auctions yet.</p></div>
             ) : (
               <>
                 {activeAuctions.length > 0 && (
                   <div>
                     <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
                       <Gavel className="h-5 w-5 text-amber-400" /> Live Auctions
-                      <Badge className="bg-amber-500/20 text-amber-300 border-0">{activeAuctions.length} active</Badge>
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {activeAuctions.map((auction: any) => {
-                        const endDate = new Date(auction.endDate);
-                        const timeLeft = endDate.getTime() - Date.now();
-                        const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                        const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                        const timeLeft = new Date(auction.endDate).getTime() - Date.now();
+                        const hoursLeft = Math.floor(timeLeft / 3600000);
+                        const minutesLeft = Math.floor((timeLeft % 3600000) / 60000);
                         const myBid = bidAmounts[auction.id] ?? "";
                         const minBid = Math.max(auction.startingBid, (auction.currentHighBid ?? 0) + 1);
                         const isHighBidder = auction.currentHighBidderId === user?.id;
-                        const canAfford = balance >= minBid;
                         return (
                           <div key={auction.id} className="rounded-2xl p-5 bg-amber-500/5 border border-amber-500/20 flex flex-col gap-3" data-testid={`auction-card-${auction.id}`}>
                             <div className="flex items-start justify-between">
-                              <div>
-                                <span className="text-2xl">{auction.emoji ?? "🎁"}</span>
-                                <p className="font-black text-white text-base mt-1">{auction.title}</p>
-                                {auction.description && <p className="text-xs text-slate-400 mt-0.5">{auction.description}</p>}
-                              </div>
+                              <div><span className="text-2xl">{auction.emoji ?? "🎁"}</span><p className="font-black text-white mt-1">{auction.title}</p></div>
                               {isHighBidder && <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">Winning!</Badge>}
                             </div>
                             <div className="flex justify-between text-sm">
-                              <div>
-                                <p className="text-slate-500 text-xs">Current Bid</p>
-                                <p className="font-bold text-amber-300">{currencySymbol}{auction.currentHighBid ?? 0}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-slate-500 text-xs">Ends in</p>
-                                <p className="font-bold text-white text-xs">{hoursLeft > 0 ? `${hoursLeft}h ${minutesLeft}m` : `${minutesLeft}m`}</p>
-                              </div>
+                              <div><p className="text-slate-500 text-xs">Current Bid</p><p className="font-bold text-amber-300">{currencySymbol}{auction.currentHighBid ?? 0}</p></div>
+                              <div className="text-right"><p className="text-slate-500 text-xs">Ends in</p><p className="font-bold text-white text-xs">{hoursLeft > 0 ? `${hoursLeft}h ${minutesLeft}m` : `${minutesLeft}m`}</p></div>
                             </div>
                             <div className="flex gap-2">
-                              <Input
-                                type="number" min={minBid}
-                                placeholder={`Min: ${currencySymbol}${minBid}`}
-                                value={myBid}
-                                onChange={e => setBidAmounts(prev => ({ ...prev, [auction.id]: e.target.value }))}
-                                className="bg-white/5 border-white/10 text-white text-sm h-8"
-                                data-testid={`input-bid-${auction.id}`}
-                              />
-                              <Button size="sm"
-                                className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
-                                disabled={!myBid || Number(myBid) < minBid || !canAfford || bidMutation.isPending}
+                              <Input type="number" min={minBid} placeholder={`Min: ${currencySymbol}${minBid}`}
+                                value={myBid} onChange={e => setBidAmounts(p => ({ ...p, [auction.id]: e.target.value }))}
+                                className="bg-white/5 border-white/10 text-white text-sm h-8" data-testid={`input-bid-${auction.id}`} />
+                              <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+                                disabled={!myBid || Number(myBid) < minBid || balance < minBid || bidMutation.isPending}
                                 onClick={() => bidMutation.mutate({ auctionId: auction.id, amount: Number(myBid) })}
-                                data-testid={`button-bid-${auction.id}`}
-                              >
+                                data-testid={`button-bid-${auction.id}`}>
                                 {bidMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Bid"}
                               </Button>
                             </div>
-                            {!canAfford && <p className="text-xs text-red-400">Insufficient balance for minimum bid</p>}
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
-
                 {closedAuctions.length > 0 && (
                   <div>
                     <h2 className="text-base font-bold text-slate-400 mb-3">Past Auctions</h2>
                     <div className="space-y-2">
-                      {closedAuctions.slice(0, 5).map((auction: any) => (
-                        <div key={auction.id} className="flex items-center gap-3 rounded-xl p-3 bg-white/3 border border-white/5">
-                          <span className="text-lg">{auction.emoji ?? "🎁"}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white">{auction.title}</p>
-                            <p className="text-xs text-slate-500">Ended {format(new Date(auction.endDate), "MMM d")}</p>
-                          </div>
-                          {auction.winnerId === user?.id ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">You won!</Badge>
-                          ) : auction.winnerId ? (
-                            <Badge className="bg-slate-500/20 text-slate-400 border-0 text-xs">Sold: {currencySymbol}{auction.currentHighBid}</Badge>
-                          ) : (
-                            <Badge className="bg-slate-500/20 text-slate-400 border-0 text-xs">No bids</Badge>
-                          )}
+                      {closedAuctions.slice(0, 5).map((a: any) => (
+                        <div key={a.id} className="flex items-center gap-3 rounded-xl p-3 bg-white/3 border border-white/5">
+                          <span className="text-lg">{a.emoji ?? "🎁"}</span>
+                          <div className="flex-1"><p className="text-sm font-semibold text-white">{a.title}</p><p className="text-xs text-slate-500">Ended {format(new Date(a.endDate), "MMM d")}</p></div>
+                          {a.winnerId === user?.id ? <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-xs">Won!</Badge> : <Badge className="bg-slate-500/20 text-slate-400 border-0 text-xs">{a.currentHighBid ? `${currencySymbol}${a.currentHighBid}` : "No bids"}</Badge>}
                         </div>
                       ))}
                     </div>
@@ -529,14 +624,11 @@ export default function SchoolEconomy() {
           </div>
         )}
 
-        {/* === STORE SECTION === */}
+        {/* ══ STORE ══ */}
         {activeSection === "store" && (
           <div>
             {storeItems.length === 0 ? (
-              <div className="text-center py-16 text-slate-500">
-                <ShoppingBag className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>The store is empty. Check back after your teacher adds items!</p>
-              </div>
+              <div className="text-center py-16 text-slate-500"><ShoppingBag className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>Store is empty.</p></div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {storeItems.map((item: any) => {
@@ -551,12 +643,9 @@ export default function SchoolEconomy() {
                         <span className="font-bold text-sm text-purple-300">{currencySymbol}{item.price}</span>
                         {item.stock !== null && <span className="text-xs text-slate-500">{item.stock} left</span>}
                       </div>
-                      <Button size="sm"
-                        className={`w-full text-xs font-bold ${canAfford && !outOfStock ? "bg-purple-600 hover:bg-purple-500 text-white" : "bg-white/5 text-slate-500 cursor-not-allowed"}`}
+                      <Button size="sm" className={`w-full text-xs font-bold ${canAfford && !outOfStock ? "bg-purple-600 hover:bg-purple-500 text-white" : "bg-white/5 text-slate-500"}`}
                         disabled={!canAfford || outOfStock || buyMutation.isPending}
-                        onClick={() => buyMutation.mutate(item.id)}
-                        data-testid={`button-buy-${item.id}`}
-                      >
+                        onClick={() => buyMutation.mutate(item.id)} data-testid={`button-buy-${item.id}`}>
                         {outOfStock ? "Out of stock" : !canAfford ? "Can't afford" : buyMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Buy"}
                       </Button>
                     </div>
@@ -567,17 +656,12 @@ export default function SchoolEconomy() {
           </div>
         )}
 
-        {/* === LEADERBOARD SECTION === */}
+        {/* ══ LEADERBOARD ══ */}
         {activeSection === "leaderboard" && (
           <div className="space-y-4">
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-400" /> Class Leaderboard
-            </h2>
+            <h2 className="text-lg font-black text-white flex items-center gap-2"><Trophy className="h-5 w-5 text-amber-400" /> Class Leaderboard</h2>
             {leaderboard.length === 0 ? (
-              <div className="text-center py-16 text-slate-500">
-                <Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>No rankings yet. Start earning coins!</p>
-              </div>
+              <div className="text-center py-16 text-slate-500"><Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No rankings yet.</p></div>
             ) : (
               <div className="space-y-2">
                 {leaderboard.map((student: any, index: number) => {
@@ -594,11 +678,10 @@ export default function SchoolEconomy() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-bold text-sm ${isMe ? "text-teal-300" : "text-white"}`}>{student.displayName}{isMe && " (You)"}</p>
-                        {student.savingsBalance > 0 && <p className="text-xs text-slate-500">{currencySymbol}{student.savingsBalance} in savings</p>}
+                        {student.savingsBalance > 0 && <p className="text-xs text-slate-500">{currencySymbol}{student.savingsBalance} saved</p>}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-black text-amber-300">{currencySymbol}{(student.balance ?? 0).toLocaleString()}</p>
-                        <p className="text-xs text-slate-500">balance</p>
                       </div>
                     </div>
                   );

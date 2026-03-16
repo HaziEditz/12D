@@ -107,6 +107,13 @@ The School System is a completely separate, immersive visual environment at `/sc
 - **Class Leaderboard**: Rankings scoped to class via `/api/leaderboard?scope=class`
 - **Fun Zone Games**: Age-adapted mini-games (Coin Rain, Piggy Bank Builder, Stock Guesser, Budget Boss, Finance Quiz, Market Prediction, Investment Quiz, Strategy Challenge)
 - **Simulator Settings**: Persisted to `localStorage["school-sim-settings"]` — theme (default/neon/ocean/sunset/matrix), layout (standard/compact/wide), showGrid, showVolume
+- **School World Economy**: Full virtual classroom economy. Tables: `economySettings`, `economyBalances`, `economyTransactions`, `economySavings`, `economyJobs`, `economyExpenses`, `economyAuctions`, `economyAuctionBids`, `economyStoreItems`, `economyPurchases`, `economyChallenges`, `classroomAssets`, `studentAssets`.
+  - Students: earn coins from lessons (50), quizzes (25 if ≥60%), assignments (100); manage savings with interest; bid in auctions; buy from store; purchase assets (property/business/investment) that add to net worth and generate passive income; view net worth breakdown and class leaderboard.
+  - Teachers (via EconomyTab in teacher dashboard): create/delete jobs, expenses, auctions, store items, assets, challenges; trigger economy events (bonus/fine/fine-percent/interest); award coins to students; process asset income; configure currency name/symbol/rewards.
+  - Simulator profits auto-convert to economy coins via `/api/economy/convert-profit` (configurable rate in economy settings).
+  - Net worth = cash + savings + asset portfolio value (NOT simulator balance).
+  - API prefix: `/api/economy/*`. Routes include assets, my-assets, net-worth, net-worth-leaderboard, process-asset-income.
+  - Student economy page: `/school/economy` (5 tabs: Wallet, Assets, Auctions, Store, Rankings).
 
 ## Casual Plan Features
 

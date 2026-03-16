@@ -24,7 +24,8 @@ import {
 import {
   Users, GraduationCap, Target, Zap, Plus, Search,
   BarChart3, TrendingUp, Coins, Trash2, CheckCircle2,
-  Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase, Trophy
+  Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase, Trophy,
+  Home, Building2
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -718,6 +719,8 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
   const [challengeDialogOpen, setChallengeDialogOpen] = useState(false);
   const [challengeData, setChallengeData] = useState({ title: "", description: "", emoji: "🏆", type: "most_coins", rewardAmount: "", rewardDescription: "", endDate: "" });
   const [eventData, setEventData] = useState({ amount: "", percent: "", description: "", mode: "bonus" as "bonus" | "fine" | "fine_percent" | "interest" });
+  const [assetDialogOpen, setAssetDialogOpen] = useState(false);
+  const [assetData, setAssetData] = useState({ name: "", description: "", emoji: "🏠", type: "property", price: "", value: "", passiveIncome: "", incomeFrequency: "weekly", maintenanceCost: "", maintenanceFrequency: "weekly", maxOwners: "" });
 
   const { data: balances = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/balances", selectedClassId],
@@ -754,6 +757,11 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     queryFn: () => fetch(`/api/economy/challenges?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!selectedClassId,
   });
+  const { data: classroomAssets = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/assets", selectedClassId],
+    queryFn: () => fetch(`/api/economy/assets?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
   const { data: classLeaderboard = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/leaderboard", selectedClassId],
     queryFn: () => fetch(`/api/economy/leaderboard?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
@@ -772,6 +780,30 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     qc.invalidateQueries({ queryKey: ["/api/economy/expenses", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/challenges", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/leaderboard", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/assets", selectedClassId] });
+  };
+
+  const createAsset = async () => {
+    await apiRequest("POST", "/api/economy/assets", {
+      classId: selectedClassId,
+      ...assetData,
+      price: Number(assetData.price),
+      value: Number(assetData.value) || Number(assetData.price),
+      passiveIncome: Number(assetData.passiveIncome) || 0,
+      maintenanceCost: Number(assetData.maintenanceCost) || 0,
+      maxOwners: assetData.maxOwners ? Number(assetData.maxOwners) : null,
+    });
+    invalidateAll();
+    toast({ title: "Asset created!" });
+    setAssetDialogOpen(false);
+    setAssetData({ name: "", description: "", emoji: "🏠", type: "property", price: "", value: "", passiveIncome: "", incomeFrequency: "weekly", maintenanceCost: "", maintenanceFrequency: "weekly", maxOwners: "" });
+  };
+
+  const processAssetIncome = async () => {
+    const r = await apiRequest("POST", "/api/economy/process-asset-income", { classId: selectedClassId }) as any;
+    const data = await r.json();
+    invalidateAll();
+    toast({ title: `Asset income processed!`, description: `${data.incomeCount} income payments, ${data.maintenanceCount} maintenance charges` });
   };
 
   const saveSettings = async () => {
@@ -1173,6 +1205,128 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
           </div>
         </div>
       )}
+
+      {/* Assets */}
+      <div className="rounded-2xl p-5 bg-blue-500/5 border border-blue-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-black text-white text-base flex items-center gap-2">
+            <Home className="h-4 w-4 text-blue-400" /> Assets
+          </h3>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={processAssetIncome}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs" data-testid="button-process-asset-income">
+              <Zap className="h-3 w-3 mr-1" /> Pay Income
+            </Button>
+            <Dialog open={assetDialogOpen} onOpenChange={setAssetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs" data-testid="button-open-create-asset">
+                  <Plus className="h-3 w-3 mr-1" /> Add Asset
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#0f172a] border-white/10 max-w-md">
+                <DialogHeader><DialogTitle className="text-white">Create Asset</DialogTitle></DialogHeader>
+                <div className="space-y-3 mt-2">
+                  <div className="flex gap-2">
+                    <Input placeholder="Emoji" value={assetData.emoji} onChange={e => setAssetData(p => ({ ...p, emoji: e.target.value }))}
+                      className="bg-white/5 border-white/20 text-white w-16 text-center text-lg" />
+                    <Input placeholder="Asset name" value={assetData.name} onChange={e => setAssetData(p => ({ ...p, name: e.target.value }))}
+                      className="bg-white/5 border-white/20 text-white flex-1" data-testid="input-asset-name" />
+                  </div>
+                  <Input placeholder="Description (optional)" value={assetData.description} onChange={e => setAssetData(p => ({ ...p, description: e.target.value }))}
+                    className="bg-white/5 border-white/20 text-white" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {["property", "business", "investment"].map(t => (
+                      <button key={t} onClick={() => setAssetData(p => ({ ...p, type: t }))}
+                        className={`rounded-lg p-2 text-xs font-bold capitalize transition-all ${assetData.type === t ? "bg-blue-600 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}
+                        data-testid={`button-type-${t}`}>
+                        {t === "property" ? "🏠" : t === "business" ? "🏢" : "📈"} {t}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Purchase Price *</p>
+                      <Input type="number" placeholder="500" value={assetData.price} onChange={e => setAssetData(p => ({ ...p, price: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" data-testid="input-asset-price" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Net Worth Value</p>
+                      <Input type="number" placeholder="Same as price" value={assetData.value} onChange={e => setAssetData(p => ({ ...p, value: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Passive Income</p>
+                      <Input type="number" placeholder="0" value={assetData.passiveIncome} onChange={e => setAssetData(p => ({ ...p, passiveIncome: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Income Frequency</p>
+                      <select value={assetData.incomeFrequency} onChange={e => setAssetData(p => ({ ...p, incomeFrequency: e.target.value }))}
+                        className="w-full h-9 rounded-md bg-white/5 border border-white/20 text-white text-sm px-2">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Maintenance Cost</p>
+                      <Input type="number" placeholder="0" value={assetData.maintenanceCost} onChange={e => setAssetData(p => ({ ...p, maintenanceCost: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Max Owners (optional)</p>
+                      <Input type="number" placeholder="∞" value={assetData.maxOwners} onChange={e => setAssetData(p => ({ ...p, maxOwners: e.target.value }))}
+                        className="bg-white/5 border-white/20 text-white" />
+                    </div>
+                  </div>
+                  <Button onClick={createAsset} disabled={!assetData.name || !assetData.price}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold" data-testid="button-create-asset">
+                    Create Asset
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Create assets students can purchase. Press "Pay Income" to distribute passive income to all owners.</p>
+        {(classroomAssets as any[]).length === 0 ? (
+          <div className="text-center py-8 text-slate-600">
+            <Building2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No assets yet. Add some for students to invest in!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(classroomAssets as any[]).map((asset: any) => (
+              <div key={asset.id} className="rounded-xl p-4 bg-white/5 border border-white/10 flex flex-col gap-2" data-testid={`asset-card-${asset.id}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-2">
+                    <span className="text-2xl">{asset.emoji}</span>
+                    <div>
+                      <p className="font-bold text-white text-sm">{asset.name}</p>
+                      <p className="text-xs text-slate-500 capitalize">{asset.type}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost"
+                    onClick={() => apiRequest("DELETE", `/api/economy/assets/${asset.id}`, {}).then(() => { invalidateAll(); toast({ title: "Asset deleted" }); })}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 -mt-1 -mr-1 h-7 w-7 p-0" data-testid={`button-delete-asset-${asset.id}`}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  <span className="bg-white/8 rounded-md px-2 py-0.5 text-slate-300">💰 {asset.price} to buy</span>
+                  {asset.passiveIncome > 0 && <span className="bg-emerald-500/15 rounded-md px-2 py-0.5 text-emerald-300">+{asset.passiveIncome}/{asset.incomeFrequency}</span>}
+                  {asset.maintenanceCost > 0 && <span className="bg-red-500/15 rounded-md px-2 py-0.5 text-red-300">-{asset.maintenanceCost} upkeep</span>}
+                  {asset.maxOwners !== null && <span className="bg-blue-500/15 rounded-md px-2 py-0.5 text-blue-300">{asset.maxOwners} max owners</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Economy Events */}
       <div className="rounded-2xl p-5 bg-rose-500/5 border border-rose-500/20">

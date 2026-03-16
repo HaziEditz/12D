@@ -528,6 +528,42 @@ export const insertClassroomChallengeSchema = createInsertSchema(classroomChalle
 export type ClassroomChallenge = typeof classroomChallenges.$inferSelect;
 export type InsertClassroomChallenge = z.infer<typeof insertClassroomChallengeSchema>;
 
+// Purchasable assets: housing, business, investment property
+export const classroomAssets = pgTable("classroom_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  emoji: text("emoji").default("🏠"),
+  type: varchar("type").notNull().default("property"), // property | business | investment
+  price: integer("price").notNull(),
+  value: integer("value").notNull(), // net worth contribution
+  passiveIncome: integer("passive_income").default(0),
+  incomeFrequency: varchar("income_frequency").default("weekly"),
+  maintenanceCost: integer("maintenance_cost").default(0),
+  maintenanceFrequency: varchar("maintenance_frequency").default("weekly"),
+  maxOwners: integer("max_owners"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Student-owned assets
+export const studentAssets = pgTable("student_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  assetId: varchar("asset_id").notNull(),
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+  lastIncomePaidAt: timestamp("last_income_paid_at"),
+  lastMaintenancePaidAt: timestamp("last_maintenance_paid_at"),
+});
+
+export const insertClassroomAssetSchema = createInsertSchema(classroomAssets).omit({ id: true, createdAt: true });
+export const insertStudentAssetSchema = createInsertSchema(studentAssets).omit({ id: true, purchasedAt: true });
+export type ClassroomAsset = typeof classroomAssets.$inferSelect;
+export type InsertClassroomAsset = z.infer<typeof insertClassroomAssetSchema>;
+export type StudentAsset = typeof studentAssets.$inferSelect;
+
 export const insertClassroomEconomySettingsSchema = createInsertSchema(classroomEconomySettings).omit({ id: true, createdAt: true });
 export const insertClassroomCurrencyTransactionSchema = createInsertSchema(classroomCurrencyTransactions).omit({ id: true, createdAt: true });
 export const insertClassroomExpenseSchema = createInsertSchema(classroomExpenses).omit({ id: true, createdAt: true });

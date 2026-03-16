@@ -3095,6 +3095,78 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) { res.status(500).json({ message: error.message }); }
   });
 
+  // ─── Assets ────────────────────────────────────────────────────
+  app.get("/api/economy/assets", requireAuth, async (req, res) => {
+    try {
+      const { classId } = req.query as { classId: string };
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const assets = await storage.getClassroomAssets(classId);
+      res.json(assets);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/assets", requireTeacher, async (req, res) => {
+    try {
+      const asset = await storage.createClassroomAsset(req.body);
+      res.json(asset);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.delete("/api/economy/assets/:id", requireTeacher, async (req, res) => {
+    try {
+      await storage.deleteClassroomAsset(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/assets/:id/buy", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId } = req.body;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const sa = await storage.purchaseClassroomAsset(classId, user.id, req.params.id);
+      res.json(sa);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.get("/api/economy/my-assets", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId } = req.query as { classId: string };
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const assets = await storage.getStudentAssets(classId, user.id);
+      res.json(assets);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/process-asset-income", requireTeacher, async (req, res) => {
+    try {
+      const { classId } = req.body;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const result = await storage.processAssetIncome(classId);
+      res.json(result);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.get("/api/economy/net-worth", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId } = req.query as { classId: string };
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const netWorth = await storage.getStudentNetWorth(classId, user.id);
+      res.json(netWorth);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.get("/api/economy/net-worth-leaderboard", requireAuth, async (req, res) => {
+    try {
+      const { classId } = req.query as { classId: string };
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const leaderboard = await storage.getClassNetWorthLeaderboard(classId);
+      res.json(leaderboard);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
   // Background achievement check loop
   setInterval(async () => {
     try {

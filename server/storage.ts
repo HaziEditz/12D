@@ -8,6 +8,7 @@ import {
   classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
   classroomStoreItems, classroomStorePurchases, classroomChallenges,
+  classroomAssets, studentAssets,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -33,7 +34,8 @@ import {
   type ClassroomAuctionBid,
   type ClassroomStoreItem, type InsertClassroomStoreItem,
   type ClassroomStorePurchase,
-  type ClassroomChallenge, type InsertClassroomChallenge
+  type ClassroomChallenge, type InsertClassroomChallenge,
+  type ClassroomAsset, type InsertClassroomAsset, type StudentAsset
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -1508,6 +1510,101 @@ export class DatabaseStorage implements IStorage {
       result.push({ id: e.studentId, displayName: e.displayName, balance, savingsBalance });
     }
     return result.sort((a, b) => b.balance - a.balance);
+  }
+
+  // ─── Assets ────────────────────────────────────────────────────
+  async getClassroomAssets(classId: string): Promise<ClassroomAsset[]> {
+    return db.select().from(classroomAssets)
+      .where(and(eq(classroomAssets.classId, classId), eq(classroomAssets.isActive, true)))
+      .orderBy(classroomAssets.createdAt);
+  }
+
+  async createClassroomAsset(data: InsertClassroomAsset): Promise<ClassroomAsset> {
+    const [asset] = await db.insert(classroomAssets).values(data).returning();
+    return asset;
+  }
+
+  async deleteClassroomAsset(id: string): Promise<void> {
+    await db.update(classroomAssets).set({ isActive: false }).where(eq(classroomAssets.id, id));
+  }
+
+  async getStudentAssets(classId: string, studentId: string): Promise<(StudentAsset & { asset: ClassroomAsset })[]> {
+    const rows = await db.select({ sa: studentAssets, a: classroomAssets })
+      .from(studentAssets)
+      .innerJoin(classroomAssets, eq(studentAssets.assetId, classroomAssets.id))
+      .where(and(eq(studentAssets.classId, classId), eq(studentAssets.studentId, studentId)));
+    return rows.map(r => ({ ...r.sa, asset: r.a }));
+  }
+
+  async countAssetOwners(assetId: string): Promise<number> {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+      .from(studentAssets)
+      .where(eq(studentAssets.assetId, assetId));
+    return Number(count);
+  }
+
+  async purchaseClassroomAsset(classId: string, studentId: string, assetId: string): Promise<StudentAsset> {
+    const asset = await db.select().from(classroomAssets).where(eq(classroomAssets.id, assetId)).limit(1).then(r => r[0]);
+    if (!asset) throw new Error("Asset not found");
+    if (asset.maxOwners !== null) {
+      const count = await this.countAssetOwners(assetId);
+      if (count >= asset.maxOwners) throw new Error("Asset is fully owned");
+    }
+    const balance = await this.getStudentBalance(classId, studentId);
+    if (balance < asset.price) throw new Error("Insufficient balance");
+    await this.addCurrencyTransaction({ classId, studentId, amount: -asset.price, type: "purchase", description: `Bought asset: ${asset.name}`, referenceId: assetId });
+    const [sa] = await db.insert(studentAssets).values({ classId, studentId, assetId }).returning();
+    return sa;
+  }
+
+  async processAssetIncome(classId: string): Promise<{ incomeCount: number; maintenanceCount: number }> {
+    const enrollments = await db.select({ studentId: classStudents.studentId })
+      .from(classStudents).where(eq(classStudents.classId, classId));
+    let incomeCount = 0, maintenanceCount = 0;
+    for (const e of enrollments) {
+      const ownedAssets = await this.getStudentAssets(classId, e.studentId);
+      for (const owned of ownedAssets) {
+        const asset = owned.asset;
+        if (asset.passiveIncome && asset.passiveIncome > 0) {
+          await this.addCurrencyTransaction({ classId, studentId: e.studentId, amount: asset.passiveIncome, type: "interest", description: `Income from: ${asset.name}`, referenceId: owned.id });
+          await db.update(studentAssets).set({ lastIncomePaidAt: new Date() }).where(eq(studentAssets.id, owned.id));
+          incomeCount++;
+        }
+        if (asset.maintenanceCost && asset.maintenanceCost > 0) {
+          const balance = await this.getStudentBalance(classId, e.studentId);
+          const charge = Math.min(balance, asset.maintenanceCost);
+          if (charge > 0) {
+            await this.addCurrencyTransaction({ classId, studentId: e.studentId, amount: -charge, type: "expense", description: `Maintenance: ${asset.name}`, referenceId: owned.id });
+            await db.update(studentAssets).set({ lastMaintenancePaidAt: new Date() }).where(eq(studentAssets.id, owned.id));
+            maintenanceCount++;
+          }
+        }
+      }
+    }
+    return { incomeCount, maintenanceCount };
+  }
+
+  async getStudentNetWorth(classId: string, studentId: string): Promise<{ cash: number; savings: number; assetValue: number; simulatorBalance: number; total: number }> {
+    const cash = await this.getStudentBalance(classId, studentId);
+    const savings = await this.getSavingsBalance(studentId, classId);
+    const ownedAssets = await this.getStudentAssets(classId, studentId);
+    const assetValue = ownedAssets.reduce((sum, sa) => sum + (sa.asset.value ?? 0), 0);
+    const user = await this.getUserById(studentId);
+    const simulatorBalance = user?.simulatorBalance ?? 0;
+    const total = cash + savings + assetValue;
+    return { cash, savings, assetValue, simulatorBalance, total };
+  }
+
+  async getClassNetWorthLeaderboard(classId: string): Promise<{ id: string; displayName: string; netWorth: number; cash: number; assetValue: number }[]> {
+    const enrollments = await db.select({ studentId: classStudents.studentId, displayName: users.displayName })
+      .from(classStudents).innerJoin(users, eq(classStudents.studentId, users.id))
+      .where(eq(classStudents.classId, classId));
+    const result = [];
+    for (const e of enrollments) {
+      const nw = await this.getStudentNetWorth(classId, e.studentId);
+      result.push({ id: e.studentId, displayName: e.displayName, netWorth: nw.total, cash: nw.cash, assetValue: nw.assetValue });
+    }
+    return result.sort((a, b) => b.netWorth - a.netWorth);
   }
 }
 
