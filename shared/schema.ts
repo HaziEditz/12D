@@ -507,6 +507,27 @@ export const classroomStorePurchases = pgTable("classroom_store_purchases", {
   purchasedAt: timestamp("purchased_at").defaultNow(),
 });
 
+export const classroomChallenges = pgTable("classroom_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  teacherId: varchar("teacher_id").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  type: varchar("type").notNull().default("most_coins"),
+  rewardAmount: integer("reward_amount").default(0),
+  rewardDescription: text("reward_description"),
+  emoji: text("emoji").default("🏆"),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").default(true),
+  winnerId: varchar("winner_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClassroomChallengeSchema = createInsertSchema(classroomChallenges).omit({ id: true, createdAt: true, winnerId: true });
+export type ClassroomChallenge = typeof classroomChallenges.$inferSelect;
+export type InsertClassroomChallenge = z.infer<typeof insertClassroomChallengeSchema>;
+
 export const insertClassroomEconomySettingsSchema = createInsertSchema(classroomEconomySettings).omit({ id: true, createdAt: true });
 export const insertClassroomCurrencyTransactionSchema = createInsertSchema(classroomCurrencyTransactions).omit({ id: true, createdAt: true });
 export const insertClassroomExpenseSchema = createInsertSchema(classroomExpenses).omit({ id: true, createdAt: true });

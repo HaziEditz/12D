@@ -2691,10 +2691,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { classId } = req.query as { classId: string };
       if (!classId) return res.status(400).json({ message: "classId required" });
       const balance = await storage.getStudentBalance(classId, user.id);
-      const transactions = await storage.getStudentTransactions(classId, user.id, 30);
+      const savingsBalance = await storage.getSavingsBalance(user.id, classId);
+      const transactions = await storage.getStudentTransactions(classId, user.id, 50);
       const myJobs = await storage.getJobAssignmentsByStudent(user.id, classId);
       const purchases = await storage.getPurchasesByStudent(user.id, classId);
-      res.json({ balance, transactions, myJobs, purchases });
+      res.json({ balance, savingsBalance, transactions, myJobs, purchases });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2976,6 +2977,122 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // Savings
+  app.post("/api/economy/savings/deposit", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId, amount } = req.body;
+      if (!classId || !amount || amount <= 0) return res.status(400).json({ message: "Invalid request" });
+      await storage.depositToSavings(user.id, classId, Math.floor(amount));
+      res.json({ success: true });
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/savings/withdraw", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { classId, amount } = req.body;
+      if (!classId || !amount || amount <= 0) return res.status(400).json({ message: "Invalid request" });
+      await storage.withdrawFromSavings(user.id, classId, Math.floor(amount));
+      res.json({ success: true });
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.get("/api/economy/savings", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const classId = req.query.classId as string;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const savings = await storage.getSavingsBalance(user.id, classId);
+      res.json({ savings });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/savings/apply-interest", requireTeacher, async (req, res) => {
+    try {
+      const { classId } = req.body;
+      const settings = await storage.getEconomySettings(classId);
+      const rate = settings?.savingsInterestRate ?? 5;
+      const count = await storage.applySavingsInterestToAll(classId, rate);
+      res.json({ success: true, applied: count, rate });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // Economy Events (bulk)
+  app.post("/api/economy/events/bonus", requireTeacher, async (req, res) => {
+    try {
+      const { classId, amount, description } = req.body;
+      if (!classId || !amount || amount <= 0) return res.status(400).json({ message: "Invalid request" });
+      const count = await storage.classBonus(classId, Math.floor(amount), description || `Class bonus: ${amount} coins`);
+      res.json({ success: true, awarded: count });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/events/fine", requireTeacher, async (req, res) => {
+    try {
+      const { classId, amount, description } = req.body;
+      if (!classId || !amount || amount <= 0) return res.status(400).json({ message: "Invalid request" });
+      const count = await storage.classFine(classId, Math.floor(amount), description || `Class fine: ${amount} coins`);
+      res.json({ success: true, charged: count });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/events/fine-percent", requireTeacher, async (req, res) => {
+    try {
+      const { classId, percent, description } = req.body;
+      if (!classId || !percent || percent <= 0) return res.status(400).json({ message: "Invalid request" });
+      const count = await storage.classFinePercent(classId, percent, description || `Class tax: ${percent}%`);
+      res.json({ success: true, charged: count });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // Challenges
+  app.get("/api/economy/challenges", requireAuth, async (req, res) => {
+    try {
+      const classId = req.query.classId as string;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const challenges = await storage.getChallengesByClass(classId);
+      res.json(challenges);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/challenges", requireTeacher, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const data = { ...req.body, teacherId: user.id };
+      const challenge = await storage.createChallenge(data);
+      res.json(challenge);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.delete("/api/economy/challenges/:id", requireTeacher, async (req, res) => {
+    try {
+      await storage.deleteChallenge(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/economy/challenges/:id/close", requireTeacher, async (req, res) => {
+    try {
+      const { winnerId, classId } = req.body;
+      const challenges = await storage.getChallengesByClass(classId);
+      const challenge = challenges.find(c => c.id === req.params.id);
+      if (!challenge) return res.status(404).json({ message: "Challenge not found" });
+      await storage.closeChallengeAndAward(req.params.id, winnerId, classId, challenge.rewardAmount ?? 0, challenge.title);
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // Class Leaderboard
+  app.get("/api/economy/leaderboard", requireAuth, async (req, res) => {
+    try {
+      const classId = req.query.classId as string;
+      if (!classId) return res.status(400).json({ message: "classId required" });
+      const leaderboard = await storage.getClassLeaderboard(classId);
+      res.json(leaderboard);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
   });
 
   // Background achievement check loop

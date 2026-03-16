@@ -99,6 +99,17 @@ function Router() {
   );
 }
 
+function StudentGuard() {
+  const [location, navigate] = useLocation();
+  const { user } = useAuth();
+  const isSchoolPage = location.startsWith("/school") || location === "/school-plan";
+  if (user?.role === "student" && !isSchoolPage) {
+    navigate("/school");
+    return null;
+  }
+  return null;
+}
+
 function AppContent() {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -128,6 +139,7 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen bg-background${(isCasualPage || isCasualUser) ? " casual-world" : ""}`}>
+      <StudentGuard />
       <TrialBanner />
       <Navbar />
       <Router />

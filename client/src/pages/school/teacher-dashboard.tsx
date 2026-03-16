@@ -24,8 +24,9 @@ import {
 import {
   Users, GraduationCap, Target, Zap, Plus, Search,
   BarChart3, TrendingUp, Coins, Trash2, CheckCircle2,
-  Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase
+  Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase, Trophy
 } from "lucide-react";
+import { format } from "date-fns";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from "recharts";
@@ -714,6 +715,9 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
   const [storeData, setStoreData] = useState({ name: "", description: "", emoji: "🎁", price: "", stock: "" });
   const [expenseData, setExpenseData] = useState({ name: "", description: "", amount: "", frequency: "weekly" });
   const [settingsData, setSettingsData] = useState<any>(null);
+  const [challengeDialogOpen, setChallengeDialogOpen] = useState(false);
+  const [challengeData, setChallengeData] = useState({ title: "", description: "", emoji: "🏆", type: "most_coins", rewardAmount: "", rewardDescription: "", endDate: "" });
+  const [eventData, setEventData] = useState({ amount: "", percent: "", description: "", mode: "bonus" as "bonus" | "fine" | "fine_percent" | "interest" });
 
   const { data: balances = [] } = useQuery<any[]>({
     queryKey: ["/api/economy/balances", selectedClassId],
@@ -745,6 +749,16 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     queryFn: () => fetch(`/api/economy/expenses?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!selectedClassId,
   });
+  const { data: challenges = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/challenges", selectedClassId],
+    queryFn: () => fetch(`/api/economy/challenges?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: classLeaderboard = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/leaderboard", selectedClassId],
+    queryFn: () => fetch(`/api/economy/leaderboard?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
 
   const jobs: any[] = jobsData?.jobs ?? [];
   const jobAssignments: any[] = jobsData?.assignments ?? [];
@@ -756,6 +770,8 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     qc.invalidateQueries({ queryKey: ["/api/economy/auctions", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/store", selectedClassId] });
     qc.invalidateQueries({ queryKey: ["/api/economy/expenses", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/challenges", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/leaderboard", selectedClassId] });
   };
 
   const saveSettings = async () => {
@@ -772,6 +788,37 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
     toast({ title: "Currency awarded!" });
     setAwardDialogOpen(false);
     setAwardData({ studentId: "", amount: "", description: "" });
+  };
+
+  const createChallenge = async () => {
+    await apiRequest("POST", "/api/economy/challenges", {
+      classId: selectedClassId, ...challengeData,
+      rewardAmount: Number(challengeData.rewardAmount) || 0,
+      endDate: challengeData.endDate ? new Date(challengeData.endDate).toISOString() : undefined,
+    });
+    invalidateAll();
+    toast({ title: "Challenge created!" });
+    setChallengeDialogOpen(false);
+    setChallengeData({ title: "", description: "", emoji: "🏆", type: "most_coins", rewardAmount: "", rewardDescription: "", endDate: "" });
+  };
+
+  const triggerEvent = async () => {
+    const desc = eventData.description || undefined;
+    if (eventData.mode === "bonus") {
+      const r = await apiRequest("POST", "/api/economy/events/bonus", { classId: selectedClassId, amount: Number(eventData.amount), description: desc }) as any;
+      toast({ title: `Bonus sent to ${r.awarded} student(s)!` });
+    } else if (eventData.mode === "fine") {
+      const r = await apiRequest("POST", "/api/economy/events/fine", { classId: selectedClassId, amount: Number(eventData.amount), description: desc }) as any;
+      toast({ title: `Charged ${r.charged} student(s)!` });
+    } else if (eventData.mode === "fine_percent") {
+      const r = await apiRequest("POST", "/api/economy/events/fine-percent", { classId: selectedClassId, percent: Number(eventData.percent), description: desc }) as any;
+      toast({ title: `Charged ${r.charged} student(s) ${eventData.percent}%!` });
+    } else if (eventData.mode === "interest") {
+      const r = await apiRequest("POST", "/api/economy/savings/apply-interest", { classId: selectedClassId }) as any;
+      toast({ title: `Applied ${r.rate}% interest to ${r.applied} saver(s)!` });
+    }
+    invalidateAll();
+    setEventData({ amount: "", percent: "", description: "", mode: "bonus" });
   };
 
   const createJob = async () => {
@@ -1121,6 +1168,161 @@ function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) 
                 <p className="font-bold text-white text-xs mt-1 truncate">{item.name}</p>
                 <p className="text-purple-300 font-bold text-xs">{currencySymbol}{item.price}</p>
                 {item.stock !== null && <p className="text-slate-500 text-xs">{item.stock} left</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Economy Events */}
+      <div className="rounded-2xl p-5 bg-rose-500/5 border border-rose-500/20">
+        <h3 className="font-black text-white text-base mb-1 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-rose-400" /> Economy Events
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">Trigger class-wide financial events that affect all students at once.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          {(["bonus", "fine", "fine_percent", "interest"] as const).map(m => (
+            <button key={m} onClick={() => setEventData(d => ({ ...d, mode: m }))}
+              className={`rounded-xl py-2 px-3 text-xs font-bold transition-all ${eventData.mode === m ? m === "bonus" ? "bg-emerald-500 text-white" : m === "fine" || m === "fine_percent" ? "bg-rose-500 text-white" : "bg-teal-500 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}
+              data-testid={`button-event-mode-${m}`}>
+              {m === "bonus" ? "💰 Class Bonus" : m === "fine" ? "💸 Class Fine" : m === "fine_percent" ? "📊 % Fine" : "🏦 Apply Interest"}
+            </button>
+          ))}
+        </div>
+        {(eventData.mode === "bonus" || eventData.mode === "fine") && (
+          <div className="flex gap-2 mb-3">
+            <Input type="number" placeholder={`Amount (${currencySymbol})`} value={eventData.amount} onChange={e => setEventData(d => ({ ...d, amount: e.target.value }))}
+              className="bg-white/5 border-white/10 text-white text-sm" data-testid="input-event-amount" />
+            <Input placeholder="Description (optional)" value={eventData.description} onChange={e => setEventData(d => ({ ...d, description: e.target.value }))}
+              className="bg-white/5 border-white/10 text-white text-sm" data-testid="input-event-description" />
+          </div>
+        )}
+        {eventData.mode === "fine_percent" && (
+          <div className="flex gap-2 mb-3">
+            <Input type="number" placeholder="Percent (e.g. 10)" value={eventData.percent} onChange={e => setEventData(d => ({ ...d, percent: e.target.value }))}
+              className="bg-white/5 border-white/10 text-white text-sm" data-testid="input-event-percent" />
+            <Input placeholder="Description (optional)" value={eventData.description} onChange={e => setEventData(d => ({ ...d, description: e.target.value }))}
+              className="bg-white/5 border-white/10 text-white text-sm" />
+          </div>
+        )}
+        {eventData.mode === "interest" && (
+          <p className="text-xs text-slate-400 mb-3">
+            Will apply <span className="text-teal-300 font-bold">{settings?.savingsInterestRate ?? 0}%</span> interest to all student savings accounts.
+            Interest rate can be changed in Settings above.
+          </p>
+        )}
+        <Button onClick={triggerEvent}
+          disabled={!selectedClassId || (eventData.mode !== "interest" && eventData.mode !== "fine_percent" && !eventData.amount) || (eventData.mode === "fine_percent" && !eventData.percent)}
+          className={`text-white font-bold text-sm ${eventData.mode === "bonus" ? "bg-emerald-600 hover:bg-emerald-500" : eventData.mode === "interest" ? "bg-teal-600 hover:bg-teal-500" : "bg-rose-600 hover:bg-rose-500"}`}
+          data-testid="button-trigger-event">
+          {eventData.mode === "bonus" ? "Send Bonus to All" : eventData.mode === "fine" ? "Charge All Students" : eventData.mode === "fine_percent" ? "Apply % Fine to All" : "Apply Savings Interest"}
+        </Button>
+      </div>
+
+      {/* Challenges */}
+      <div className="rounded-2xl p-5 bg-amber-500/5 border border-amber-500/20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-black text-white text-base flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-400" /> Challenges
+            </h3>
+            <p className="text-xs text-slate-500">Create class challenges visible on students' Economy page.</p>
+          </div>
+          <Dialog open={challengeDialogOpen} onOpenChange={setChallengeDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs gap-1" data-testid="button-create-challenge">
+                <Plus className="h-3 w-3" /> New Challenge
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-[#0f172a] border-white/10">
+              <DialogHeader><DialogTitle className="text-white">Create Challenge</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input placeholder="Emoji" value={challengeData.emoji} onChange={e => setChallengeData(d => ({ ...d, emoji: e.target.value }))}
+                    className="w-20 bg-white/5 border-white/10 text-white text-center text-lg" maxLength={2} data-testid="input-challenge-emoji" />
+                  <Input placeholder="Challenge title *" value={challengeData.title} onChange={e => setChallengeData(d => ({ ...d, title: e.target.value }))}
+                    className="flex-1 bg-white/5 border-white/10 text-white" data-testid="input-challenge-title" />
+                </div>
+                <Input placeholder="Description (optional)" value={challengeData.description} onChange={e => setChallengeData(d => ({ ...d, description: e.target.value }))}
+                  className="bg-white/5 border-white/10 text-white" data-testid="input-challenge-description" />
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Challenge Type</p>
+                  <select value={challengeData.type} onChange={e => setChallengeData(d => ({ ...d, type: e.target.value }))}
+                    className="w-full bg-[#1e293b] border border-white/10 text-white rounded-lg px-3 py-2 text-sm" data-testid="select-challenge-type">
+                    <option value="most_coins">Most Coins</option>
+                    <option value="most_savings">Most Savings</option>
+                    <option value="most_lessons">Most Lessons Completed</option>
+                    <option value="most_quizzes">Most Quizzes Passed</option>
+                    <option value="custom">Custom / Manual</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Input type="number" placeholder={`Reward (${currencySymbol})`} value={challengeData.rewardAmount}
+                    onChange={e => setChallengeData(d => ({ ...d, rewardAmount: e.target.value }))}
+                    className="bg-white/5 border-white/10 text-white" data-testid="input-challenge-reward" />
+                  <Input placeholder="Reward description" value={challengeData.rewardDescription}
+                    onChange={e => setChallengeData(d => ({ ...d, rewardDescription: e.target.value }))}
+                    className="bg-white/5 border-white/10 text-white" data-testid="input-challenge-reward-desc" />
+                </div>
+                <Input type="datetime-local" value={challengeData.endDate} onChange={e => setChallengeData(d => ({ ...d, endDate: e.target.value }))}
+                  className="bg-white/5 border-white/10 text-white text-sm" data-testid="input-challenge-end-date" />
+                <Button onClick={createChallenge} disabled={!challengeData.title} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold" data-testid="button-submit-challenge">
+                  Create Challenge
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {(challenges as any[]).length === 0 ? (
+          <div className="text-center py-6 text-slate-500 text-sm">
+            <Trophy className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p>No challenges yet. Create one to motivate students!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(challenges as any[]).map((c: any) => (
+              <div key={c.id} className="flex items-center gap-3 rounded-xl p-3 bg-amber-500/10 border border-amber-500/20" data-testid={`challenge-row-${c.id}`}>
+                <span className="text-xl">{c.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-sm">{c.title}</p>
+                  <div className="flex gap-2 mt-0.5">
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${c.isActive ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-500/20 text-slate-400"}`}>{c.isActive ? "Active" : "Closed"}</span>
+                    {c.rewardAmount > 0 && <span className="text-xs text-amber-300">{currencySymbol}{c.rewardAmount} reward</span>}
+                    {c.endDate && <span className="text-xs text-slate-500">ends {format(new Date(c.endDate), "MMM d")}</span>}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  {c.isActive && (
+                    <Button size="sm" variant="ghost" className="text-slate-400 hover:text-amber-400 text-xs h-7" data-testid={`button-close-challenge-${c.id}`}
+                      onClick={() => apiRequest("POST", `/api/economy/challenges/${c.id}/close`, {}).then(invalidateAll)}>
+                      Close
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" className="text-slate-400 hover:text-red-400 h-7 w-7 p-0" data-testid={`button-delete-challenge-${c.id}`}
+                    onClick={() => apiRequest("DELETE", `/api/economy/challenges/${c.id}`).then(invalidateAll)}>✕</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Class Leaderboard */}
+      {classLeaderboard.length > 0 && (
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+          <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-amber-400" /> Class Leaderboard
+          </h3>
+          <div className="space-y-1.5">
+            {classLeaderboard.slice(0, 10).map((s: any, i: number) => (
+              <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2 bg-white/3" data-testid={`leaderboard-teacher-row-${s.id}`}>
+                <span className="w-6 text-center text-sm font-black text-slate-500">#{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{s.displayName}</p>
+                </div>
+                <span className="font-bold text-amber-300 text-sm">{currencySymbol}{(s.balance ?? 0).toLocaleString()}</span>
+                {s.savingsBalance > 0 && <span className="text-xs text-emerald-400 font-medium">+{currencySymbol}{s.savingsBalance} saved</span>}
               </div>
             ))}
           </div>

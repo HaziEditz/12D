@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, asc, and, isNull, ilike, or, sql, sum, ne } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, ilike, or, sql, sum, ne, inArray } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
@@ -7,7 +7,7 @@ import {
   quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores, classGroupMessages,
   classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
-  classroomStoreItems, classroomStorePurchases,
+  classroomStoreItems, classroomStorePurchases, classroomChallenges,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -32,7 +32,8 @@ import {
   type ClassroomAuction, type InsertClassroomAuction,
   type ClassroomAuctionBid,
   type ClassroomStoreItem, type InsertClassroomStoreItem,
-  type ClassroomStorePurchase
+  type ClassroomStorePurchase,
+  type ClassroomChallenge, type InsertClassroomChallenge
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -1390,6 +1391,123 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(classroomStorePurchases.studentId, studentId), eq(classroomStorePurchases.classId, classId)))
       .orderBy(desc(classroomStorePurchases.purchasedAt));
     return results as any;
+  }
+
+  // Savings
+  async getSavingsBalance(studentId: string, classId: string): Promise<number> {
+    const txs = await db.select().from(classroomCurrencyTransactions)
+      .where(and(
+        eq(classroomCurrencyTransactions.studentId, studentId),
+        eq(classroomCurrencyTransactions.classId, classId),
+        inArray(classroomCurrencyTransactions.type, ["savings_deposit", "savings_withdrawal", "savings_interest"])
+      ));
+    let savings = 0;
+    for (const tx of txs) {
+      if (tx.type === "savings_deposit") savings += Math.abs(tx.amount);
+      else if (tx.type === "savings_withdrawal") savings -= Math.abs(tx.amount);
+      else if (tx.type === "savings_interest") savings += tx.amount;
+    }
+    return Math.max(0, savings);
+  }
+
+  async depositToSavings(studentId: string, classId: string, amount: number): Promise<void> {
+    const balance = await this.getStudentBalance(classId, studentId);
+    if (balance < amount) throw new Error("Insufficient balance");
+    await this.addCurrencyTransaction({ classId, studentId, amount: -amount, type: "savings_deposit", description: `Deposited ${amount} to savings` });
+  }
+
+  async withdrawFromSavings(studentId: string, classId: string, amount: number): Promise<void> {
+    const savings = await this.getSavingsBalance(studentId, classId);
+    if (savings < amount) throw new Error("Insufficient savings balance");
+    await this.addCurrencyTransaction({ classId, studentId, amount: amount, type: "savings_withdrawal", description: `Withdrew ${amount} from savings` });
+  }
+
+  async applySavingsInterestToAll(classId: string, interestRate: number): Promise<number> {
+    const enrollments = await db.select().from(classStudents).where(eq(classStudents.classId, classId));
+    let count = 0;
+    for (const enrollment of enrollments) {
+      const savings = await this.getSavingsBalance(enrollment.studentId, classId);
+      if (savings > 0) {
+        const interest = Math.floor(savings * (interestRate / 100));
+        if (interest > 0) {
+          await this.addCurrencyTransaction({ classId, studentId: enrollment.studentId, amount: interest, type: "savings_interest", description: `Savings interest (${interestRate}%)` });
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  // Economy Events (bulk actions)
+  async classBonus(classId: string, amount: number, description: string): Promise<number> {
+    const enrollments = await db.select().from(classStudents).where(eq(classStudents.classId, classId));
+    for (const e of enrollments) {
+      await this.addCurrencyTransaction({ classId, studentId: e.studentId, amount, type: "teacher_award", description });
+    }
+    return enrollments.length;
+  }
+
+  async classFine(classId: string, amount: number, description: string): Promise<number> {
+    const enrollments = await db.select().from(classStudents).where(eq(classStudents.classId, classId));
+    let count = 0;
+    for (const e of enrollments) {
+      const balance = await this.getStudentBalance(classId, e.studentId);
+      const charge = Math.min(amount, balance);
+      if (charge > 0) {
+        await this.addCurrencyTransaction({ classId, studentId: e.studentId, amount: -charge, type: "expense", description });
+        count++;
+      }
+    }
+    return count;
+  }
+
+  async classFinePercent(classId: string, percent: number, description: string): Promise<number> {
+    const enrollments = await db.select().from(classStudents).where(eq(classStudents.classId, classId));
+    let count = 0;
+    for (const e of enrollments) {
+      const balance = await this.getStudentBalance(classId, e.studentId);
+      const charge = Math.floor(balance * (percent / 100));
+      if (charge > 0) {
+        await this.addCurrencyTransaction({ classId, studentId: e.studentId, amount: -charge, type: "expense", description });
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // Challenges
+  async getChallengesByClass(classId: string): Promise<ClassroomChallenge[]> {
+    return db.select().from(classroomChallenges).where(eq(classroomChallenges.classId, classId)).orderBy(desc(classroomChallenges.createdAt));
+  }
+
+  async createChallenge(data: InsertClassroomChallenge): Promise<ClassroomChallenge> {
+    const [challenge] = await db.insert(classroomChallenges).values(data).returning();
+    return challenge;
+  }
+
+  async deleteChallenge(id: string): Promise<void> {
+    await db.update(classroomChallenges).set({ isActive: false }).where(eq(classroomChallenges.id, id));
+  }
+
+  async closeChallengeAndAward(challengeId: string, winnerId: string, classId: string, rewardAmount: number, challengeTitle: string): Promise<void> {
+    await db.update(classroomChallenges).set({ isActive: false, winnerId }).where(eq(classroomChallenges.id, challengeId));
+    if (rewardAmount > 0) {
+      await this.addCurrencyTransaction({ classId, studentId: winnerId, amount: rewardAmount, type: "teacher_award", description: `Won challenge: ${challengeTitle}` });
+    }
+  }
+
+  async getClassLeaderboard(classId: string): Promise<{ id: string; displayName: string; balance: number; savingsBalance: number }[]> {
+    const enrollments = await db.select({ studentId: classStudents.studentId, displayName: users.displayName })
+      .from(classStudents)
+      .innerJoin(users, eq(classStudents.studentId, users.id))
+      .where(eq(classStudents.classId, classId));
+    const result = [];
+    for (const e of enrollments) {
+      const balance = await this.getStudentBalance(classId, e.studentId);
+      const savingsBalance = await this.getSavingsBalance(e.studentId, classId);
+      result.push({ id: e.studentId, displayName: e.displayName, balance, savingsBalance });
+    }
+    return result.sort((a, b) => b.balance - a.balance);
   }
 }
 
