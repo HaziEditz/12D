@@ -70,6 +70,14 @@ export default function SchoolHub() {
       big: true,
     },
     {
+      emoji: "🪙",
+      title: "Economy",
+      desc: "Your balance, auctions, jobs & store",
+      href: "/school/economy",
+      color: isPrimary ? "from-amber-400 to-yellow-500" : "from-amber-500 to-orange-600",
+      big: true,
+    },
+    {
       emoji: "🎮",
       title: "Fun Zone",
       desc: "Play games and earn tokens",

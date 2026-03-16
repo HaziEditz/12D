@@ -393,6 +393,147 @@ export type FunZoneScore = typeof funZoneScores.$inferSelect;
 export type InsertClassGroupMessage = z.infer<typeof insertClassGroupMessageSchema>;
 export type ClassGroupMessage = typeof classGroupMessages.$inferSelect;
 
+// ===== CLASSROOM ECONOMY TABLES =====
+
+export const classroomEconomySettings = pgTable("classroom_economy_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull().unique(),
+  currencyName: text("currency_name").notNull().default("Coins"),
+  currencySymbol: text("currency_symbol").notNull().default("🪙"),
+  lessonReward: integer("lesson_reward").notNull().default(50),
+  quizReward: integer("quiz_reward").notNull().default(25),
+  assignmentReward: integer("assignment_reward").notNull().default(100),
+  simulatorConversionRate: real("simulator_conversion_rate").notNull().default(0.1),
+  savingsInterestRate: real("savings_interest_rate").notNull().default(5),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomCurrencyTransactions = pgTable("classroom_currency_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  amount: integer("amount").notNull(),
+  type: text("type").notNull(),
+  description: text("description").notNull(),
+  referenceId: varchar("reference_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomExpenses = pgTable("classroom_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  amount: integer("amount").notNull(),
+  frequency: text("frequency").notNull().default("weekly"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomExpensePayments = pgTable("classroom_expense_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  expenseId: varchar("expense_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  amount: integer("amount").notNull(),
+  paidAt: timestamp("paid_at").defaultNow(),
+});
+
+export const classroomJobs = pgTable("classroom_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  payAmount: integer("pay_amount").notNull(),
+  payFrequency: text("pay_frequency").notNull().default("weekly"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomJobAssignments = pgTable("classroom_job_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  lastPaidAt: timestamp("last_paid_at"),
+});
+
+export const classroomAuctions = pgTable("classroom_auctions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  teacherId: varchar("teacher_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  emoji: text("emoji").default("🎁"),
+  startingBid: integer("starting_bid").notNull().default(1),
+  currentHighBid: integer("current_high_bid").default(0),
+  currentHighBidderId: varchar("current_high_bidder_id"),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  winnerId: varchar("winner_id"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomAuctionBids = pgTable("classroom_auction_bids", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  auctionId: varchar("auction_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  amount: integer("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomStoreItems = pgTable("classroom_store_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: integer("price").notNull(),
+  emoji: text("emoji").default("🎁"),
+  stock: integer("stock"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classroomStorePurchases = pgTable("classroom_store_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  price: integer("price").notNull(),
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+});
+
+export const insertClassroomEconomySettingsSchema = createInsertSchema(classroomEconomySettings).omit({ id: true, createdAt: true });
+export const insertClassroomCurrencyTransactionSchema = createInsertSchema(classroomCurrencyTransactions).omit({ id: true, createdAt: true });
+export const insertClassroomExpenseSchema = createInsertSchema(classroomExpenses).omit({ id: true, createdAt: true });
+export const insertClassroomExpensePaymentSchema = createInsertSchema(classroomExpensePayments).omit({ id: true, paidAt: true });
+export const insertClassroomJobSchema = createInsertSchema(classroomJobs).omit({ id: true, createdAt: true });
+export const insertClassroomJobAssignmentSchema = createInsertSchema(classroomJobAssignments).omit({ id: true, assignedAt: true });
+export const insertClassroomAuctionSchema = createInsertSchema(classroomAuctions).omit({ id: true, createdAt: true, closedAt: true });
+export const insertClassroomAuctionBidSchema = createInsertSchema(classroomAuctionBids).omit({ id: true, createdAt: true });
+export const insertClassroomStoreItemSchema = createInsertSchema(classroomStoreItems).omit({ id: true, createdAt: true });
+export const insertClassroomStorePurchaseSchema = createInsertSchema(classroomStorePurchases).omit({ id: true, purchasedAt: true });
+
+export type ClassroomEconomySettings = typeof classroomEconomySettings.$inferSelect;
+export type InsertClassroomEconomySettings = z.infer<typeof insertClassroomEconomySettingsSchema>;
+export type ClassroomCurrencyTransaction = typeof classroomCurrencyTransactions.$inferSelect;
+export type InsertClassroomCurrencyTransaction = z.infer<typeof insertClassroomCurrencyTransactionSchema>;
+export type ClassroomExpense = typeof classroomExpenses.$inferSelect;
+export type InsertClassroomExpense = z.infer<typeof insertClassroomExpenseSchema>;
+export type ClassroomJob = typeof classroomJobs.$inferSelect;
+export type InsertClassroomJob = z.infer<typeof insertClassroomJobSchema>;
+export type ClassroomJobAssignment = typeof classroomJobAssignments.$inferSelect;
+export type ClassroomAuction = typeof classroomAuctions.$inferSelect;
+export type InsertClassroomAuction = z.infer<typeof insertClassroomAuctionSchema>;
+export type ClassroomAuctionBid = typeof classroomAuctionBids.$inferSelect;
+export type ClassroomStoreItem = typeof classroomStoreItems.$inferSelect;
+export type InsertClassroomStoreItem = z.infer<typeof insertClassroomStoreItemSchema>;
+export type ClassroomStorePurchase = typeof classroomStorePurchases.$inferSelect;
+
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),

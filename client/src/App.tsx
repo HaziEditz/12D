@@ -47,6 +47,7 @@ import SchoolSimulator from "@/pages/school/simulator";
 import SchoolLeaderboard from "@/pages/school/leaderboard";
 import SchoolLessons from "@/pages/school/lessons";
 import SchoolChat from "@/pages/school/chat";
+import SchoolEconomy from "@/pages/school/economy";
 import SchoolPlanPortal from "@/pages/school-plan-portal";
 import CasualPortfolioAnalysis from "@/pages/casual-portfolio-analysis";
 
@@ -90,6 +91,7 @@ function Router() {
       <Route path="/school/student" component={SchoolStudentDashboard} />
       <Route path="/school/teacher" component={SchoolTeacherDashboard} />
       <Route path="/school/fun-zone" component={SchoolFunZone} />
+      <Route path="/school/economy" component={SchoolEconomy} />
       <Route path="/school" component={SchoolHub} />
       <Route path="/casual/portfolio" component={CasualPortfolioAnalysis} />
       <Route component={NotFound} />

@@ -1,10 +1,13 @@
 import { db } from "./db";
-import { eq, desc, asc, and, isNull, ilike, or, sql } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, ilike, or, sql, sum, ne } from "drizzle-orm";
 import { 
   users, lessons, lessonProgress, trades, portfolioItems, assignments, strategies,
   schools, classes, classStudents, achievements, userAchievements, tradingTips, marketInsights,
   friendships, chatMessages, watchlistItems, journalEntries, notifications, promoCodes,
   quizzes, quizAttempts, priceAlerts, classroomEvents, funZoneScores, classGroupMessages,
+  classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
+  classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
+  classroomStoreItems, classroomStorePurchases,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -20,7 +23,16 @@ import {
   type PriceAlert, type InsertPriceAlert,
   type ClassroomEvent, type InsertClassroomEvent,
   type FunZoneScore, type InsertFunZoneScore,
-  type ClassGroupMessage, type InsertClassGroupMessage
+  type ClassGroupMessage, type InsertClassGroupMessage,
+  type ClassroomEconomySettings, type InsertClassroomEconomySettings,
+  type ClassroomCurrencyTransaction, type InsertClassroomCurrencyTransaction,
+  type ClassroomExpense, type InsertClassroomExpense,
+  type ClassroomJob, type InsertClassroomJob,
+  type ClassroomJobAssignment,
+  type ClassroomAuction, type InsertClassroomAuction,
+  type ClassroomAuctionBid,
+  type ClassroomStoreItem, type InsertClassroomStoreItem,
+  type ClassroomStorePurchase
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -1163,6 +1175,221 @@ export class DatabaseStorage implements IStorage {
         await this.updateAchievementProgress(userId, achievement.id, currentProgress);
       }
     }
+  }
+
+  // ===== CLASSROOM ECONOMY =====
+
+  async getEconomySettings(classId: string): Promise<ClassroomEconomySettings | undefined> {
+    const [settings] = await db.select().from(classroomEconomySettings).where(eq(classroomEconomySettings.classId, classId));
+    return settings;
+  }
+
+  async upsertEconomySettings(classId: string, data: Partial<InsertClassroomEconomySettings>): Promise<ClassroomEconomySettings> {
+    const existing = await this.getEconomySettings(classId);
+    if (existing) {
+      const [updated] = await db.update(classroomEconomySettings).set(data).where(eq(classroomEconomySettings.classId, classId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(classroomEconomySettings).values({ classId, ...data }).returning();
+    return created;
+  }
+
+  async addCurrencyTransaction(data: InsertClassroomCurrencyTransaction): Promise<ClassroomCurrencyTransaction> {
+    const [tx] = await db.insert(classroomCurrencyTransactions).values(data).returning();
+    return tx;
+  }
+
+  async getStudentBalance(classId: string, studentId: string): Promise<number> {
+    const result = await db.select({ total: sum(classroomCurrencyTransactions.amount) })
+      .from(classroomCurrencyTransactions)
+      .where(and(eq(classroomCurrencyTransactions.classId, classId), eq(classroomCurrencyTransactions.studentId, studentId)));
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async getStudentTransactions(classId: string, studentId: string, limit = 50): Promise<ClassroomCurrencyTransaction[]> {
+    return db.select().from(classroomCurrencyTransactions)
+      .where(and(eq(classroomCurrencyTransactions.classId, classId), eq(classroomCurrencyTransactions.studentId, studentId)))
+      .orderBy(desc(classroomCurrencyTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getAllStudentBalances(classId: string): Promise<{ studentId: string; balance: number }[]> {
+    const results = await db.select({ studentId: classroomCurrencyTransactions.studentId, balance: sum(classroomCurrencyTransactions.amount) })
+      .from(classroomCurrencyTransactions)
+      .where(eq(classroomCurrencyTransactions.classId, classId))
+      .groupBy(classroomCurrencyTransactions.studentId);
+    return results.map(r => ({ studentId: r.studentId, balance: Number(r.balance ?? 0) }));
+  }
+
+  // Expenses
+  async createExpense(data: InsertClassroomExpense): Promise<ClassroomExpense> {
+    const [expense] = await db.insert(classroomExpenses).values(data).returning();
+    return expense;
+  }
+
+  async getExpensesByClass(classId: string): Promise<ClassroomExpense[]> {
+    return db.select().from(classroomExpenses)
+      .where(and(eq(classroomExpenses.classId, classId), eq(classroomExpenses.isActive, true)))
+      .orderBy(desc(classroomExpenses.createdAt));
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await db.update(classroomExpenses).set({ isActive: false }).where(eq(classroomExpenses.id, id));
+  }
+
+  async chargeExpenseToStudent(expenseId: string, studentId: string, classId: string, amount: number, name: string): Promise<void> {
+    await db.insert(classroomExpensePayments).values({ expenseId, studentId, classId, amount });
+    await this.addCurrencyTransaction({ classId, studentId, amount: -amount, type: "expense", description: `Expense: ${name}`, referenceId: expenseId });
+  }
+
+  async getExpensePaymentsByStudent(studentId: string, classId: string): Promise<any[]> {
+    return db.select({ id: classroomExpensePayments.id, expenseId: classroomExpensePayments.expenseId, amount: classroomExpensePayments.amount, paidAt: classroomExpensePayments.paidAt, name: classroomExpenses.name })
+      .from(classroomExpensePayments)
+      .innerJoin(classroomExpenses, eq(classroomExpensePayments.expenseId, classroomExpenses.id))
+      .where(and(eq(classroomExpensePayments.studentId, studentId), eq(classroomExpensePayments.classId, classId)))
+      .orderBy(desc(classroomExpensePayments.paidAt));
+  }
+
+  // Jobs
+  async createJob(data: InsertClassroomJob): Promise<ClassroomJob> {
+    const [job] = await db.insert(classroomJobs).values(data).returning();
+    return job;
+  }
+
+  async getJobsByClass(classId: string): Promise<ClassroomJob[]> {
+    return db.select().from(classroomJobs)
+      .where(and(eq(classroomJobs.classId, classId), eq(classroomJobs.isActive, true)))
+      .orderBy(desc(classroomJobs.createdAt));
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    await db.update(classroomJobs).set({ isActive: false }).where(eq(classroomJobs.id, id));
+    await db.delete(classroomJobAssignments).where(eq(classroomJobAssignments.jobId, id));
+  }
+
+  async assignJob(jobId: string, studentId: string, classId: string): Promise<ClassroomJobAssignment> {
+    const [assignment] = await db.insert(classroomJobAssignments).values({ jobId, studentId, classId }).returning();
+    return assignment;
+  }
+
+  async unassignJob(jobId: string, studentId: string): Promise<void> {
+    await db.delete(classroomJobAssignments).where(and(eq(classroomJobAssignments.jobId, jobId), eq(classroomJobAssignments.studentId, studentId)));
+  }
+
+  async getJobAssignmentsByClass(classId: string): Promise<(ClassroomJobAssignment & { jobTitle: string; payAmount: number; studentName: string })[]> {
+    const results = await db.select({
+      id: classroomJobAssignments.id, jobId: classroomJobAssignments.jobId,
+      studentId: classroomJobAssignments.studentId, classId: classroomJobAssignments.classId,
+      assignedAt: classroomJobAssignments.assignedAt, lastPaidAt: classroomJobAssignments.lastPaidAt,
+      jobTitle: classroomJobs.title, payAmount: classroomJobs.payAmount, studentName: users.displayName
+    })
+      .from(classroomJobAssignments)
+      .innerJoin(classroomJobs, eq(classroomJobAssignments.jobId, classroomJobs.id))
+      .innerJoin(users, eq(classroomJobAssignments.studentId, users.id))
+      .where(eq(classroomJobAssignments.classId, classId));
+    return results as any;
+  }
+
+  async getJobAssignmentsByStudent(studentId: string, classId: string): Promise<(ClassroomJobAssignment & { jobTitle: string; payAmount: number; payFrequency: string })[]> {
+    const results = await db.select({
+      id: classroomJobAssignments.id, jobId: classroomJobAssignments.jobId,
+      studentId: classroomJobAssignments.studentId, classId: classroomJobAssignments.classId,
+      assignedAt: classroomJobAssignments.assignedAt, lastPaidAt: classroomJobAssignments.lastPaidAt,
+      jobTitle: classroomJobs.title, payAmount: classroomJobs.payAmount, payFrequency: classroomJobs.payFrequency
+    })
+      .from(classroomJobAssignments)
+      .innerJoin(classroomJobs, eq(classroomJobAssignments.jobId, classroomJobs.id))
+      .where(and(eq(classroomJobAssignments.studentId, studentId), eq(classroomJobAssignments.classId, classId)));
+    return results as any;
+  }
+
+  async payJobHolder(assignmentId: string, studentId: string, classId: string, amount: number, jobTitle: string): Promise<void> {
+    await db.update(classroomJobAssignments).set({ lastPaidAt: new Date() }).where(eq(classroomJobAssignments.id, assignmentId));
+    await this.addCurrencyTransaction({ classId, studentId, amount, type: "job", description: `Job pay: ${jobTitle}`, referenceId: assignmentId });
+  }
+
+  // Auctions
+  async createAuction(data: InsertClassroomAuction): Promise<ClassroomAuction> {
+    const [auction] = await db.insert(classroomAuctions).values(data).returning();
+    return auction;
+  }
+
+  async getAuctionsByClass(classId: string): Promise<ClassroomAuction[]> {
+    return db.select().from(classroomAuctions)
+      .where(eq(classroomAuctions.classId, classId))
+      .orderBy(desc(classroomAuctions.createdAt));
+  }
+
+  async getAuction(id: string): Promise<ClassroomAuction | undefined> {
+    const [auction] = await db.select().from(classroomAuctions).where(eq(classroomAuctions.id, id));
+    return auction;
+  }
+
+  async placeBid(auctionId: string, studentId: string, classId: string, amount: number): Promise<ClassroomAuctionBid> {
+    const [bid] = await db.insert(classroomAuctionBids).values({ auctionId, studentId, classId, amount }).returning();
+    await db.update(classroomAuctions).set({ currentHighBid: amount, currentHighBidderId: studentId }).where(eq(classroomAuctions.id, auctionId));
+    return bid;
+  }
+
+  async getBidsByAuction(auctionId: string): Promise<(ClassroomAuctionBid & { studentName: string })[]> {
+    const results = await db.select({ id: classroomAuctionBids.id, auctionId: classroomAuctionBids.auctionId, studentId: classroomAuctionBids.studentId, classId: classroomAuctionBids.classId, amount: classroomAuctionBids.amount, createdAt: classroomAuctionBids.createdAt, studentName: users.displayName })
+      .from(classroomAuctionBids)
+      .innerJoin(users, eq(classroomAuctionBids.studentId, users.id))
+      .where(eq(classroomAuctionBids.auctionId, auctionId))
+      .orderBy(desc(classroomAuctionBids.amount));
+    return results as any;
+  }
+
+  async closeAuction(auctionId: string): Promise<ClassroomAuction> {
+    const auction = await this.getAuction(auctionId);
+    if (!auction) throw new Error("Auction not found");
+    const winnerId = auction.currentHighBidderId;
+    if (winnerId && auction.currentHighBid && auction.currentHighBid > 0) {
+      await this.addCurrencyTransaction({ classId: auction.classId, studentId: winnerId, amount: -(auction.currentHighBid), type: "auction", description: `Won auction: ${auction.title}`, referenceId: auctionId });
+    }
+    const [closed] = await db.update(classroomAuctions).set({ isActive: false, winnerId, closedAt: new Date() }).where(eq(classroomAuctions.id, auctionId)).returning();
+    return closed;
+  }
+
+  async deleteAuction(id: string): Promise<void> {
+    await db.update(classroomAuctions).set({ isActive: false }).where(eq(classroomAuctions.id, id));
+  }
+
+  // Store
+  async createStoreItem(data: InsertClassroomStoreItem): Promise<ClassroomStoreItem> {
+    const [item] = await db.insert(classroomStoreItems).values(data).returning();
+    return item;
+  }
+
+  async getStoreItemsByClass(classId: string): Promise<ClassroomStoreItem[]> {
+    return db.select().from(classroomStoreItems)
+      .where(and(eq(classroomStoreItems.classId, classId), eq(classroomStoreItems.isActive, true)))
+      .orderBy(asc(classroomStoreItems.price));
+  }
+
+  async deleteStoreItem(id: string): Promise<void> {
+    await db.update(classroomStoreItems).set({ isActive: false }).where(eq(classroomStoreItems.id, id));
+  }
+
+  async purchaseStoreItem(itemId: string, studentId: string, classId: string): Promise<ClassroomStorePurchase> {
+    const [item] = await db.select().from(classroomStoreItems).where(eq(classroomStoreItems.id, itemId));
+    if (!item) throw new Error("Item not found");
+    if (item.stock !== null && item.stock <= 0) throw new Error("Out of stock");
+    if (item.stock !== null) {
+      await db.update(classroomStoreItems).set({ stock: item.stock - 1 }).where(eq(classroomStoreItems.id, itemId));
+    }
+    const [purchase] = await db.insert(classroomStorePurchases).values({ itemId, studentId, classId, price: item.price }).returning();
+    await this.addCurrencyTransaction({ classId, studentId, amount: -item.price, type: "purchase", description: `Bought: ${item.name}`, referenceId: itemId });
+    return purchase;
+  }
+
+  async getPurchasesByStudent(studentId: string, classId: string): Promise<(ClassroomStorePurchase & { itemName: string; emoji: string })[]> {
+    const results = await db.select({ id: classroomStorePurchases.id, itemId: classroomStorePurchases.itemId, studentId: classroomStorePurchases.studentId, classId: classroomStorePurchases.classId, price: classroomStorePurchases.price, purchasedAt: classroomStorePurchases.purchasedAt, itemName: classroomStoreItems.name, emoji: classroomStoreItems.emoji })
+      .from(classroomStorePurchases)
+      .innerJoin(classroomStoreItems, eq(classroomStorePurchases.itemId, classroomStoreItems.id))
+      .where(and(eq(classroomStorePurchases.studentId, studentId), eq(classroomStorePurchases.classId, classId)))
+      .orderBy(desc(classroomStorePurchases.purchasedAt));
+    return results as any;
   }
 }
 

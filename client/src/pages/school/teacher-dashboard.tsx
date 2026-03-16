@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import SchoolLayout from "@/layouts/school-layout";
@@ -24,13 +24,13 @@ import {
 import {
   Users, GraduationCap, Target, Zap, Plus, Search,
   BarChart3, TrendingUp, Coins, Trash2, CheckCircle2,
-  Clock, Sparkles, ChevronRight, Copy
+  Clock, Sparkles, ChevronRight, Copy, Receipt, Gavel, ShoppingBag, Briefcase
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from "recharts";
 
-const tabs = ["Overview", "Classes", "Students", "Assignments", "Market Events", "Analytics"] as const;
+const tabs = ["Overview", "Classes", "Students", "Assignments", "Market Events", "Economy", "Analytics"] as const;
 type Tab = typeof tabs[number];
 
 const createClassSchema = z.object({
@@ -237,6 +237,7 @@ export default function TeacherCommandCenter() {
           />
         )}
         {activeTab === "Analytics" && <AnalyticsTab analyticsData={analyticsData} students={students} assignments={assignments} />}
+        {activeTab === "Economy" && <EconomyTab classes={classes} students={students} />}
       </div>
     </SchoolLayout>
   );
@@ -698,6 +699,437 @@ function getAgeGroupLabel(g: string) {
 function getAgeGroupStyle(g: string) {
   return g === "primary" ? "bg-amber-500/20 text-amber-300" : g === "intermediate" ? "bg-purple-500/20 text-purple-300" : "bg-teal-500/20 text-teal-300";
 }
+function EconomyTab({ classes, students }: { classes: any[]; students: any[] }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id ?? "");
+  const [awardDialogOpen, setAwardDialogOpen] = useState(false);
+  const [jobDialogOpen, setJobDialogOpen] = useState(false);
+  const [auctionDialogOpen, setAuctionDialogOpen] = useState(false);
+  const [storeDialogOpen, setStoreDialogOpen] = useState(false);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [awardData, setAwardData] = useState({ studentId: "", amount: "", description: "" });
+  const [jobData, setJobData] = useState({ title: "", description: "", payAmount: "", payFrequency: "weekly" });
+  const [auctionData, setAuctionData] = useState({ title: "", description: "", emoji: "🎁", startingBid: "", endDate: "" });
+  const [storeData, setStoreData] = useState({ name: "", description: "", emoji: "🎁", price: "", stock: "" });
+  const [expenseData, setExpenseData] = useState({ name: "", description: "", amount: "", frequency: "weekly" });
+  const [settingsData, setSettingsData] = useState<any>(null);
+
+  const { data: balances = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/balances", selectedClassId],
+    queryFn: () => fetch(`/api/economy/balances?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/economy/settings", selectedClassId],
+    queryFn: () => fetch(`/api/economy/settings?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: jobsData } = useQuery<any>({
+    queryKey: ["/api/economy/jobs", selectedClassId],
+    queryFn: () => fetch(`/api/economy/jobs?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: auctions = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/auctions", selectedClassId],
+    queryFn: () => fetch(`/api/economy/auctions?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: storeItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/store", selectedClassId],
+    queryFn: () => fetch(`/api/economy/store?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+  const { data: expenses = [] } = useQuery<any[]>({
+    queryKey: ["/api/economy/expenses", selectedClassId],
+    queryFn: () => fetch(`/api/economy/expenses?classId=${selectedClassId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedClassId,
+  });
+
+  const jobs: any[] = jobsData?.jobs ?? [];
+  const jobAssignments: any[] = jobsData?.assignments ?? [];
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["/api/economy/balances", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/settings", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/jobs", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/auctions", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/store", selectedClassId] });
+    qc.invalidateQueries({ queryKey: ["/api/economy/expenses", selectedClassId] });
+  };
+
+  const saveSettings = async () => {
+    const defaults = { currencyName: "Coins", currencySymbol: "🪙", lessonReward: 50, quizReward: 25, assignmentReward: 100, simulatorConversionRate: 0.1, savingsInterestRate: 5 };
+    const payload = { ...defaults, ...(settings ?? {}), ...(settingsData ?? {}), classId: selectedClassId, isActive: true };
+    await apiRequest("POST", "/api/economy/settings", payload);
+    qc.invalidateQueries({ queryKey: ["/api/economy/settings", selectedClassId] });
+    toast({ title: "Economy settings saved!" });
+  };
+
+  const awardCurrency = async () => {
+    await apiRequest("POST", "/api/economy/award", { classId: selectedClassId, ...awardData, amount: Number(awardData.amount) });
+    qc.invalidateQueries({ queryKey: ["/api/economy/balances", selectedClassId] });
+    toast({ title: "Currency awarded!" });
+    setAwardDialogOpen(false);
+    setAwardData({ studentId: "", amount: "", description: "" });
+  };
+
+  const createJob = async () => {
+    await apiRequest("POST", "/api/economy/jobs", { classId: selectedClassId, ...jobData, payAmount: Number(jobData.payAmount) });
+    invalidateAll();
+    toast({ title: "Job created!" });
+    setJobDialogOpen(false);
+    setJobData({ title: "", description: "", payAmount: "", payFrequency: "weekly" });
+  };
+
+  const payAllJobs = async () => {
+    const result = await apiRequest("POST", "/api/economy/jobs/pay-all", { classId: selectedClassId }) as any;
+    invalidateAll();
+    toast({ title: `Paid ${result?.paid ?? 0} job holder(s)!` });
+  };
+
+  const createAuction = async () => {
+    await apiRequest("POST", "/api/economy/auctions", { classId: selectedClassId, ...auctionData, startingBid: Number(auctionData.startingBid), endDate: new Date(auctionData.endDate).toISOString() });
+    invalidateAll();
+    toast({ title: "Auction created!" });
+    setAuctionDialogOpen(false);
+    setAuctionData({ title: "", description: "", emoji: "🎁", startingBid: "", endDate: "" });
+  };
+
+  const createStoreItem = async () => {
+    const payload: any = { classId: selectedClassId, ...storeData, price: Number(storeData.price) };
+    if (storeData.stock) payload.stock = Number(storeData.stock); else payload.stock = null;
+    await apiRequest("POST", "/api/economy/store", payload);
+    invalidateAll();
+    toast({ title: "Store item added!" });
+    setStoreDialogOpen(false);
+    setStoreData({ name: "", description: "", emoji: "🎁", price: "", stock: "" });
+  };
+
+  const createExpense = async () => {
+    await apiRequest("POST", "/api/economy/expenses", { classId: selectedClassId, ...expenseData, amount: Number(expenseData.amount) });
+    invalidateAll();
+    toast({ title: "Expense created!" });
+    setExpenseDialogOpen(false);
+    setExpenseData({ name: "", description: "", amount: "", frequency: "weekly" });
+  };
+
+  const collectExpense = async (expenseId: string) => {
+    const result = await apiRequest("POST", `/api/economy/expenses/${expenseId}/collect`, { classId: selectedClassId }) as any;
+    invalidateAll();
+    toast({ title: `Collected from ${result?.charged ?? 0} student(s)!` });
+  };
+
+  const assignJob = async (jobId: string, studentId: string) => {
+    await apiRequest("POST", `/api/economy/jobs/${jobId}/assign`, { studentId, classId: selectedClassId });
+    invalidateAll();
+    toast({ title: "Job assigned!" });
+  };
+
+  const classStudents = students.filter((s: any) => balances.some((b: any) => b.id === s.id) || true);
+  const currencyName = settings?.currencyName ?? "Coins";
+  const currencySymbol = settings?.currencySymbol ?? "🪙";
+  const activeAuctions = auctions.filter((a: any) => a.isActive);
+
+  const InputStyle = "bg-white/5 border-white/20 text-white text-sm";
+  const LabelStyle = "text-xs text-slate-400 font-semibold mb-1";
+
+  return (
+    <div className="space-y-6">
+      {/* Class Selector */}
+      {classes.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-400">Class:</span>
+          <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}
+            className="bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-white text-sm">
+            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Economy Settings */}
+      <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+        <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+          <Coins className="h-4 w-4 text-amber-400" /> Economy Settings
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          {[
+            { label: "Currency Name", key: "currencyName", placeholder: "Coins" },
+            { label: "Currency Symbol", key: "currencySymbol", placeholder: "🪙" },
+            { label: `${currencySymbol} per Lesson`, key: "lessonReward", type: "number", placeholder: "50" },
+            { label: `${currencySymbol} per Quiz`, key: "quizReward", type: "number", placeholder: "25" },
+            { label: `${currencySymbol} per Assignment`, key: "assignmentReward", type: "number", placeholder: "100" },
+            { label: "Simulator Conversion %", key: "simulatorConversionRate", type: "number", placeholder: "10" },
+          ].map(({ label, key, type = "text", placeholder }) => (
+            <div key={key}>
+              <p className={LabelStyle}>{label}</p>
+              <Input
+                type={type}
+                placeholder={placeholder}
+                value={settingsData?.[key] ?? settings?.[key] ?? ""}
+                onChange={e => setSettingsData((prev: any) => ({ ...(prev ?? settings ?? {}), [key]: type === "number" ? parseFloat(e.target.value) || 0 : e.target.value }))}
+                className={InputStyle}
+                data-testid={`input-economy-${key}`}
+              />
+            </div>
+          ))}
+        </div>
+        <Button onClick={saveSettings} className="bg-teal-600 hover:bg-teal-500 text-white font-bold" data-testid="button-save-economy">
+          Save Settings
+        </Button>
+      </div>
+
+      {/* Quick Actions Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <Dialog open={awardDialogOpen} onOpenChange={setAwardDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-amber-600 hover:bg-amber-500 text-white font-bold gap-1.5" data-testid="button-award-currency">
+              <Coins className="h-4 w-4" /> Award Currency
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-[#0f172a] border-white/10">
+            <DialogHeader><DialogTitle className="text-white">Award Currency</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <p className={LabelStyle}>Student</p>
+                <select value={awardData.studentId} onChange={e => setAwardData(p => ({ ...p, studentId: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-white text-sm" data-testid="select-award-student">
+                  <option value="">Select student...</option>
+                  {students.map((s: any) => <option key={s.id} value={s.id}>{s.displayName}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className={LabelStyle}>Amount</p>
+                <Input type="number" placeholder="50" value={awardData.amount} onChange={e => setAwardData(p => ({ ...p, amount: e.target.value }))} className={InputStyle} data-testid="input-award-amount" />
+              </div>
+              <div>
+                <p className={LabelStyle}>Note (optional)</p>
+                <Input placeholder="e.g. Great participation today!" value={awardData.description} onChange={e => setAwardData(p => ({ ...p, description: e.target.value }))} className={InputStyle} data-testid="input-award-description" />
+              </div>
+              <Button onClick={awardCurrency} disabled={!awardData.studentId || !awardData.amount} className="w-full bg-amber-600 hover:bg-amber-500 text-white" data-testid="button-submit-award">Award</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold gap-1.5" data-testid="button-create-expense">
+              <Receipt className="h-4 w-4" /> New Expense
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-[#0f172a] border-white/10">
+            <DialogHeader><DialogTitle className="text-white">Create Expense</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><p className={LabelStyle}>Name</p><Input placeholder="e.g. Rent" value={expenseData.name} onChange={e => setExpenseData(p => ({ ...p, name: e.target.value }))} className={InputStyle} /></div>
+              <div><p className={LabelStyle}>Amount</p><Input type="number" placeholder="50" value={expenseData.amount} onChange={e => setExpenseData(p => ({ ...p, amount: e.target.value }))} className={InputStyle} /></div>
+              <div><p className={LabelStyle}>Frequency</p>
+                <select value={expenseData.frequency} onChange={e => setExpenseData(p => ({ ...p, frequency: e.target.value }))} className="w-full bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-white text-sm">
+                  <option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="once">One-time</option>
+                </select>
+              </div>
+              <Button onClick={createExpense} disabled={!expenseData.name || !expenseData.amount} className="w-full bg-red-600 hover:bg-red-500 text-white">Create Expense</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={jobDialogOpen} onOpenChange={setJobDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold gap-1.5" data-testid="button-create-job">
+              <Briefcase className="h-4 w-4" /> New Job
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-[#0f172a] border-white/10">
+            <DialogHeader><DialogTitle className="text-white">Create Classroom Job</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><p className={LabelStyle}>Job Title</p><Input placeholder="e.g. Class Banker" value={jobData.title} onChange={e => setJobData(p => ({ ...p, title: e.target.value }))} className={InputStyle} /></div>
+              <div><p className={LabelStyle}>Description (optional)</p><Input placeholder="What does this job involve?" value={jobData.description} onChange={e => setJobData(p => ({ ...p, description: e.target.value }))} className={InputStyle} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className={LabelStyle}>Pay Amount</p><Input type="number" placeholder="25" value={jobData.payAmount} onChange={e => setJobData(p => ({ ...p, payAmount: e.target.value }))} className={InputStyle} /></div>
+                <div><p className={LabelStyle}>Pay Frequency</p>
+                  <select value={jobData.payFrequency} onChange={e => setJobData(p => ({ ...p, payFrequency: e.target.value }))} className="w-full bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-white text-sm">
+                    <option value="daily">Daily</option><option value="weekly">Weekly</option>
+                  </select>
+                </div>
+              </div>
+              <Button onClick={createJob} disabled={!jobData.title || !jobData.payAmount} className="w-full bg-blue-600 hover:bg-blue-500 text-white">Create Job</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={auctionDialogOpen} onOpenChange={setAuctionDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold gap-1.5" data-testid="button-create-auction">
+              <Gavel className="h-4 w-4" /> New Auction
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-[#0f172a] border-white/10">
+            <DialogHeader><DialogTitle className="text-white">Create Auction</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-1"><p className={LabelStyle}>Emoji</p><Input placeholder="🎁" value={auctionData.emoji} onChange={e => setAuctionData(p => ({ ...p, emoji: e.target.value }))} className={InputStyle} /></div>
+                <div className="col-span-3"><p className={LabelStyle}>Item/Reward</p><Input placeholder="e.g. Free homework pass" value={auctionData.title} onChange={e => setAuctionData(p => ({ ...p, title: e.target.value }))} className={InputStyle} /></div>
+              </div>
+              <div><p className={LabelStyle}>Description (optional)</p><Input placeholder="What is this reward?" value={auctionData.description} onChange={e => setAuctionData(p => ({ ...p, description: e.target.value }))} className={InputStyle} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className={LabelStyle}>Starting Bid</p><Input type="number" placeholder="1" value={auctionData.startingBid} onChange={e => setAuctionData(p => ({ ...p, startingBid: e.target.value }))} className={InputStyle} /></div>
+                <div><p className={LabelStyle}>End Date & Time</p><Input type="datetime-local" value={auctionData.endDate} onChange={e => setAuctionData(p => ({ ...p, endDate: e.target.value }))} className={InputStyle} /></div>
+              </div>
+              <Button onClick={createAuction} disabled={!auctionData.title || !auctionData.startingBid || !auctionData.endDate} className="w-full bg-amber-600 hover:bg-amber-500 text-white">Create Auction</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={storeDialogOpen} onOpenChange={setStoreDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 font-bold gap-1.5" data-testid="button-create-store-item">
+              <ShoppingBag className="h-4 w-4" /> Add Store Item
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-[#0f172a] border-white/10">
+            <DialogHeader><DialogTitle className="text-white">Add Store Item</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-1"><p className={LabelStyle}>Emoji</p><Input placeholder="🎁" value={storeData.emoji} onChange={e => setStoreData(p => ({ ...p, emoji: e.target.value }))} className={InputStyle} /></div>
+                <div className="col-span-3"><p className={LabelStyle}>Item Name</p><Input placeholder="e.g. Snack pass" value={storeData.name} onChange={e => setStoreData(p => ({ ...p, name: e.target.value }))} className={InputStyle} /></div>
+              </div>
+              <div><p className={LabelStyle}>Description</p><Input placeholder="What is this item?" value={storeData.description} onChange={e => setStoreData(p => ({ ...p, description: e.target.value }))} className={InputStyle} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className={LabelStyle}>Price ({currencySymbol})</p><Input type="number" placeholder="100" value={storeData.price} onChange={e => setStoreData(p => ({ ...p, price: e.target.value }))} className={InputStyle} /></div>
+                <div><p className={LabelStyle}>Stock (leave empty = unlimited)</p><Input type="number" placeholder="—" value={storeData.stock} onChange={e => setStoreData(p => ({ ...p, stock: e.target.value }))} className={InputStyle} /></div>
+              </div>
+              <Button onClick={createStoreItem} disabled={!storeData.name || !storeData.price} className="w-full bg-purple-600 hover:bg-purple-500 text-white">Add to Store</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Student Balances */}
+      <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+        <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+          <Coins className="h-4 w-4 text-amber-400" /> Student Balances — {currencyName}
+        </h3>
+        {balances.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-6">No economy data yet. Set up the economy settings to get started.</p>
+        ) : (
+          <div className="space-y-2">
+            {[...balances].sort((a: any, b: any) => b.balance - a.balance).map((s: any) => (
+              <div key={s.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0" data-testid={`economy-student-${s.id}`}>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-xs font-black text-white shrink-0">
+                  {s.displayName?.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm truncate">{s.displayName}</p>
+                </div>
+                <span className="font-bold text-amber-300 text-sm">{currencySymbol}{(s.balance ?? 0).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Expenses */}
+      {expenses.length > 0 && (
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+          <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-red-400" /> Active Expenses
+          </h3>
+          <div className="space-y-2">
+            {expenses.map((exp: any) => (
+              <div key={exp.id} className="flex items-center gap-3 rounded-xl p-3 bg-red-500/5 border border-red-500/15">
+                <div className="flex-1">
+                  <p className="font-semibold text-white text-sm">{exp.name}</p>
+                  <p className="text-xs text-slate-500 capitalize">{exp.frequency} · {currencySymbol}{exp.amount} per student</p>
+                </div>
+                <Button size="sm" onClick={() => collectExpense(exp.id)} className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold" data-testid={`button-collect-${exp.id}`}>Collect</Button>
+                <Button size="sm" variant="ghost" onClick={() => apiRequest("DELETE", `/api/economy/expenses/${exp.id}`).then(invalidateAll)} className="text-slate-500 hover:text-red-400 text-xs">Remove</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Jobs */}
+      {jobs.length > 0 && (
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-black text-white text-base flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-blue-400" /> Classroom Jobs
+            </h3>
+            <Button size="sm" onClick={payAllJobs} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold gap-1" data-testid="button-pay-all-jobs">
+              <Coins className="h-3 w-3" /> Pay All
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {jobs.map((job: any) => {
+              const assigned = jobAssignments.filter((a: any) => a.jobId === job.id);
+              return (
+                <div key={job.id} className="rounded-xl p-4 bg-blue-500/5 border border-blue-500/15">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-bold text-white text-sm">{job.title}</p>
+                      <p className="text-xs text-slate-500">{currencySymbol}{job.payAmount} / {job.payFrequency}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => apiRequest("DELETE", `/api/economy/jobs/${job.id}`).then(invalidateAll)} className="text-slate-600 hover:text-red-400 text-xs h-6 px-1">✕</Button>
+                  </div>
+                  {assigned.length > 0 ? (
+                    <div className="text-xs text-slate-400">Assigned: {assigned.map((a: any) => a.studentName).join(", ")}</div>
+                  ) : (
+                    <select onChange={e => e.target.value && assignJob(job.id, e.target.value)} className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-slate-400 text-xs mt-1">
+                      <option value="">Assign to student...</option>
+                      {students.map((s: any) => <option key={s.id} value={s.id}>{s.displayName}</option>)}
+                    </select>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Auctions */}
+      {activeAuctions.length > 0 && (
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+          <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+            <Gavel className="h-4 w-4 text-amber-400" /> Live Auctions
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeAuctions.map((a: any) => (
+              <div key={a.id} className="rounded-xl p-4 bg-amber-500/5 border border-amber-500/15 flex justify-between items-start" data-testid={`teacher-auction-${a.id}`}>
+                <div>
+                  <p className="font-bold text-white text-sm">{a.emoji} {a.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">High bid: {currencySymbol}{a.currentHighBid ?? 0} · Ends {new Date(a.endDate).toLocaleDateString()}</p>
+                </div>
+                <Button size="sm" onClick={() => apiRequest("POST", `/api/economy/auctions/${a.id}/close`, {}).then(() => { invalidateAll(); toast({ title: "Auction closed!" }); })}
+                  className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shrink-0" data-testid={`button-close-auction-${a.id}`}>Close</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Store Items */}
+      {storeItems.length > 0 && (
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10">
+          <h3 className="font-black text-white text-base mb-4 flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4 text-purple-400" /> Classroom Store
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {storeItems.map((item: any) => (
+              <div key={item.id} className="rounded-xl p-3 bg-purple-500/5 border border-purple-500/15 relative">
+                <Button size="sm" variant="ghost" onClick={() => apiRequest("DELETE", `/api/economy/store/${item.id}`).then(invalidateAll)} className="absolute top-1 right-1 text-slate-600 hover:text-red-400 h-5 w-5 p-0">✕</Button>
+                <span className="text-2xl">{item.emoji}</span>
+                <p className="font-bold text-white text-xs mt-1 truncate">{item.name}</p>
+                <p className="text-purple-300 font-bold text-xs">{currencySymbol}{item.price}</p>
+                {item.stock !== null && <p className="text-slate-500 text-xs">{item.stock} left</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getEventEmoji(type: string) {
   return { boom: "🚀", crash: "📉", news: "📰", tip: "💡" }[type] ?? "📢";
 }
