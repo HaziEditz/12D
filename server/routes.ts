@@ -258,6 +258,8 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
   const achievements = await storage.getAchievements();
   const userAchievements = await storage.getUserAchievements(userId);
 
+  let xpEarned = 0;
+
   for (const achievement of achievements) {
     const existingUa = userAchievements.find(ua => ua.achievementId === achievement.id);
     if (existingUa && existingUa.progress === 100) continue;
@@ -357,9 +359,7 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
           unlockedAt: shouldUnlock ? new Date() : null,
         });
         if (shouldUnlock) {
-          await storage.updateUser(userId, {
-            xp: (user.xp ?? 0) + achievement.xpReward,
-          });
+          xpEarned += achievement.xpReward;
         }
       }
     } else if (roundedProgress > 0) {
@@ -370,11 +370,15 @@ async function checkAndAwardAchievements(userId: string): Promise<void> {
         unlockedAt: shouldUnlock ? new Date() : null,
       });
       if (shouldUnlock) {
-        await storage.updateUser(userId, {
-          xp: (user.xp ?? 0) + achievement.xpReward,
-        });
+        xpEarned += achievement.xpReward;
       }
     }
+  }
+
+  if (xpEarned > 0) {
+    await storage.updateUser(userId, {
+      xp: (user.xp ?? 0) + xpEarned,
+    });
   }
 }
 
@@ -3241,8 +3245,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const leaderboard = await storage.getLeaderboard();
       for (const user of leaderboard) {
-        // @ts-ignore - checkAndAwardAchievements is added to DatabaseStorage
-        await storage.checkAndAwardAchievements(user.id);
+        await checkAndAwardAchievements(user.id);
       }
     } catch (error) {
       console.error("Error in background achievement check:", error);
