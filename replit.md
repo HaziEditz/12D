@@ -101,6 +101,7 @@ The School System is a completely separate, immersive visual environment at `/sc
 ### School Features
 - **Join Code Enrollment**: `POST /api/classroom/join` with `{ joinCode }` — students enter teacher-given code to join class. Register page shows join code step after signup. Hub shows join code prompt for students with no class.
 - **Classroom Tokens**: Stored as `classroomTokens` on users table; awarded by Fun Zone games
+- **Token Shop**: Fun Zone has a shop tab where students spend tokens on cosmetics (titles/frames). New columns: `purchasedCosmetics` (JSON array), `equippedTitle`, `equippedFrame`. Routes: POST `/api/school/shop/purchase`, POST `/api/school/shop/equip`. Equipped titles and frames appear in the school leaderboard.
 - **Market Events**: Teachers post boom/crash/news/tip events to classes
 - **Assignments**: profit_target, lesson_completion, portfolio_balance types with student progress tracking
 - **Class Group Chat**: `classGroupMessages` table (classId, senderId, content, messageType). `GET/POST /api/classroom/chat`. Teacher can post announcements (pinned card styling). Polls every 3s.

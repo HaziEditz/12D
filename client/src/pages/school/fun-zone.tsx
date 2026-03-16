@@ -7,21 +7,68 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap } from "lucide-react";
+import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check } from "lucide-react";
 
 type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge";
 
+const COSMETICS = {
+  titles: [
+    { id: "title-bull", label: "Bull 🐂", cost: 10, preview: "Bull 🐂" },
+    { id: "title-bear", label: "Bear 🐻", cost: 10, preview: "Bear 🐻" },
+    { id: "title-day-trader", label: "Day Trader", cost: 15, preview: "Day Trader" },
+    { id: "title-diamond", label: "Diamond Hands 💎", cost: 20, preview: "Diamond Hands 💎" },
+    { id: "title-risk", label: "Risk Taker", cost: 20, preview: "Risk Taker" },
+    { id: "title-scholar", label: "The Scholar 📚", cost: 25, preview: "The Scholar 📚" },
+    { id: "title-maker", label: "Market Maker", cost: 30, preview: "Market Maker" },
+    { id: "title-investor", label: "Top Investor ⭐", cost: 40, preview: "Top Investor ⭐" },
+    { id: "title-professor", label: "The Professor 🎓", cost: 50, preview: "The Professor 🎓" },
+  ],
+  frames: [
+    { id: "frame-silver", label: "Silver Frame", cost: 20, color: "ring-2 ring-slate-400" },
+    { id: "frame-blue", label: "Neon Blue Frame", cost: 25, color: "ring-2 ring-blue-400 ring-offset-1" },
+    { id: "frame-gold", label: "Gold Frame", cost: 50, color: "ring-2 ring-amber-400 ring-offset-1" },
+    { id: "frame-fire", label: "Fire Frame 🔥", cost: 35, color: "ring-2 ring-orange-500 ring-offset-1" },
+    { id: "frame-diamond", label: "Diamond Frame 💎", cost: 75, color: "ring-[3px] ring-cyan-400 ring-offset-2" },
+    { id: "frame-rainbow", label: "Rainbow Frame 🌈", cost: 100, color: "ring-2 ring-purple-500 ring-offset-1" },
+  ],
+};
+
 export default function SchoolFunZone() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const { toast } = useToast();
   const { data: classData } = useQuery<any>({ queryKey: ["/api/classroom"], enabled: user?.role === "student" });
   const ageGroup = classData?.class?.ageGroup ?? "high_school";
   const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [tokensEarned, setTokensEarned] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [view, setView] = useState<"games" | "shop">("games");
 
   const awardTokensMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/fun-zone/score", { tokensEarned: amount }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/user"] }),
+  });
+
+  const purchaseMutation = useMutation({
+    mutationFn: ({ cosmeticId, cost }: { cosmeticId: string; cost: number }) =>
+      apiRequest("POST", "/api/school/shop/purchase", { cosmeticId, cost }),
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Purchased!", description: data.message });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        refreshUser();
+      } else {
+        toast({ title: "Could not purchase", description: data.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const equipMutation = useMutation({
+    mutationFn: ({ type, value }: { type: "title" | "frame"; value: string | null }) =>
+      apiRequest("POST", "/api/school/shop/equip", { type, value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      refreshUser();
+    },
   });
 
   const handleEarnTokens = (amount: number) => {
@@ -33,6 +80,11 @@ export default function SchoolFunZone() {
 
   const isPrimary = ageGroup === "primary";
   const isIntermediate = ageGroup === "intermediate";
+
+  const owned: string[] = JSON.parse((user as any)?.purchasedCosmetics ?? "[]");
+  const equippedTitle = (user as any)?.equippedTitle ?? null;
+  const equippedFrame = (user as any)?.equippedFrame ?? null;
+  const tokenBalance = user?.classroomTokens ?? 0;
 
   const primaryGames = [
     { id: "coin-rain" as Game, emoji: "🌧️", title: "Coin Rain", desc: "Catch coins before they hit the ground!", color: "from-amber-400 to-orange-500", tokens: "5–15" },
@@ -74,50 +126,162 @@ export default function SchoolFunZone() {
           <div className="relative z-10 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-black text-white">
-                {isPrimary ? "🎮 Fun Zone!" : isIntermediate ? "🎮 Game Zone" : "🎮 Challenge Arena"}
+                {view === "shop" ? "🛍️ Token Shop" : isPrimary ? "🎮 Fun Zone!" : isIntermediate ? "🎮 Game Zone" : "🎮 Challenge Arena"}
               </h1>
               <p className={`text-sm mt-1 ${isPrimary ? "text-purple-100" : "text-purple-200"}`}>
-                {isPrimary ? "Play games and earn tokens! 🪙" : isIntermediate ? "Put your skills to the test" : "Advanced finance challenges"}
+                {view === "shop" ? "Spend your tokens on cosmetics and titles" : isPrimary ? "Play games and earn tokens! 🪙" : isIntermediate ? "Put your skills to the test" : "Advanced finance challenges"}
               </p>
             </div>
-            {tokensEarned > 0 && (
-              <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/30 rounded-xl px-4 py-2.5 sw-token-glow sw-bounce-in">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/30 rounded-xl px-4 py-2.5">
                 <Coins className="h-5 w-5 text-amber-400" />
                 <div>
-                  <p className="text-xl font-black text-amber-300">+{tokensEarned}</p>
-                  <p className="text-amber-400 text-xs">Today</p>
+                  <p className="text-xl font-black text-amber-300">{tokenBalance}</p>
+                  <p className="text-amber-400 text-xs">Tokens</p>
                 </div>
               </div>
-            )}
+              <Button
+                size="sm"
+                variant={view === "shop" ? "default" : "secondary"}
+                onClick={() => setView(view === "shop" ? "games" : "shop")}
+                className="rounded-xl"
+                data-testid="btn-toggle-shop"
+              >
+                {view === "shop" ? <><Zap className="h-4 w-4 mr-1.5" />Games</> : <><ShoppingBag className="h-4 w-4 mr-1.5" />Shop</>}
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Games Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {games.map(game => (
-            <div
-              key={game.id}
-              onClick={() => setActiveGame(game.id)}
-              className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer hover:scale-105 hover:-translate-y-1 transition-all duration-200 shadow-lg`}
-              data-testid={`game-card-${game.id}`}
-            >
-              <div className="text-5xl mb-3 sw-bounce-in">{game.emoji}</div>
-              <h3 className="font-black text-white text-lg leading-tight">{game.title}</h3>
-              <p className="text-white/75 text-xs mt-1 mb-3">{game.desc}</p>
-              <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-3 py-1 w-fit">
-                <Coins className="h-3.5 w-3.5 text-amber-300" />
-                <span className="text-white text-xs font-bold">{game.tokens} tokens</span>
+        {view === "shop" ? (
+          <div className="space-y-6">
+            {/* Titles */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h2 className="font-black text-lg">Titles</h2>
+                <span className="text-sm text-muted-foreground">Show off a special title next to your name</span>
               </div>
-              <ChevronRight className="absolute bottom-4 right-4 h-5 w-5 text-white/40" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {COSMETICS.titles.map(item => {
+                  const isOwned = owned.includes(item.id);
+                  const isEquipped = equippedTitle === item.id;
+                  return (
+                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-border bg-card"}`} data-testid={`cosmetic-title-${item.id}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm">{item.label}</span>
+                        {isEquipped && <Badge className="bg-primary text-primary-foreground text-xs">Equipped</Badge>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-auto pt-1">
+                        <Coins className="h-3.5 w-3.5 text-amber-400" />
+                        <span className="text-sm font-bold text-amber-500">{item.cost}</span>
+                        {isOwned ? (
+                          <Button size="sm" variant={isEquipped ? "outline" : "default"} className="ml-auto h-7 text-xs rounded-lg"
+                            onClick={() => equipMutation.mutate({ type: "title", value: isEquipped ? null : item.id })}
+                            disabled={equipMutation.isPending}
+                            data-testid={`btn-equip-title-${item.id}`}
+                          >
+                            {isEquipped ? "Unequip" : "Equip"}
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="ml-auto h-7 text-xs rounded-lg"
+                            onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
+                            disabled={purchaseMutation.isPending || tokenBalance < item.cost}
+                            data-testid={`btn-buy-title-${item.id}`}
+                          >
+                            {tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ))}
-        </div>
 
-        <div className="rounded-xl p-4 bg-white/5 border border-white/10 text-center">
-          <p className={`text-sm font-semibold ${isPrimary ? "text-amber-700" : "text-slate-400"}`}>
-            {isPrimary ? "🌟 Play games to fill your Token Jar!" : "Play games to earn tokens and climb the leaderboard!"}
-          </p>
-        </div>
+            {/* Frames */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="h-5 w-5 text-amber-500" />
+                <h2 className="font-black text-lg">Profile Frames</h2>
+                <span className="text-sm text-muted-foreground">Style your avatar in the leaderboard</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {COSMETICS.frames.map(item => {
+                  const isOwned = owned.includes(item.id);
+                  const isEquipped = equippedFrame === item.id;
+                  return (
+                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-border bg-card"}`} data-testid={`cosmetic-frame-${item.id}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 ${item.color} flex items-center justify-center text-lg shrink-0`}>
+                          {user?.displayName?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-sm">{item.label}</p>
+                          {isEquipped && <Badge className="bg-primary text-primary-foreground text-xs mt-0.5">Equipped</Badge>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-auto pt-1">
+                        <Coins className="h-3.5 w-3.5 text-amber-400" />
+                        <span className="text-sm font-bold text-amber-500">{item.cost}</span>
+                        {isOwned ? (
+                          <Button size="sm" variant={isEquipped ? "outline" : "default"} className="ml-auto h-7 text-xs rounded-lg"
+                            onClick={() => equipMutation.mutate({ type: "frame", value: isEquipped ? null : item.id })}
+                            disabled={equipMutation.isPending}
+                            data-testid={`btn-equip-frame-${item.id}`}
+                          >
+                            {isEquipped ? "Unequip" : "Equip"}
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="ml-auto h-7 text-xs rounded-lg"
+                            onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
+                            disabled={purchaseMutation.isPending || tokenBalance < item.cost}
+                            data-testid={`btn-buy-frame-${item.id}`}
+                          >
+                            {tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl p-4 bg-muted/30 border border-border text-center">
+              <p className="text-sm text-muted-foreground">Earn more tokens by playing games in the Fun Zone. Equipped titles and frames appear in the school leaderboard.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Games Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {games.map(game => (
+                <div
+                  key={game.id}
+                  onClick={() => setActiveGame(game.id)}
+                  className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer hover:scale-105 hover:-translate-y-1 transition-all duration-200 shadow-lg`}
+                  data-testid={`game-card-${game.id}`}
+                >
+                  <div className="text-5xl mb-3 sw-bounce-in">{game.emoji}</div>
+                  <h3 className="font-black text-white text-lg leading-tight">{game.title}</h3>
+                  <p className="text-white/75 text-xs mt-1 mb-3">{game.desc}</p>
+                  <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-3 py-1 w-fit">
+                    <Coins className="h-3.5 w-3.5 text-amber-300" />
+                    <span className="text-white text-xs font-bold">{game.tokens} tokens</span>
+                  </div>
+                  <ChevronRight className="absolute bottom-4 right-4 h-5 w-5 text-white/40" />
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl p-4 bg-white/5 border border-white/10 text-center">
+              <p className={`text-sm font-semibold ${isPrimary ? "text-amber-700" : "text-slate-400"}`}>
+                {isPrimary ? "🌟 Play games to fill your Token Jar! Visit the Shop to spend them!" : "Earn tokens in games and spend them in the Token Shop!"}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </SchoolLayout>
   );

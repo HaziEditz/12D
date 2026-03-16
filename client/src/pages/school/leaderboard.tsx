@@ -3,6 +3,27 @@ import { useAuth } from "@/lib/auth-context";
 import SchoolLayout from "@/layouts/school-layout";
 import { Trophy, Medal, Crown, Star, TrendingUp, Users, Flame } from "lucide-react";
 
+const FRAME_CLASSES: Record<string, string> = {
+  "frame-silver": "ring-2 ring-slate-400",
+  "frame-blue": "ring-2 ring-blue-400 ring-offset-1 ring-offset-[#0d1a2e]",
+  "frame-gold": "ring-2 ring-amber-400 ring-offset-1 ring-offset-[#0d1a2e]",
+  "frame-fire": "ring-2 ring-orange-500 ring-offset-1 ring-offset-[#0d1a2e]",
+  "frame-diamond": "ring-[3px] ring-cyan-400 ring-offset-2 ring-offset-[#0d1a2e]",
+  "frame-rainbow": "ring-2 ring-purple-500 ring-offset-1 ring-offset-[#0d1a2e]",
+};
+
+const TITLE_LABELS: Record<string, string> = {
+  "title-bull": "Bull 🐂",
+  "title-bear": "Bear 🐻",
+  "title-day-trader": "Day Trader",
+  "title-diamond": "Diamond Hands 💎",
+  "title-risk": "Risk Taker",
+  "title-scholar": "The Scholar 📚",
+  "title-maker": "Market Maker",
+  "title-investor": "Top Investor ⭐",
+  "title-professor": "The Professor 🎓",
+};
+
 function getRankIcon(rank: number) {
   if (rank === 1) return <Crown className="h-5 w-5 text-yellow-400" />;
   if (rank === 2) return <Medal className="h-5 w-5 text-slate-300" />;
@@ -78,14 +99,21 @@ export default function SchoolLeaderboard() {
                 <div className="w-8 flex items-center justify-center flex-shrink-0">
                   {getRankIcon(rank)}
                 </div>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 ${isPrimary ? "bg-amber-400 text-white" : "bg-teal-600 text-white"}`}>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 ${isPrimary ? "bg-amber-400 text-white" : "bg-teal-600 text-white"} ${entry.equippedFrame ? FRAME_CLASSES[entry.equippedFrame] ?? "" : ""}`}>
                   {entry.displayName?.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-sm truncate ${headingColor}`}>
-                    {entry.displayName}
-                    {isMe && <span className="ml-1 text-xs text-teal-400">(You)</span>}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className={`font-bold text-sm truncate ${headingColor}`}>
+                      {entry.displayName}
+                      {isMe && <span className="ml-1 text-xs text-teal-400">(You)</span>}
+                    </p>
+                    {entry.equippedTitle && TITLE_LABELS[entry.equippedTitle] && (
+                      <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                        {TITLE_LABELS[entry.equippedTitle]}
+                      </span>
+                    )}
+                  </div>
                   <p className={`text-xs ${subColor}`}>
                     {entry.totalProfit >= 0 ? "+" : ""}${(entry.totalProfit ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} profit
                   </p>

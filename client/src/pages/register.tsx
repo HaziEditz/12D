@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { School } from "@shared/schema";
-import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, Check, ArrowRight, KeyRound } from "lucide-react";
+import { TrendingUp, Loader2, Eye, EyeOff, GraduationCap, Check, ArrowRight, KeyRound, ShieldAlert } from "lucide-react";
 
 const ORBS = [
   { size: 280, x: "80%", y: "-5%", color: "hsl(199 89% 38%)", delay: 1 },
@@ -375,6 +375,11 @@ export default function RegisterPage() {
               <Link href="/login" className="text-primary hover:underline font-medium" data-testid="link-login">
                 Sign in
               </Link>
+            </div>
+
+            <div className="mt-5 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+              <p><strong>Disclaimer:</strong> This is not financial advice. 12Digits is for educational purposes only. Always consult a qualified financial professional before making investment decisions.</p>
             </div>
           </div>
         </div>

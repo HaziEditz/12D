@@ -32,6 +32,9 @@ export const users = pgTable("users", {
   onboardingCompleted: boolean("onboarding_completed").default(false),
   username: varchar("username", { length: 50 }).unique(),
   classroomTokens: integer("classroom_tokens").default(0),
+  purchasedCosmetics: text("purchased_cosmetics").default("[]"),
+  equippedTitle: text("equipped_title"),
+  equippedFrame: text("equipped_frame"),
 });
 
 export const lessons = pgTable("lessons", {
@@ -268,6 +271,12 @@ export const classGroupMessages = pgTable("class_group_messages", {
   content: text("content").notNull(),
   messageType: text("message_type").default("message"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: text("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });

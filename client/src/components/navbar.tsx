@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, 
@@ -63,7 +63,7 @@ export function Navbar() {
   };
 
   const navItems = [
-    { href: "/lessons", label: "Lessons", icon: BookOpen, premium: false },
+    { href: "/lessons", label: "Academy", icon: BookOpen, premium: false },
     { href: "/simulator", label: "Simulator", icon: LineChart, premium: false },
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, premium: false },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
@@ -197,6 +197,7 @@ export function Navbar() {
                   <Button variant="ghost" className="gap-2 relative" data-testid="button-user-menu">
                     <div className="relative">
                       <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.avatarUrl || undefined} />
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                           {getInitials(user?.displayName ?? "U")}
                         </AvatarFallback>

@@ -59,6 +59,7 @@ export function getSubscriptionStatus(user: User | null): {
 export function isPremiumTier(user: User | null): boolean {
   if (!user) return false;
   if (user.role === "admin") return true;
+  if (user.membershipTier === "school" && user.membershipStatus === "active") return true;
   return user.membershipTier === "premium" && user.membershipStatus === "active";
 }
 

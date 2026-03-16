@@ -220,6 +220,8 @@ export interface IStorage {
   getClassroomEvents(classId: string): Promise<ClassroomEvent[]>;
   deleteClassroomEvent(id: string): Promise<void>;
   addClassroomTokens(userId: string, tokens: number): Promise<void>;
+  purchaseCosmetic(userId: string, cosmeticId: string, cost: number): Promise<{ success: boolean; message: string; newBalance: number }>;
+  equipCosmetic(userId: string, type: "title" | "frame", value: string | null): Promise<void>;
   saveFunZoneScore(data: InsertFunZoneScore): Promise<FunZoneScore>;
   getFunZoneLeaderboard(game: string): Promise<{ userId: string; displayName: string; score: number }[]>;
 }
@@ -259,6 +261,7 @@ export class DatabaseStorage implements IStorage {
         const classmateIds = [...new Set(classmateEnrollments.map(e => e.studentId))];
         return db.select().from(users).where(sql`${users.id} IN ${classmateIds}`).orderBy(desc(users.totalProfit));
       }
+      return []; // Not enrolled in any class — return empty instead of all users
     } else if (scope === "friends" && userId) {
       const friendsData = await this.getFriends(userId);
       const friendIds = friendsData.map(f => f.friend.id);
@@ -1117,6 +1120,27 @@ export class DatabaseStorage implements IStorage {
 
   async addClassroomTokens(userId: string, tokens: number): Promise<void> {
     await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${tokens}` }).where(eq(users.id, userId));
+  }
+
+  async purchaseCosmetic(userId: string, cosmeticId: string, cost: number): Promise<{ success: boolean; message: string; newBalance: number }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found", newBalance: 0 };
+    const balance = user.classroomTokens ?? 0;
+    if (balance < cost) return { success: false, message: "Not enough tokens", newBalance: balance };
+    const owned: string[] = JSON.parse(user.purchasedCosmetics ?? "[]");
+    if (owned.includes(cosmeticId)) return { success: false, message: "Already owned", newBalance: balance };
+    owned.push(cosmeticId);
+    const newBalance = balance - cost;
+    await db.update(users).set({ classroomTokens: newBalance, purchasedCosmetics: JSON.stringify(owned) }).where(eq(users.id, userId));
+    return { success: true, message: "Purchased!", newBalance };
+  }
+
+  async equipCosmetic(userId: string, type: "title" | "frame", value: string | null): Promise<void> {
+    if (type === "title") {
+      await db.update(users).set({ equippedTitle: value }).where(eq(users.id, userId));
+    } else {
+      await db.update(users).set({ equippedFrame: value }).where(eq(users.id, userId));
+    }
   }
 
   async saveFunZoneScore(data: InsertFunZoneScore): Promise<FunZoneScore> {

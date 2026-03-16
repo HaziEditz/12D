@@ -253,9 +253,11 @@ function StrategyContent() {
                 <h3 className="font-semibold">Want to practice these strategies?</h3>
                 <p className="text-sm text-muted-foreground">Try them risk-free in our trading simulator</p>
               </div>
-              <Button data-testid="button-go-simulator">
-                <Activity className="w-4 h-4 mr-2" />
-                Open Simulator
+              <Button asChild data-testid="button-go-simulator">
+                <a href="/simulator">
+                  <Activity className="w-4 h-4 mr-2" />
+                  Open Simulator
+                </a>
               </Button>
             </div>
           </CardContent>

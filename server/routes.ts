@@ -1709,6 +1709,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/school/shop/purchase", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { cosmeticId, cost } = req.body;
+      if (!cosmeticId || typeof cost !== "number") return res.status(400).json({ message: "Invalid request" });
+      const result = await storage.purchaseCosmetic(user.id, cosmeticId, cost);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/school/shop/equip", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { type, value } = req.body;
+      if (!["title", "frame"].includes(type)) return res.status(400).json({ message: "Invalid type" });
+      await storage.equipCosmetic(user.id, type, value ?? null);
+      const updated = await storage.getUserById(user.id);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // PayPal routes with error handling
   app.get("/setup", async (req, res) => {
     try {

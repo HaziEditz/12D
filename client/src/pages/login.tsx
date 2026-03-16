@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Loader2, Eye, EyeOff, Check } from "lucide-react";
+import { TrendingUp, Loader2, Eye, EyeOff, Check, ShieldAlert } from "lucide-react";
 
 const ORBS = [
   { size: 320, x: "-10%", y: "-10%", color: "hsl(199 89% 38%)", delay: 0 },
@@ -204,6 +204,11 @@ export default function LoginPage() {
               <Link href="/register" className="text-primary hover:underline font-medium" data-testid="link-register">
                 Sign up
               </Link>
+            </div>
+
+            <div className={`mt-5 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400 transition-all duration-400 ${mounted ? "opacity-100" : "opacity-0"}`} style={{ transitionDelay: "500ms" }}>
+              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+              <p><strong>Disclaimer:</strong> This is not financial advice. 12Digits is for educational purposes only. Always consult a qualified financial professional before making investment decisions.</p>
             </div>
           </div>
         </div>

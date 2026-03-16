@@ -333,8 +333,9 @@ export default function SimulatorPage() {
       let basePrice = realPrice ?? SYMBOL_BASE_PRICES[selectedSymbol] ?? 100;
       setPriceSource(realPrice ? "live" : "simulated");
       
-      // Use localStorage as the SINGLE source of truth for candles
-      const storedCandles = localStorage.getItem(`candles_${selectedSymbol}`);
+      // Use localStorage keyed by symbol+timeframe for correct data per timeframe
+      const storageKey = `candles_${selectedSymbol}_${timeframe}`;
+      const storedCandles = localStorage.getItem(storageKey);
       let data: CandlestickData[] = [];
 
       if (storedCandles) {
@@ -346,10 +347,10 @@ export default function SimulatorPage() {
       }
 
       if (data.length === 0) {
-        // Only generate initial candles once if none exist
+        // Generate initial candles for this symbol+timeframe
         data = generateCandlestickData(100, basePrice, timeframe);
         if (!realPrice) {
-          localStorage.setItem(`candles_${selectedSymbol}`, JSON.stringify(data));
+          localStorage.setItem(storageKey, JSON.stringify(data));
           localStorage.setItem(`price_${selectedSymbol}`, data[data.length - 1].close.toString());
         }
       }
@@ -512,7 +513,7 @@ export default function SimulatorPage() {
         // Update persistent candles and price if simulated
         if (priceSource === "simulated") {
           localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
-          localStorage.setItem(`candles_${selectedSymbol}`, JSON.stringify(newData));
+          localStorage.setItem(`candles_${selectedSymbol}_${timeframe}`, JSON.stringify(newData));
         }
         
         return newData;

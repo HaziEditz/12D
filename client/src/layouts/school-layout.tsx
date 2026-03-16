@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
   { href: "/school", label: "Hub", icon: Home, emoji: "🏠" },
@@ -17,15 +18,20 @@ const navItems = [
   { href: "/school/simulator", label: "Simulator", icon: TrendingUp, emoji: "📊" },
   { href: "/school/economy", label: "Economy", icon: Coins, emoji: "🏦", studentOnly: true },
   { href: "/school/fun-zone", label: "Fun Zone", icon: Gamepad2, emoji: "🎮" },
-  { href: "/school/lessons", label: "Lessons", icon: BookOpen, emoji: "📚" },
+  { href: "/school/lessons", label: "Academy", icon: BookOpen, emoji: "📚" },
   { href: "/school/leaderboard", label: "Leaderboard", icon: Trophy, emoji: "🏆" },
   { href: "/school/chat", label: "Class Chat", icon: MessageCircle, emoji: "💬" },
 ];
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => refreshUser(), 30000);
+    return () => clearInterval(interval);
+  }, [refreshUser]);
 
   const { data: classData } = useQuery<any>({
     queryKey: ["/api/classroom"],
@@ -73,9 +79,12 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       {user && (
         <div className={`p-4 border-b border-current/10 ${isPrimary ? "bg-amber-50" : "bg-white/3"}`}>
           <div className="flex items-center gap-3 mb-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-black ${isPrimary ? "bg-amber-400 text-white" : "bg-teal-600 text-white"}`}>
-              {user.displayName?.charAt(0).toUpperCase()}
-            </div>
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={(user as any).avatarUrl || undefined} />
+              <AvatarFallback className={`text-lg font-black ${isPrimary ? "bg-amber-400 text-white" : "bg-teal-600 text-white"}`}>
+                {user.displayName?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0">
               <p className={`font-bold text-sm truncate ${sidebarText}`}>{user.displayName}</p>
               <p className={`text-xs ${isPrimary ? "text-amber-600" : "text-teal-400"} font-semibold`}>

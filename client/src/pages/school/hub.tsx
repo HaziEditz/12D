@@ -86,7 +86,7 @@ export default function SchoolHub() {
     },
     {
       emoji: "📚",
-      title: "Lessons",
+      title: "Academy",
       desc: "Learn and complete quizzes",
       href: "/school/lessons",
       color: isPrimary ? "from-blue-400 to-indigo-500" : "from-blue-500 to-indigo-600",
@@ -126,7 +126,7 @@ export default function SchoolHub() {
     },
     {
       emoji: "📚",
-      title: "Browse Lessons",
+      title: "Browse Academy",
       desc: "Preview lesson content",
       href: "/school/lessons",
       color: "from-blue-500 to-indigo-600",
