@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import SchoolLayout from "@/layouts/school-layout";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { createChart, ColorType, CandlestickData, Time } from "lightweight-charts";
+import { createChart, ColorType, CandlestickSeries, CandlestickData, Time } from "lightweight-charts";
 import {
   TrendingUp, TrendingDown, DollarSign, Settings, X, ChevronDown,
   Palette, Layout, BarChart2, Zap, RefreshCw, Activity
@@ -136,7 +136,7 @@ export default function SchoolSimulator() {
       timeScale: { borderColor: theme.grid, timeVisible: true },
     });
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.addSeries(CandlestickSeries, {
       upColor: theme.up, downColor: theme.down,
       borderUpColor: theme.up, borderDownColor: theme.down,
       wickUpColor: theme.up, wickDownColor: theme.down,
