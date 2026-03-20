@@ -2328,7 +2328,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(403).json({ message: "This feature requires a paid membership" });
   };
 
-  // Middleware for premium-only features (12Digits+ tier or trial users only)
+  // Middleware for premium-only features (12Digits+ tier, School Plan, or trial users only)
   const requirePremiumContent = (req: Request, res: Response, next: NextFunction) => {
     const user = req.user as User;
     if (!user) {
@@ -2340,6 +2340,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     // Premium tier subscription
     if (user.membershipTier === "premium" && user.membershipStatus === "active") {
+      return next();
+    }
+    // School Plan users get full premium access
+    if (user.membershipTier === "school" && user.membershipStatus === "active") {
       return next();
     }
     // Check trial period (14 days) - trial users get premium access
