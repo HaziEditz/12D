@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,8 +40,34 @@ const notificationRoutes: Record<string, string> = {
   price_alert: "/simulator",
 };
 
+function requestPushPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function sendPushNotification(title: string, body: string) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+      });
+    } catch (e) {
+      // Some browsers block notifications in certain contexts
+    }
+  }
+}
+
 export function NotificationBell() {
   const [, navigate] = useLocation();
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "denied"
+  );
+  const seenIds = useRef<Set<string>>(new Set());
+  const isFirstLoad = useRef(true);
+
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     refetchInterval: 30000,
@@ -50,6 +77,21 @@ export function NotificationBell() {
     queryKey: ["/api/notifications/unread-count"],
     refetchInterval: 15000,
   });
+
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    if (isFirstLoad.current) {
+      notifications.forEach(n => seenIds.current.add(n.id));
+      isFirstLoad.current = false;
+      return;
+    }
+    notifications.forEach(n => {
+      if (!seenIds.current.has(n.id) && !n.isRead) {
+        sendPushNotification(n.title, n.message);
+        seenIds.current.add(n.id);
+      }
+    });
+  }, [notifications]);
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/notifications/${id}/read`),
@@ -87,6 +129,14 @@ export function NotificationBell() {
     }
   };
 
+  const handleEnableAlerts = async () => {
+    if (!("Notification" in window)) return;
+    const permission = await Notification.requestPermission();
+    setPushPermission(permission);
+  };
+
+  const supportsPush = typeof window !== "undefined" && "Notification" in window;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -105,18 +155,38 @@ export function NotificationBell() {
       <DropdownMenuContent align="end" className="w-80">
         <div className="flex items-center justify-between gap-2 px-3 py-2">
           <span className="font-semibold">Notifications</span>
-          {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending}
-              data-testid="button-mark-all-read"
-            >
-              <Check className="h-4 w-4 mr-1" />
-              Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {supportsPush && pushPermission !== "granted" && pushPermission !== "denied" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEnableAlerts}
+                className="text-xs h-7 text-primary"
+                data-testid="button-enable-push"
+              >
+                <Bell className="h-3 w-3 mr-1" />
+                Enable alerts
+              </Button>
+            )}
+            {supportsPush && pushPermission === "granted" && (
+              <span className="text-xs text-green-500 flex items-center gap-1">
+                <Bell className="h-3 w-3" /> Alerts on
+              </span>
+            )}
+            {unreadCount > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-7"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Mark all read
+              </Button>
+            )}
+          </div>
         </div>
         <DropdownMenuSeparator />
         <ScrollArea className="h-[300px]">

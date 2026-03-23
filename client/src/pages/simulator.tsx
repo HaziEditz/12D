@@ -101,14 +101,13 @@ const SYMBOL_BASE_PRICES: Record<string, number> = {
 
 const TIMEFRAME_SECONDS: Record<string, number> = {
   "1m": 60,
-  "5m": 300,
   "15m": 900,
   "1h": 3600,
   "4h": 14400,
   "1d": 86400
 };
 
-const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
+const TIMEFRAMES = ["1m", "15m", "1h", "4h", "1d"] as const;
 
 function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
