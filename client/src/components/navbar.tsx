@@ -45,22 +45,20 @@ import {
 import { useState } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 import { getLevelInfo } from "@/lib/levels";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const hasPremium = isPremiumTier(user);
-
-  const resetOnboarding = async () => {
-    try {
-      await apiRequest("PATCH", "/api/user/onboarding", { onboardingCompleted: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-    } catch (error) {
-      console.error("Failed to reset onboarding:", error);
-    }
-  };
 
   const navItems = [
     { href: "/lessons", label: "Academy", icon: BookOpen, premium: false },
@@ -171,10 +169,10 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={resetOnboarding}
-              title="Reset Tutorial"
+              onClick={() => setHelpOpen(true)}
+              title="Help & Guide"
               className="hover-elevate"
-              data-testid="button-reset-tutorial"
+              data-testid="button-help"
             >
               <HelpCircle className="h-5 w-5" />
             </Button>
@@ -368,6 +366,52 @@ export function Navbar() {
           )}
         </div>
       </div>
+
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-primary" />
+              Help & Quick Guide
+            </DialogTitle>
+            <DialogDescription>
+              Get started with 12Digits — your trading education platform.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-2">
+              <h4 className="font-semibold">Getting Started</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Visit <strong>Academy</strong> to work through structured lessons</li>
+                <li>• Use the <strong>Simulator</strong> to practice buying and selling stocks risk-free</li>
+                <li>• Check your <strong>Dashboard</strong> for a summary of your progress</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold">Key Features</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• <strong>Leaderboard</strong> — compete with other traders globally or in your class</li>
+                <li>• <strong>Achievements</strong> — earn badges by completing lessons and trades</li>
+                <li>• <strong>Strategy Library</strong> — explore proven trading strategies</li>
+                <li>• <strong>Risk Calculator</strong> — calculate position size and risk/reward</li>
+                <li>• <strong>Market News</strong> — stay updated on market sentiment</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold">Simulator Tips</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Select any stock or crypto from the dropdown</li>
+                <li>• Set quantity, choose order type, then click Buy or Sell</li>
+                <li>• Open positions are shown below the chart</li>
+                <li>• Close a trade anytime to lock in your profit or loss</li>
+              </ul>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3 text-muted-foreground">
+              Need more help? Reach out to support at <strong>support@12digits.com</strong>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {mobileMenuOpen && isAuthenticated && (
         <div className="md:hidden border-t bg-background px-4 py-4">

@@ -28,12 +28,12 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { type Class, type User, type Assignment } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ClassroomData {
   class: Class;
   teacher: { id: string; displayName: string } | null;
-  classmates: { id: string; displayName: string; totalProfit: number }[];
+  classmates: { id: string; displayName: string; totalProfit: number; avatarUrl?: string | null }[];
 }
 
 interface AssignmentWithProgress extends Assignment {
@@ -280,6 +280,7 @@ export default function ClassroomPage() {
                     {index + 1}
                   </div>
                   <Avatar className="h-8 w-8">
+                    <AvatarImage src={classmate.avatarUrl || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary text-xs">
                       {classmate.displayName.charAt(0).toUpperCase()}
                     </AvatarFallback>

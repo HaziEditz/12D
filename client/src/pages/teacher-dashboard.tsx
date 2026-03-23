@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Users, 
   Plus, 
@@ -49,6 +49,7 @@ interface StudentProgress {
   id: string;
   displayName: string;
   email: string;
+  avatarUrl?: string | null;
   lessonsCompleted: number;
   totalProfit: number;
   simulatorBalance: number;
@@ -649,6 +650,7 @@ export default function TeacherDashboard() {
                             >
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10">
+                                  <AvatarImage src={student.avatarUrl || undefined} />
                                   <AvatarFallback className="bg-primary/10 text-primary">
                                     {student.displayName.charAt(0).toUpperCase()}
                                   </AvatarFallback>

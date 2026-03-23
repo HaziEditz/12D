@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -269,6 +269,7 @@ export default function TeacherPage() {
                       data-testid={`row-student-${student.id}`}
                     >
                       <Avatar className="h-12 w-12">
+                        <AvatarImage src={(student as any).avatarUrl || undefined} />
                         <AvatarFallback className="bg-primary/10 text-primary">
                           {getInitials(student.displayName)}
                         </AvatarFallback>

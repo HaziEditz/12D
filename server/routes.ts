@@ -1395,6 +1395,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           id: student.id,
           displayName: student.displayName,
           email: student.email,
+          avatarUrl: student.avatarUrl,
           lessonsCompleted: completedLessons,
           totalProfit: student.totalProfit ?? 0,
           simulatorBalance: student.simulatorBalance ?? 10000,
@@ -1492,7 +1493,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({
         class: cls,
         teacher: teacher ? { id: teacher.id, displayName: teacher.displayName } : null,
-        classmates: classmates.map(c => ({ id: c.id, displayName: c.displayName, totalProfit: c.totalProfit })),
+        classmates: classmates.map(c => ({ id: c.id, displayName: c.displayName, totalProfit: c.totalProfit, avatarUrl: c.avatarUrl })),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

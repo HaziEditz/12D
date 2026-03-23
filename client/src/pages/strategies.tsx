@@ -20,7 +20,7 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Crown,
+  Library,
   CheckCircle2
 } from "lucide-react";
 import { useState } from "react";
@@ -170,16 +170,13 @@ function StrategyContent() {
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="container mx-auto max-w-6xl">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
-            <Crown className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
+            <Library className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-strategies-title">Strategy Library</h1>
-            <p className="text-muted-foreground">Proven trading strategies exclusive to 12Digits+ members</p>
+            <p className="text-muted-foreground">Proven trading strategies to boost your performance</p>
           </div>
-          <Badge className="ml-auto bg-gradient-to-r from-amber-500 to-amber-600">
-            Premium
-          </Badge>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

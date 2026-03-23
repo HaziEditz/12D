@@ -10,30 +10,56 @@ import {
   TrendingDown, 
   Star,
   Plus,
+  X,
   ArrowUpRight,
   ArrowDownRight,
   Activity,
   Zap,
   Eye,
   RefreshCw,
-  CheckCircle2,
   Loader2
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, IChartApi, CandlestickSeries } from "lightweight-charts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const watchlistStocks = [
-  { symbol: "AAPL", name: "Apple Inc.", price: 189.43, change: 2.34, changePercent: 1.25, volume: "52.3M" },
-  { symbol: "MSFT", name: "Microsoft", price: 378.91, change: 4.12, changePercent: 1.10, volume: "28.1M" },
-  { symbol: "GOOGL", name: "Alphabet", price: 141.80, change: -1.23, changePercent: -0.86, volume: "21.7M" },
-  { symbol: "AMZN", name: "Amazon", price: 178.25, change: 3.45, changePercent: 1.97, volume: "45.2M" },
-  { symbol: "NVDA", name: "NVIDIA", price: 495.22, change: 12.45, changePercent: 2.58, volume: "41.8M" },
-  { symbol: "TSLA", name: "Tesla", price: 248.50, change: -5.30, changePercent: -2.09, volume: "98.4M" },
-  { symbol: "META", name: "Meta", price: 505.95, change: 8.20, changePercent: 1.65, volume: "15.3M" },
-  { symbol: "JPM", name: "JPMorgan", price: 195.40, change: 1.85, changePercent: 0.96, volume: "8.7M" },
+type WatchlistStock = { symbol: string; name: string; price: number; change: number; changePercent: number; volume: string };
+
+const DEFAULT_WATCHLIST: WatchlistStock[] = [
+  { symbol: "AAPL", name: "Apple Inc.", price: 195.00, change: 2.34, changePercent: 1.25, volume: "52.3M" },
+  { symbol: "MSFT", name: "Microsoft", price: 430.00, change: 4.12, changePercent: 1.10, volume: "28.1M" },
+  { symbol: "GOOGL", name: "Alphabet", price: 175.00, change: -1.23, changePercent: -0.86, volume: "21.7M" },
+  { symbol: "AMZN", name: "Amazon", price: 220.00, change: 3.45, changePercent: 1.97, volume: "45.2M" },
+  { symbol: "NVDA", name: "NVIDIA", price: 140.00, change: 12.45, changePercent: 2.58, volume: "41.8M" },
+  { symbol: "TSLA", name: "Tesla", price: 420.00, change: -5.30, changePercent: -2.09, volume: "98.4M" },
+  { symbol: "META", name: "Meta", price: 590.00, change: 8.20, changePercent: 1.65, volume: "15.3M" },
+  { symbol: "JPM", name: "JPMorgan", price: 245.00, change: 1.85, changePercent: 0.96, volume: "8.7M" },
+];
+
+const ALL_ADDABLE_STOCKS: { symbol: string; name: string; price: number }[] = [
+  { symbol: "NFLX", name: "Netflix", price: 900.00 },
+  { symbol: "AMD", name: "AMD", price: 125.00 },
+  { symbol: "DIS", name: "Disney", price: 115.00 },
+  { symbol: "PYPL", name: "PayPal", price: 90.00 },
+  { symbol: "UBER", name: "Uber", price: 65.00 },
+  { symbol: "COIN", name: "Coinbase", price: 320.00 },
+  { symbol: "BA", name: "Boeing", price: 175.00 },
+  { symbol: "V", name: "Visa", price: 315.00 },
+  { symbol: "SPY", name: "S&P 500 ETF", price: 605.00 },
+  { symbol: "QQQ", name: "Nasdaq 100 ETF", price: 525.00 },
+  { symbol: "DIA", name: "Dow Jones ETF", price: 440.00 },
+  { symbol: "BTC/USD", name: "Bitcoin", price: 102000.00 },
+  { symbol: "ETH/USD", name: "Ethereum", price: 3900.00 },
+  { symbol: "SOL/USD", name: "Solana", price: 225.00 },
 ];
 
 const marketOverview = [
@@ -141,13 +167,62 @@ function CommandCenterContent() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [watchlistStocks, setWatchlistStocks] = useState<WatchlistStock[]>(DEFAULT_WATCHLIST);
   const [selectedSymbols, setSelectedSymbols] = useState(["AAPL", "MSFT", "NVDA", "TSLA"]);
   const [orderType, setOrderType] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("100");
   const [quickTradeSymbol, setQuickTradeSymbol] = useState("AAPL");
   const [recentTrades, setRecentTrades] = useState<{type: string, symbol: string, qty: number, total: number}[]>([]);
+  const [addStockOpen, setAddStockOpen] = useState(false);
+  const [addStockSymbol, setAddStockSymbol] = useState("");
 
   const selectedStocks = watchlistStocks.filter(s => selectedSymbols.includes(s.symbol));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWatchlistStocks(prev => prev.map(stock => {
+        const volatility = stock.price > 10000 ? 0.001 : 0.002;
+        const change = (Math.random() - 0.48) * volatility * stock.price;
+        const newPrice = Math.max(stock.price + change, 0.01);
+        const newChange = newPrice - DEFAULT_WATCHLIST.find(d => d.symbol === stock.symbol)?.price || 0;
+        const base = DEFAULT_WATCHLIST.find(d => d.symbol === stock.symbol)?.price ?? newPrice;
+        const newChangePercent = ((newPrice - base) / base) * 100;
+        return { ...stock, price: newPrice, change: newPrice - base, changePercent: newChangePercent };
+      }));
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const availableToAdd = ALL_ADDABLE_STOCKS.filter(
+    s => !watchlistStocks.some(w => w.symbol === s.symbol)
+  );
+
+  const handleAddStock = () => {
+    if (!addStockSymbol) return;
+    const stock = ALL_ADDABLE_STOCKS.find(s => s.symbol === addStockSymbol);
+    if (!stock) return;
+    const newStock: WatchlistStock = {
+      symbol: stock.symbol,
+      name: stock.name,
+      price: stock.price,
+      change: 0,
+      changePercent: 0,
+      volume: "N/A",
+    };
+    setWatchlistStocks(prev => [...prev, newStock]);
+    setAddStockOpen(false);
+    setAddStockSymbol("");
+    toast({ title: `${stock.symbol} added to watchlist` });
+  };
+
+  const handleRemoveStock = (symbol: string) => {
+    setWatchlistStocks(prev => prev.filter(s => s.symbol !== symbol));
+    setSelectedSymbols(prev => prev.filter(s => s !== symbol));
+    if (quickTradeSymbol === symbol) {
+      const remaining = watchlistStocks.filter(s => s.symbol !== symbol);
+      if (remaining.length > 0) setQuickTradeSymbol(remaining[0].symbol);
+    }
+  };
 
   const tradeMutation = useMutation({
     mutationFn: async (tradeData: { symbol: string; type: "buy" | "sell"; quantity: number; price: number }) => {
@@ -191,6 +266,41 @@ function CommandCenterContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Dialog open={addStockOpen} onOpenChange={setAddStockOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Stock to Watchlist</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={addStockSymbol} onValueChange={setAddStockSymbol}>
+              <SelectTrigger data-testid="select-add-stock">
+                <SelectValue placeholder="Choose a stock..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableToAdd.map(s => (
+                  <SelectItem key={s.symbol} value={s.symbol}>
+                    {s.symbol} — {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={handleAddStock}
+                disabled={!addStockSymbol}
+                data-testid="button-confirm-add-stock"
+              >
+                Add to Watchlist
+              </Button>
+              <Button variant="outline" onClick={() => setAddStockOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="border-b bg-card/50 px-4 py-3">
         <div className="container mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -228,7 +338,15 @@ function CommandCenterContent() {
                     <Eye className="w-4 h-4" />
                     Watchlist
                   </CardTitle>
-                  <Button size="icon" variant="ghost" className="h-6 w-6" data-testid="button-add-watchlist">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => setAddStockOpen(true)}
+                    disabled={availableToAdd.length === 0}
+                    title="Add stock to watchlist"
+                    data-testid="button-add-watchlist"
+                  >
                     <Plus className="w-3 h-3" />
                   </Button>
                 </div>
@@ -241,7 +359,7 @@ function CommandCenterContent() {
                     return (
                       <div
                         key={stock.symbol}
-                        className={`px-4 py-2 hover-elevate cursor-pointer ${isSelected ? "bg-muted/50" : ""}`}
+                        className={`group px-4 py-2 cursor-pointer ${isSelected ? "bg-muted/50" : "hover:bg-muted/30"}`}
                         onClick={() => {
                           if (selectedSymbols.length < 4 || isSelected) {
                             setSelectedSymbols(
@@ -258,15 +376,30 @@ function CommandCenterContent() {
                             {isSelected && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
                             <div>
                               <p className="font-semibold text-sm">{stock.symbol}</p>
-                              <p className="text-xs text-muted-foreground truncate max-w-[100px]">{stock.name}</p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[80px]">{stock.name}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-mono text-sm">${stock.price.toFixed(2)}</p>
-                            <div className={`flex items-center gap-1 text-xs ${isUp ? "text-green-500" : "text-red-500"}`}>
-                              {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                              <span>{isUp ? "+" : ""}{stock.changePercent.toFixed(2)}%</span>
+                          <div className="flex items-center gap-1">
+                            <div className="text-right">
+                              <p className="font-mono text-sm">${stock.price.toFixed(2)}</p>
+                              <div className={`flex items-center gap-1 text-xs ${isUp ? "text-green-500" : "text-red-500"}`}>
+                                {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                <span>{isUp ? "+" : ""}{stock.changePercent.toFixed(2)}%</span>
+                              </div>
                             </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveStock(stock.symbol);
+                              }}
+                              title={`Remove ${stock.symbol}`}
+                              data-testid={`button-remove-${stock.symbol}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>

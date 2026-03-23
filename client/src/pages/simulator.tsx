@@ -102,9 +102,13 @@ const SYMBOL_BASE_PRICES: Record<string, number> = {
 const TIMEFRAME_SECONDS: Record<string, number> = {
   "1m": 60,
   "5m": 300,
+  "15m": 900,
   "1h": 3600,
+  "4h": 14400,
   "1d": 86400
 };
+
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 
 function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
@@ -440,87 +444,93 @@ export default function SimulatorPage() {
     };
   }, [candleData.length > 0 ? candleData[0].time : null, selectedSymbol]);
 
-  // Live price updates - only updates existing candles, doesn't recreate chart
+  // Track last update time for Page Visibility API catch-up
+  const lastUpdateTimeRef = useRef<number>(Date.now());
+
+  // Core price tick function — used both by interval and visibility catch-up
+  const applyPriceTick = useCallback(() => {
+    setCandleData(prev => {
+      if (prev.length === 0) return prev;
+      
+      const lastCandle = prev[prev.length - 1];
+      
+      const recentCandles = prev.slice(-30);
+      const avgRange = recentCandles.reduce((acc, c) => acc + (c.high - c.low), 0) / recentCandles.length;
+      const derivedVolatility = avgRange / lastCandle.close || 0.001;
+      const volatility = Math.max(0.0005, Math.min(derivedVolatility, 0.005));
+      
+      const change = (Math.random() - 0.5) * 2 * volatility * lastCandle.close;
+      const newClose = lastCandle.close + change;
+      
+      const wickVariation = Math.random() * volatility * lastCandle.close * 0.5;
+      const newHigh = Math.max(lastCandle.open, newClose, lastCandle.high) + wickVariation * 0.1;
+      const newLow = Math.min(lastCandle.open, newClose, lastCandle.low) - wickVariation * 0.1;
+
+      const now = Date.now();
+      const timeframeMs = (TIMEFRAME_SECONDS[timeframe] || 60) * 1000;
+      const currentIntervalStart = Math.floor(now / timeframeMs) * timeframeMs;
+      const lastCandleTime = Number(lastCandle.time);
+      const isNewCandleTime = currentIntervalStart > lastCandleTime;
+
+      let newData: CandlestickData[];
+      
+      if (isNewCandleTime) {
+        const newCandle: CandlestickData = {
+          time: currentIntervalStart as Time,
+          open: lastCandle.close,
+          high: lastCandle.close,
+          low: lastCandle.close,
+          close: lastCandle.close,
+        };
+        newData = [...prev, newCandle];
+        if (seriesRef.current) seriesRef.current.update(newCandle);
+      } else {
+        const updatedCandle = {
+          ...lastCandle,
+          close: newClose,
+          high: Math.max(lastCandle.high, newHigh),
+          low: Math.min(lastCandle.low, newLow),
+        };
+        newData = [...prev.slice(0, -1), updatedCandle];
+        if (seriesRef.current) seriesRef.current.update(updatedCandle);
+      }
+      
+      setCurrentPrice(newClose);
+      
+      if (priceSource === "simulated") {
+        localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
+        localStorage.setItem(`candles_${selectedSymbol}_${timeframe}`, JSON.stringify(newData));
+      }
+      
+      return newData;
+    });
+  }, [selectedSymbol, priceSource, timeframe]);
+
+  // Live price updates with Page Visibility API so prices keep moving in background tabs
   useEffect(() => {
     const interval = setInterval(() => {
-      setCandleData(prev => {
-        if (prev.length === 0) return prev;
-        
-        // Use a fixed reference to the last candle
-        const lastCandle = prev[prev.length - 1];
-        
-        // Calculate average candle range from recent history (last 20-30 candles)
-        const recentCandles = prev.slice(-30);
-        const avgRange = recentCandles.reduce((acc, c) => acc + (c.high - c.low), 0) / recentCandles.length;
-        
-        // Derive volatility from the average range
-        const derivedVolatility = avgRange / lastCandle.close || 0.001;
-        const volatility = Math.max(0.0005, Math.min(derivedVolatility, 0.005));
-        
-        const change = (Math.random() - 0.5) * 2 * volatility * lastCandle.close;
-        const newClose = lastCandle.close + change;
-        
-        const wickVariation = Math.random() * volatility * lastCandle.close * 0.5;
-        const newHigh = Math.max(lastCandle.open, newClose, lastCandle.high) + wickVariation * 0.1;
-        const newLow = Math.min(lastCandle.open, newClose, lastCandle.low) - wickVariation * 0.1;
-
-        const now = Date.now();
-        const timeframeMs = (TIMEFRAME_SECONDS[timeframe] || 60) * 1000;
-        
-        // Round current time to the start of the current interval for consistency
-        const currentIntervalStart = Math.floor(now / timeframeMs) * timeframeMs;
-        const lastCandleTime = Number(lastCandle.time);
-        
-        const isNewCandleTime = currentIntervalStart > lastCandleTime;
-
-        let newData: CandlestickData[];
-        
-        if (isNewCandleTime) {
-          // Close current candle and start a NEW one
-          // The new candle's open MUST equal the previous candle's close
-          const newCandle: CandlestickData = {
-            time: currentIntervalStart as Time,
-            open: lastCandle.close,
-            high: lastCandle.close,
-            low: lastCandle.close,
-            close: lastCandle.close,
-          };
-          
-          // Append the new candle to the existing list
-          newData = [...prev, newCandle];
-          
-          if (seriesRef.current) {
-            seriesRef.current.update(newCandle);
-          }
-        } else {
-          // Update the CURRENT candle
-          const updatedCandle = {
-            ...lastCandle,
-            close: newClose,
-            high: Math.max(lastCandle.high, newHigh),
-            low: Math.min(lastCandle.low, newLow),
-          };
-          newData = [...prev.slice(0, -1), updatedCandle];
-          
-          if (seriesRef.current) {
-            seriesRef.current.update(updatedCandle);
-          }
-        }
-        
-        setCurrentPrice(newClose);
-        
-        // Update persistent candles and price if simulated
-        if (priceSource === "simulated") {
-          localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
-          localStorage.setItem(`candles_${selectedSymbol}_${timeframe}`, JSON.stringify(newData));
-        }
-        
-        return newData;
-      });
+      lastUpdateTimeRef.current = Date.now();
+      applyPriceTick();
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [selectedSymbol, priceSource, timeframe]);
+    // When tab becomes visible again, catch up on missed ticks
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const elapsed = Date.now() - lastUpdateTimeRef.current;
+        const missedTicks = Math.min(Math.floor(elapsed / 1000), 30); // cap at 30 ticks
+        for (let i = 0; i < missedTicks; i++) {
+          applyPriceTick();
+        }
+        lastUpdateTimeRef.current = Date.now();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [applyPriceTick]);
 
   const buildTradePayload = (type: "buy" | "sell") => {
     const qty = parseFloat(quantity);
@@ -703,6 +713,20 @@ export default function SimulatorPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center gap-1">
+                {TIMEFRAMES.map(tf => (
+                  <Button
+                    key={tf}
+                    variant={timeframe === tf ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 px-2 text-xs font-mono"
+                    onClick={() => setTimeframe(tf)}
+                    data-testid={`button-timeframe-${tf}`}
+                  >
+                    {tf}
+                  </Button>
+                ))}
               </div>
             </div>
           </CardContent>

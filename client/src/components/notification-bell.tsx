@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, Check, UserPlus, TrendingUp, MessageCircle, Award, X } from "lucide-react";
+import { Bell, Check, UserPlus, TrendingUp, MessageCircle, Award, X, GraduationCap, BookOpen } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Notification } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -21,6 +21,8 @@ const notificationIcons: Record<string, typeof Bell> = {
   trade_executed: TrendingUp,
   trade_closed: TrendingUp,
   chat_message: MessageCircle,
+  classroom_message: GraduationCap,
+  assignment: BookOpen,
   achievement_unlocked: Award,
   price_alert: Bell,
 };

@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Medal, TrendingUp, Crown, Sparkles, ShieldCheck, Globe, Users } from "lucide-react";
@@ -144,6 +144,7 @@ export default function LeaderboardPage() {
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <Avatar className="h-16 w-16 border-4 border-yellow-500">
+                    <AvatarImage src={(leaderboard[0] as any)?.avatarUrl || undefined} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xl">
                       {getInitials(leaderboard[0]?.displayName ?? "?")}
                     </AvatarFallback>
@@ -183,9 +184,15 @@ export default function LeaderboardPage() {
           {(!leaderboard || leaderboard.length === 0) ? (
             <div className="text-center py-12">
               <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No rankings yet</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                {scope === "class" ? "No classmates found" : scope === "friends" ? "No friends yet" : "No rankings yet"}
+              </h3>
               <p className="text-muted-foreground">
-                Start trading in the simulator to appear on the leaderboard!
+                {scope === "class"
+                  ? "Join a school class to see classmates here, or ask your teacher to enroll you."
+                  : scope === "friends"
+                  ? "Add friends to compare your trading performance with them."
+                  : "Start trading in the simulator to appear on the leaderboard!"}
               </p>
             </div>
           ) : (
@@ -208,6 +215,7 @@ export default function LeaderboardPage() {
                       
                       <div className="relative">
                         <Avatar className="h-12 w-12">
+                          <AvatarImage src={(user as any).avatarUrl || undefined} />
                           <AvatarFallback className="bg-primary/10 text-primary">
                             {getInitials(user.displayName)}
                           </AvatarFallback>

@@ -1,16 +1,13 @@
-import { Paywall } from "@/components/paywall";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  Crown, 
   Newspaper,
   TrendingUp,
   TrendingDown,
   Clock,
   ExternalLink,
-  Filter,
   RefreshCw,
   AlertTriangle,
   DollarSign,
@@ -45,7 +42,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["NVDA"],
-    url: "https://www.reuters.com/technology/nvidia"
+    url: "https://www.reuters.com/business/finance/"
   },
   {
     id: 2,
@@ -67,7 +64,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bearish",
     category: "Regulatory",
     symbols: ["AAPL"],
-    url: "https://www.ft.com/technology"
+    url: "https://www.ft.com/markets"
   },
   {
     id: 4,
@@ -78,7 +75,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bearish",
     category: "Earnings",
     symbols: ["TSLA"],
-    url: "https://www.cnbc.com/tesla"
+    url: "https://www.cnbc.com/markets/"
   },
   {
     id: 5,
@@ -89,7 +86,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["MSFT"],
-    url: "https://www.wsj.com/tech"
+    url: "https://www.wsj.com/market-data/stocks"
   },
   {
     id: 6,
@@ -100,7 +97,7 @@ const mockNews: NewsItem[] = [
     sentiment: "neutral",
     category: "Commodities",
     symbols: ["USO", "XLE"],
-    url: "https://www.marketwatch.com/commodities"
+    url: "https://www.marketwatch.com/markets/commodities"
   },
   {
     id: 7,
@@ -111,7 +108,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bullish",
     category: "Corporate",
     symbols: ["AMZN"],
-    url: "https://www.cnbc.com/amazon"
+    url: "https://www.cnbc.com/markets/"
   },
   {
     id: 8,
@@ -122,7 +119,7 @@ const mockNews: NewsItem[] = [
     sentiment: "bearish",
     category: "Sector",
     symbols: ["KRE", "XLF"],
-    url: "https://www.bloomberg.com/finance"
+    url: "https://www.bloomberg.com/markets/rates-bonds"
   },
 ];
 
@@ -224,7 +221,7 @@ function NewsFeedContent() {
             <h1 className="text-3xl font-bold" data-testid="text-news-title">Market News</h1>
             <p className="text-muted-foreground">Real-time financial news with sentiment analysis</p>
           </div>
-          <Badge className="ml-auto bg-gradient-to-r from-amber-500 to-amber-600">Premium</Badge>
+          <Badge variant="outline" className="ml-auto">Live</Badge>
         </div>
 
         <div className="grid md:grid-cols-4 gap-4 mb-8">
@@ -305,9 +302,5 @@ function NewsFeedContent() {
 }
 
 export default function NewsPage() {
-  return (
-    <Paywall featureName="Market News Feed">
-      <NewsFeedContent />
-    </Paywall>
-  );
+  return <NewsFeedContent />;
 }

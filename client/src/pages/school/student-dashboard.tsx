@@ -425,13 +425,15 @@ function HighSchoolDashboard({ user, levelInfo, tokens, classData, assignments, 
             {positions.length > 0 ? (
               <div className="space-y-2 max-h-44 overflow-y-auto scrollbar-hide">
                 {positions.slice(0, 6).map((p: any) => {
-                  const pl = (p.currentPrice - p.entryPrice) * p.quantity * (p.tradeType === "short" ? -1 : 1);
-                  const plPct = ((pl / (p.entryPrice * p.quantity)) * 100).toFixed(1);
+                  const storedPrice = parseFloat(localStorage.getItem(`price_${p.symbol}`) || "0");
+                  const currentPrice = storedPrice > 0 ? storedPrice : p.entryPrice;
+                  const pl = (currentPrice - p.entryPrice) * p.quantity * (p.type === "sell" ? -1 : 1);
+                  const plPct = p.entryPrice > 0 ? ((pl / (p.entryPrice * p.quantity)) * 100).toFixed(1) : "0.0";
                   return (
                     <div key={p.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0" data-testid={`position-${p.symbol}`}>
                       <div>
                         <p className="font-bold text-white text-sm">{p.symbol}</p>
-                        <p className="text-xs text-slate-500">{p.quantity} shares @ ${p.entryPrice}</p>
+                        <p className="text-xs text-slate-500">{p.quantity} {p.type === "buy" ? "long" : "short"} @ ${Number(p.entryPrice).toFixed(2)}</p>
                       </div>
                       <div className="text-right">
                         <p className={`font-bold text-sm ${pl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
