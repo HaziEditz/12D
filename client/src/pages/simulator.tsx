@@ -107,7 +107,6 @@ const TIMEFRAME_SECONDS: Record<string, number> = {
   "1d": 86400
 };
 
-const TIMEFRAMES = ["1m", "15m", "1h", "4h", "1d"] as const;
 
 function generateCandlestickData(count: number, basePrice: number, timeframe: string = "1m"): CandlestickData[] {
   const data: CandlestickData[] = [];
@@ -172,7 +171,7 @@ export default function SimulatorPage() {
   const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
   const [quantity, setQuantity] = useState("1");
   const [currentPrice, setCurrentPrice] = useState(0);
-  const [timeframe, setTimeframe] = useState("1m");
+  const timeframe = "1m";
   const [candleData, setCandleData] = useState<CandlestickData[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("market");
   const [triggerPrice, setTriggerPrice] = useState("");
@@ -712,20 +711,6 @@ export default function SimulatorPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="flex items-center gap-1">
-                {TIMEFRAMES.map(tf => (
-                  <Button
-                    key={tf}
-                    variant={timeframe === tf ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 px-2 text-xs font-mono"
-                    onClick={() => setTimeframe(tf)}
-                    data-testid={`button-timeframe-${tf}`}
-                  >
-                    {tf}
-                  </Button>
-                ))}
               </div>
             </div>
           </CardContent>
