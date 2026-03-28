@@ -1969,6 +1969,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         membershipTier: user.membershipTier,
         lessonsCompleted: user.lessonsCompleted,
         totalProfit: user.totalProfit,
+        xp: user.xp,
       };
       
       res.json(publicProfile);

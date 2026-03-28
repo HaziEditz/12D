@@ -270,8 +270,10 @@ export default function SchoolPlanPortal() {
         const data = await res.json();
         toast({ title: "Invalid Code", description: data.error || "Not a valid promo code", variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Error", description: "Failed to redeem code", variant: "destructive" });
+    } catch (err: any) {
+      const msg = err?.message || "";
+      const extracted = msg.includes(":") ? msg.split(":").slice(1).join(":").trim().replace(/^[{"]|[}"]$/g, "").replace(/error[":\s]+/i, "") : "";
+      toast({ title: "Invalid Code", description: extracted || "This promo code is not valid or has expired.", variant: "destructive" });
     } finally {
       setIsRedeeming(false);
     }

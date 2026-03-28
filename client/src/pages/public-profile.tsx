@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,14 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  ShieldCheck
+  ShieldCheck,
+  UserPlus,
+  UserCheck
 } from "lucide-react";
 import { getLevelInfo } from "@/lib/levels";
+import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface PublicUser {
   id: string;
@@ -119,6 +124,10 @@ function AchievementsCard({ achievements }: { achievements: UserAchievement[] })
 export default function PublicProfilePage() {
   const [, params] = useRoute("/users/:id");
   const userId = params?.id;
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [friendRequestSent, setFriendRequestSent] = useState(false);
 
   const { data: profile, isLoading, error } = useQuery<PublicUser>({
     queryKey: ["/api/users", userId],
@@ -128,6 +137,21 @@ export default function PublicProfilePage() {
   const { data: achievements } = useQuery<UserAchievement[]>({
     queryKey: ["/api/users", userId, "achievements"],
     enabled: !!userId,
+  });
+
+  const friendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/friends/request", { friendId: userId });
+      return res.json();
+    },
+    onSuccess: () => {
+      setFriendRequestSent(true);
+      toast({ title: "Friend request sent!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/friends"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not send request", description: error.message, variant: "destructive" });
+    },
   });
 
   const getInitials = (name: string) => {
@@ -249,6 +273,23 @@ export default function PublicProfilePage() {
               <p className="text-muted-foreground max-w-md" data-testid="text-public-bio">
                 {profile.bio}
               </p>
+            )}
+
+            {currentUser && currentUser.id !== profile.id && (
+              <Button
+                variant={friendRequestSent ? "secondary" : "default"}
+                size="sm"
+                className="gap-2"
+                disabled={friendRequestSent || friendMutation.isPending}
+                onClick={() => friendMutation.mutate()}
+                data-testid="button-add-friend-profile"
+              >
+                {friendRequestSent ? (
+                  <><UserCheck className="h-4 w-4" /> Request Sent</>
+                ) : (
+                  <><UserPlus className="h-4 w-4" /> Add Friend</>
+                )}
+              </Button>
             )}
           </div>
         </CardContent>

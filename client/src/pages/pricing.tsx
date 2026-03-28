@@ -124,10 +124,12 @@ export default function Pricing() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.message || "";
+      const extracted = msg.includes(":") ? msg.split(":").slice(1).join(":").trim().replace(/^[{"]|[}"]$/g, "").replace(/error[":\s]+/i, "") : "";
       toast({
-        title: "Error",
-        description: "Failed to redeem promo code. Please try again.",
+        title: "Invalid Code",
+        description: extracted || "This promo code is not valid or has expired.",
         variant: "destructive",
       });
     } finally {

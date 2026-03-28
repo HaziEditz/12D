@@ -42,84 +42,84 @@ const mockNews: NewsItem[] = [
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["NVDA"],
-    url: "https://www.reuters.com/business/finance/"
+    url: "https://www.reuters.com/technology/nvidia-results/"
   },
   {
     id: 2,
-    title: "Federal Reserve Signals Potential Rate Cuts in 2024",
-    summary: "Fed Chair Powell indicated that the central bank may begin cutting interest rates in the coming months as inflation continues to cool.",
-    source: "Bloomberg",
+    title: "Federal Reserve Signals Potential Rate Cuts Ahead",
+    summary: "Fed Chair Powell indicated that the central bank may begin cutting interest rates in the coming months as inflation continues to cool toward the 2% target.",
+    source: "Federal Reserve",
     hoursAgo: 3,
     sentiment: "bullish",
     category: "Economic",
     symbols: ["SPY", "QQQ"],
-    url: "https://www.bloomberg.com/markets"
+    url: "https://www.federalreserve.gov/newsevents/speeches.htm"
   },
   {
     id: 3,
     title: "Apple Faces Antitrust Investigation in EU",
-    summary: "European regulators have opened a formal investigation into Apple's App Store policies, potentially leading to significant fines.",
+    summary: "European regulators have opened a formal investigation into Apple's App Store policies, potentially leading to significant fines under the Digital Markets Act.",
     source: "Financial Times",
     hoursAgo: 4,
     sentiment: "bearish",
     category: "Regulatory",
     symbols: ["AAPL"],
-    url: "https://www.ft.com/markets"
+    url: "https://www.ft.com/stream/a39a4558-f562-4dca-8906-d7c76bc37285"
   },
   {
     id: 4,
     title: "Tesla Deliveries Miss Expectations in Q4",
-    summary: "Tesla reported Q4 deliveries of 484,507 vehicles, below analyst expectations of 490,000, citing production challenges.",
+    summary: "Tesla reported Q4 deliveries of 484,507 vehicles, below analyst expectations of 490,000, citing production challenges at its Fremont facility.",
     source: "CNBC",
     hoursAgo: 5,
     sentiment: "bearish",
     category: "Earnings",
     symbols: ["TSLA"],
-    url: "https://www.cnbc.com/markets/"
+    url: "https://www.cnbc.com/tesla/"
   },
   {
     id: 5,
     title: "Microsoft Cloud Revenue Surges 30% on AI Demand",
-    summary: "Microsoft's Azure cloud platform posted 30% revenue growth, with CEO Satya Nadella highlighting strong enterprise AI adoption.",
+    summary: "Microsoft's Azure cloud platform posted 30% revenue growth, with CEO Satya Nadella highlighting strong enterprise AI adoption across its Copilot suite.",
     source: "Wall Street Journal",
     hoursAgo: 6,
     sentiment: "bullish",
     category: "Earnings",
     symbols: ["MSFT"],
-    url: "https://www.wsj.com/market-data/stocks"
+    url: "https://www.wsj.com/market-data/quotes/MSFT"
   },
   {
     id: 6,
     title: "Oil Prices Rise Amid Middle East Tensions",
-    summary: "Crude oil futures climbed 3% as geopolitical tensions in the Middle East raised concerns about supply disruptions.",
+    summary: "Crude oil futures climbed 3% as geopolitical tensions in the Middle East raised concerns about supply disruptions through key shipping lanes.",
     source: "MarketWatch",
     hoursAgo: 7,
     sentiment: "neutral",
     category: "Commodities",
     symbols: ["USO", "XLE"],
-    url: "https://www.marketwatch.com/markets/commodities"
+    url: "https://www.marketwatch.com/investing/future/crude%20oil%20-%20electronic"
   },
   {
     id: 7,
     title: "Amazon Announces $10B Investment in Logistics Network",
-    summary: "Amazon plans to invest $10 billion to expand its delivery network, aiming to enable same-day delivery for more products.",
+    summary: "Amazon plans to invest $10 billion to expand its delivery network, aiming to enable same-day delivery for more than 500 million additional products.",
     source: "CNBC",
     hoursAgo: 8,
     sentiment: "bullish",
     category: "Corporate",
     symbols: ["AMZN"],
-    url: "https://www.cnbc.com/markets/"
+    url: "https://www.cnbc.com/amazon/"
   },
   {
     id: 8,
     title: "Banking Sector Faces Pressure from Commercial Real Estate",
-    summary: "Regional banks report increased loan loss provisions as commercial real estate values continue to decline.",
+    summary: "Regional banks report increased loan loss provisions as commercial real estate values continue to decline amid higher-for-longer interest rate environment.",
     source: "Bloomberg",
     hoursAgo: 9,
     sentiment: "bearish",
     category: "Sector",
     symbols: ["KRE", "XLF"],
-    url: "https://www.bloomberg.com/markets/rates-bonds"
+    url: "https://www.bloomberg.com/industries/financials"
   },
 ];
 

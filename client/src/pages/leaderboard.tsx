@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,9 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Medal, TrendingUp, Crown, Sparkles, ShieldCheck, Globe, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Medal, TrendingUp, Crown, Sparkles, ShieldCheck, Globe, Users, UserPlus, UserCheck } from "lucide-react";
 import type { User } from "@shared/schema";
 import { getLevelInfo } from "@/lib/levels";
+import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function getMembershipBadge(tier: string | null | undefined, status: string | null | undefined) {
   if (status !== "active" || !tier) return null;
@@ -40,8 +44,28 @@ function getMembershipBadge(tier: string | null | undefined, status: string | nu
 
 export default function LeaderboardPage() {
   const [scope, setScope] = useState<string>("global");
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const { data: leaderboard, isLoading } = useQuery<User[]>({
     queryKey: [`/api/leaderboard?scope=${scope}`],
+  });
+
+  const friendMutation = useMutation({
+    mutationFn: async (friendId: string) => {
+      const res = await apiRequest("POST", "/api/friends/request", { friendId });
+      return res.json();
+    },
+    onSuccess: (_, friendId) => {
+      setSentRequests(prev => new Set([...prev, friendId]));
+      toast({ title: "Friend request sent!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/friends"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not send request", description: error.message, variant: "destructive" });
+    },
   });
 
   const getInitials = (name: string) => {
@@ -199,12 +223,11 @@ export default function LeaderboardPage() {
             <div className="space-y-2">
               {leaderboard.map((user, index) => {
                 const rank = index + 1;
+                const isMe = currentUser?.id === user.id;
+                const alreadySent = sentRequests.has(user.id);
                 return (
-                  <Link key={user.id} href={`/users/${user.id}`}>
-                    <div
-                      className={`flex items-center gap-4 p-4 rounded-lg border transition-colors hover-elevate cursor-pointer ${getRankStyle(rank)}`}
-                      data-testid={`row-leaderboard-${rank}`}
-                    >
+                  <div key={user.id} className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${getRankStyle(rank)}`} data-testid={`row-leaderboard-${rank}`}>
+                    <Link href={`/users/${user.id}`} className="flex items-center gap-4 flex-1 min-w-0 hover-elevate cursor-pointer">
                       <div className="w-12 flex items-center justify-center">
                         {getRankIcon(rank) || (
                           <span className="text-xl font-bold text-muted-foreground">
@@ -225,7 +248,7 @@ export default function LeaderboardPage() {
                         </div>
                       </div>
                       
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold">{user.displayName}</p>
                           <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1">
@@ -238,7 +261,9 @@ export default function LeaderboardPage() {
                           <span>{user.lessonsCompleted ?? 0} lessons</span>
                         </div>
                       </div>
+                    </Link>
                       
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
                         <p className={`text-lg font-bold ${(user.totalProfit ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
                           {(user.totalProfit ?? 0) >= 0 ? '+' : ''}${(user.totalProfit ?? 0).toLocaleString()}
@@ -247,8 +272,28 @@ export default function LeaderboardPage() {
                           Balance: ${(user.simulatorBalance ?? 10000).toLocaleString()}
                         </p>
                       </div>
+                      {!isMe && currentUser && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 flex-shrink-0"
+                          title={alreadySent ? "Request sent" : "Add friend"}
+                          disabled={alreadySent || friendMutation.isPending}
+                          data-testid={`button-add-friend-${user.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            friendMutation.mutate(user.id);
+                          }}
+                        >
+                          {alreadySent ? (
+                            <UserCheck className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <UserPlus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>

@@ -696,7 +696,7 @@ function BudgetBossGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBac
 }
 
 /* ===== QUIZ GAME (Intermediate + HS) ===== */
-const intermediateQuestions = [
+const ALL_INTERMEDIATE_QUESTIONS = [
   { q: "What is a budget?", options: ["A plan for spending", "A type of bank", "A credit card", "A type of tax"], answer: 0 },
   { q: "What does 'saving' money mean?", options: ["Spending it all", "Keeping some for later", "Giving it away", "Losing it"], answer: 1 },
   { q: "What is interest?", options: ["Extra money paid on loans", "A hobby", "A type of investment", "A bank fee"], answer: 0 },
@@ -707,9 +707,19 @@ const intermediateQuestions = [
   { q: "What is a mutual fund?", options: ["A pooled investment", "A savings account", "A type of loan", "Government money"], answer: 0 },
   { q: "What is a bear market?", options: ["Prices rising", "Prices falling 20%+", "A bull market", "A stock split"], answer: 1 },
   { q: "What does 'compound interest' mean?", options: ["Simple interest", "Interest on interest", "A tax rate", "A loan type"], answer: 1 },
+  { q: "What is a credit score?", options: ["Your bank balance", "A measure of creditworthiness", "A loan type", "Monthly income"], answer: 1 },
+  { q: "What does 'net worth' mean?", options: ["Annual salary", "Assets minus liabilities", "Total savings", "Monthly budget"], answer: 1 },
+  { q: "What is an asset?", options: ["Something you owe", "Something you own of value", "A monthly bill", "A type of tax"], answer: 1 },
+  { q: "What is a liability?", options: ["Money you own", "A debt or obligation", "An investment", "A savings account"], answer: 1 },
+  { q: "What is the stock market?", options: ["A grocery store", "A place to buy/sell company shares", "A bank", "A currency exchange"], answer: 1 },
+  { q: "What does 'ROI' stand for?", options: ["Risk of Inflation", "Return on Investment", "Rate of Income", "Revenue over Interest"], answer: 1 },
+  { q: "What is a share?", options: ["A piece of a company", "A bank loan", "A type of tax", "A budget item"], answer: 0 },
+  { q: "What is a recession?", options: ["Economic growth", "Two quarters of declining GDP", "A stock rally", "Rising inflation"], answer: 1 },
+  { q: "What is 'opportunity cost'?", options: ["The cost of a missed alternative", "A business expense", "A tax deduction", "A profit margin"], answer: 0 },
+  { q: "What is an emergency fund?", options: ["Money for fun", "Savings for unexpected expenses", "A retirement account", "A business loan"], answer: 1 },
 ];
 
-const hsQuestions = [
+const ALL_HS_QUESTIONS = [
   { q: "What is the P/E ratio?", options: ["Price-to-Earnings", "Profit-to-Expense", "Performance-to-Equity", "Price-to-Equity"], answer: 0 },
   { q: "What is a short sale?", options: ["Quick trade", "Selling borrowed shares", "Penny stocks", "Day trading"], answer: 1 },
   { q: "What is liquidity?", options: ["Cash holdings", "Ease of converting to cash", "Debt ratio", "Revenue growth"], answer: 1 },
@@ -720,14 +730,42 @@ const hsQuestions = [
   { q: "What is an ETF?", options: ["Exchange Traded Fund", "Equity Transfer Fee", "Earnings Tax Form", "Early Trading Fee"], answer: 0 },
   { q: "What is a bull market?", options: ["Prices falling 20%+", "Prices rising", "A volatile period", "A sideways market"], answer: 1 },
   { q: "What is volatility?", options: ["Steady growth", "Price fluctuation", "High trading volume", "A chart pattern"], answer: 1 },
+  { q: "What is a stop-loss order?", options: ["An order to buy more", "Sell at a set price to limit losses", "A dividend payment", "A limit buy"], answer: 1 },
+  { q: "What is EPS?", options: ["Earnings Per Share", "Equity Price Score", "Exchange Premium Spread", "Expense Per Stock"], answer: 0 },
+  { q: "What does 'going long' mean?", options: ["Selling a stock short", "Buying expecting price to rise", "Holding for decades", "Borrowing shares"], answer: 1 },
+  { q: "What is a derivative?", options: ["A stock dividend", "A contract deriving value from an asset", "A type of ETF", "A bond coupon"], answer: 1 },
+  { q: "What is the Dow Jones?", options: ["A stock exchange", "An index of 30 major US companies", "A bond market", "A currency index"], answer: 1 },
+  { q: "What is diversification?", options: ["Buying one stock repeatedly", "Spreading investments across assets", "Selling all stocks", "Day trading only"], answer: 1 },
+  { q: "What is a yield?", options: ["Annual income from investment ÷ cost", "A stock price", "A market index", "A credit rating"], answer: 0 },
+  { q: "What is 'dollar-cost averaging'?", options: ["Buying more when prices rise", "Investing fixed amounts regularly", "Selling at peak price", "Currency speculation"], answer: 1 },
+  { q: "What is a market order?", options: ["Order at a specific price", "Buy/sell immediately at current price", "A futures contract", "A stop order"], answer: 1 },
+  { q: "What is beta in finance?", options: ["A company's profit margin", "Measure of a stock's volatility vs market", "Interest rate sensitivity", "A bond rating"], answer: 1 },
 ];
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function QuizGame({ level, onEarn, onBack }: { level: "intermediate" | "high_school"; onEarn: (n: number) => void; onBack: () => void }) {
-  const questions = level === "high_school" ? hsQuestions : intermediateQuestions;
+  const allQ = level === "high_school" ? ALL_HS_QUESTIONS : ALL_INTERMEDIATE_QUESTIONS;
+  const [questions, setQuestions] = useState(() => shuffleArray(allQ).slice(0, 10));
   const [qIdx, setQIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
+
+  const resetGame = () => {
+    setQuestions(shuffleArray(allQ).slice(0, 10));
+    setQIdx(0);
+    setScore(0);
+    setSelected(null);
+    setFinished(false);
+  };
 
   const current = questions[qIdx];
   const tokens = Math.round(score * 3);
@@ -744,7 +782,7 @@ function QuizGame({ level, onEarn, onBack }: { level: "intermediate" | "high_sch
   if (finished) return (
     <SchoolLayout>
       <div className="p-5 max-w-xl mx-auto">
-        <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={() => { setQIdx(0); setScore(0); setSelected(null); setFinished(false); }} onBack={onBack}
+        <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={resetGame} onBack={onBack}
           title="Quiz Complete!"
           message={score >= 8 ? "Finance genius! 🧠" : score >= 5 ? "Well done! 🎉" : "Keep studying! 💪"}
         />
@@ -862,29 +900,106 @@ function MarketPredictionGame({ onEarn, onBack }: { onEarn: (n: number) => void;
   );
 }
 
-/* ===== STRATEGY CHALLENGE (HS) ===== */
+/* ===== STRATEGY CHALLENGE (HS) — Trading Decision Game ===== */
+const TRADING_SCENARIOS = [
+  {
+    title: "Earnings Beat",
+    setup: "A tech company you own just reported earnings 40% above analyst estimates. Revenue grew 28% year-over-year. The stock has already jumped 12% in after-hours trading.",
+    question: "What is the best action?",
+    options: ["Buy more — momentum will continue", "Hold — let the dust settle", "Sell — take profits at the spike"],
+    correct: 1,
+    explanation: "After a major gap-up, it is often wise to hold and wait. Chasing a 12% after-hours spike adds risk, and selling too early can cost you future gains. Patient holders benefit most.",
+  },
+  {
+    title: "Interest Rate Hike",
+    setup: "The central bank just announced a surprise 0.75% interest rate hike — the largest in 20 years. Growth stocks and crypto are already falling 5-10%.",
+    question: "Which sector is likely to benefit?",
+    options: ["Technology growth stocks", "Banks and financial stocks", "Speculative cryptocurrencies"],
+    correct: 1,
+    explanation: "Banks earn more profit on loans when rates rise. Tech and crypto tend to fall because higher rates reduce the present value of future earnings.",
+  },
+  {
+    title: "Stop-Loss Decision",
+    setup: "You bought a stock at $50. It has fallen to $38 (−24%) due to a company scandal. Analysts are divided — some say it will recover, others say it will keep falling.",
+    question: "What should you do?",
+    options: ["Buy more to average down", "Hold and hope for recovery", "Cut losses with a stop-loss order"],
+    correct: 2,
+    explanation: "A stop-loss limits further damage when fundamentals are unclear. 'Averaging down' into a falling knife is risky. Protecting capital is a key trading rule.",
+  },
+  {
+    title: "Market Correction",
+    setup: "The market has dropped 22% from its peak over 3 months. Fear is high, news headlines are negative, but economic data still shows job growth and consumer spending.",
+    question: "What does this situation most likely represent?",
+    options: ["A great time to panic sell", "A potential buying opportunity", "Guaranteed continued decline"],
+    correct: 1,
+    explanation: "Market corrections with strong underlying economic data are often buying opportunities. 'Buy when there is blood in the streets' — but always manage risk.",
+  },
+  {
+    title: "Diversification Test",
+    setup: "Your portfolio is 90% in one high-flying tech stock that has tripled in 2 years. A friend says you should stay concentrated because 'it keeps going up'.",
+    question: "What is the main risk of this strategy?",
+    options: ["Missing out on other stocks", "Catastrophic loss if the stock crashes", "Paying too many trading fees"],
+    correct: 1,
+    explanation: "Concentration risk is real — even great companies can fall 50-80%. Diversification protects your portfolio from any single company's failure.",
+  },
+  {
+    title: "Insider Tip",
+    setup: "A friend who works at a company tells you their earnings report (not yet public) will be terrible. They suggest selling your shares before the announcement.",
+    question: "What should you do?",
+    options: ["Sell immediately — great tip!", "Ignore it — acting on insider information is illegal", "Tell other friends so they can sell too"],
+    correct: 1,
+    explanation: "Trading on material non-public information is insider trading — a serious crime punishable by fines and prison. Always trade using publicly available information only.",
+  },
+  {
+    title: "IPO Fever",
+    setup: "A hot new AI company is going public tomorrow. Media hype is massive. The IPO is priced at $40/share, but pre-market trading suggests it will open at $85.",
+    question: "What is the most cautious approach?",
+    options: ["Buy as many shares as possible at open", "Wait and watch how it trades for a few weeks", "Short sell it immediately"],
+    correct: 1,
+    explanation: "IPOs are often volatile. Many drop significantly after the initial hype fades. Waiting for price to stabilize helps you make a more informed entry decision.",
+  },
+  {
+    title: "Risk vs Reward",
+    setup: "You have $5,000 to invest. Option A: Government bond paying 4.5% annually with near-zero risk. Option B: Small-cap biotech stock that could gain 200% or lose 80%.",
+    question: "Which best describes a balanced approach?",
+    options: ["Put all $5,000 in the biotech", "Split: $3,500 in bonds, $1,500 in biotech", "Put all $5,000 in bonds — no risk ever"],
+    correct: 1,
+    explanation: "A balanced approach allocates most capital to safer assets while keeping a smaller 'risk budget' for higher-reward opportunities. This manages downside while allowing upside.",
+  },
+];
+
 function StrategyChallenge({ onEarn, onBack }: { onEarn: (n: number) => void; onBack: () => void }) {
-  const scenario = {
-    budget: 10000,
-    goal: "Maximise returns while managing risk",
-    assets: [
-      { id: "tech", name: "Tech ETF", risk: "High", expectedReturn: "15-25%", desc: "High volatility, high reward" },
-      { id: "bonds", name: "Gov. Bonds", risk: "Low", expectedReturn: "3-5%", desc: "Stable, low return" },
-      { id: "realestate", name: "Real Estate", risk: "Medium", expectedReturn: "8-12%", desc: "Steady growth, inflation hedge" },
-      { id: "gold", name: "Gold", risk: "Low-Medium", expectedReturn: "5-8%", desc: "Safe haven asset" },
-      { id: "crypto", name: "Crypto", risk: "Very High", expectedReturn: "−50% to +100%", desc: "Extremely volatile" },
-    ],
+  const [scenarios] = useState(() => shuffleArray(TRADING_SCENARIOS).slice(0, 5));
+  const [idx, setIdx] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+  const current = scenarios[idx];
+  const tokens = 20 + score * 6;
+
+  const choose = (i: number) => {
+    if (selected !== null) return;
+    setSelected(i);
+    if (i === current.correct) setScore(s => s + 1);
+    setTimeout(() => {
+      if (idx + 1 >= scenarios.length) setFinished(true);
+      else { setIdx(n => n + 1); setSelected(null); }
+    }, 2200);
   };
 
-  const [allocations, setAllocations] = useState<Record<string, number>>({ tech: 20, bonds: 20, realestate: 20, gold: 20, crypto: 20 });
-  const [submitted, setSubmitted] = useState(false);
+  const reset = () => { setIdx(0); setScore(0); setSelected(null); setFinished(false); };
 
-  const total = Object.values(allocations).reduce((s, v) => s + v, 0);
-  const diversified = Object.values(allocations).filter(v => v >= 5).length;
-  const riskScore = (allocations.tech ?? 0) + (allocations.crypto ?? 0);
-  const safetyScore = (allocations.bonds ?? 0) + (allocations.gold ?? 0);
-  const score = Math.min(100, diversified * 15 + (riskScore < 50 ? 20 : 0) + (safetyScore >= 20 ? 15 : 0));
-  const tokens = Math.round(score / 2) + 20;
+  if (finished) return (
+    <SchoolLayout>
+      <div className="p-5 max-w-xl mx-auto">
+        <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={reset} onBack={onBack}
+          title="Challenge Complete!"
+          message={score >= 4 ? "Trading strategist! 🎯" : score >= 3 ? "Strong decisions! 🎉" : "Review trading fundamentals! 💪"}
+        />
+      </div>
+    </SchoolLayout>
+  );
 
   return (
     <SchoolLayout>
@@ -892,46 +1007,46 @@ function StrategyChallenge({ onEarn, onBack }: { onEarn: (n: number) => void; on
         <div className="flex items-center justify-between">
           <button onClick={onBack} className="text-slate-400 hover:text-white font-semibold text-sm">← Back</button>
           <h2 className="font-black text-white text-lg">🎯 Strategy Challenge</h2>
-          <span className={`font-bold text-sm ${total > 100 ? "text-rose-400" : "text-teal-400"}`}>{total}%</span>
+          <span className="text-teal-400 font-bold text-sm">{score}/{scenarios.length}</span>
         </div>
-
-        <div className="rounded-xl p-4 bg-blue-500/10 border border-blue-500/20">
-          <p className="text-blue-300 font-bold text-sm">Budget: $10,000 — Build your portfolio!</p>
-          <p className="text-blue-400/70 text-xs mt-0.5">Allocate 100% across assets. Diversify for higher score!</p>
-        </div>
-
-        {!submitted ? (
-          <>
-            <div className="space-y-4">
-              {scenario.assets.map(asset => (
-                <div key={asset.id} className="rounded-xl p-4 bg-white/5 border border-white/10">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-bold text-white text-sm">{asset.name}</p>
-                      <p className="text-slate-500 text-xs">{asset.desc}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge className={`text-xs ${asset.risk === "Low" ? "bg-emerald-500/20 text-emerald-400" : asset.risk === "High" ? "bg-rose-500/20 text-rose-400" : asset.risk === "Very High" ? "bg-red-600/20 text-red-400" : "bg-amber-500/20 text-amber-400"}`}>{asset.risk} Risk</Badge>
-                      <p className="text-xs text-slate-400 mt-0.5">{asset.expectedReturn}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input type="range" min={0} max={80} value={allocations[asset.id]} onChange={e => setAllocations(prev => ({ ...prev, [asset.id]: Number(e.target.value) }))} className="flex-1 accent-teal-500" data-testid={`slider-${asset.id}`} />
-                    <span className="text-teal-400 font-bold text-sm w-10 text-right">{allocations[asset.id]}%</span>
-                  </div>
-                </div>
-              ))}
+        <Progress value={(idx / scenarios.length) * 100} className="h-2" />
+        <div className="rounded-2xl p-5 bg-white/5 border border-white/10 space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge className="bg-blue-500/20 text-blue-300 text-xs">Scenario {idx + 1} of {scenarios.length}</Badge>
+          </div>
+          <h3 className="text-white font-black text-base">{current.title}</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">{current.setup}</p>
+          <p className="text-white font-bold text-sm border-t border-white/10 pt-3">{current.question}</p>
+          <div className="space-y-2.5">
+            {current.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => choose(i)}
+                disabled={selected !== null}
+                data-testid={`strategy-option-${i}`}
+                className={`w-full text-left px-4 py-3 rounded-xl border font-semibold text-sm transition-all ${
+                  selected === null
+                    ? "bg-white/5 border-white/10 hover:border-blue-500/40 hover:bg-blue-500/5 text-white"
+                    : i === current.correct
+                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                    : selected === i
+                    ? "bg-rose-500/20 border-rose-500/40 text-rose-300"
+                    : "bg-white/3 border-white/5 text-slate-600"
+                }`}
+              >
+                {selected !== null && i === current.correct && "✓ "}{opt}{selected === i && i !== current.correct && " ✗"}
+              </button>
+            ))}
+          </div>
+          {selected !== null && (
+            <div className={`rounded-xl p-3 ${selected === current.correct ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-amber-500/10 border border-amber-500/20"}`}>
+              <p className={`font-bold text-xs mb-1 ${selected === current.correct ? "text-emerald-400" : "text-amber-400"}`}>
+                {selected === current.correct ? "✓ Correct!" : "✗ Not quite —"}
+              </p>
+              <p className="text-slate-300 text-xs leading-relaxed">{current.explanation}</p>
             </div>
-            <Button onClick={() => setSubmitted(true)} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl" disabled={total > 100} data-testid="button-submit-strategy">
-              Submit Strategy ({total}%)
-            </Button>
-          </>
-        ) : (
-          <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={() => setSubmitted(false)} onBack={onBack}
-            title="Strategy Submitted!"
-            message={score >= 80 ? "Portfolio master! 🎯" : score >= 50 ? "Solid strategy! 🎉" : "Try diversifying more! 💪"}
-          />
-        )}
+          )}
+        </div>
       </div>
     </SchoolLayout>
   );

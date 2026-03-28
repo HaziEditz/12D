@@ -67,7 +67,7 @@ export function Navbar() {
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy, premium: false },
     { href: "/achievements", label: "Achievements", icon: Award, premium: false },
     { href: "/strategies", label: "Strategies", icon: Library, premium: false },
-    { href: "/risk-calculator", label: "Risk Calc", icon: Calculator, premium: false },
+    { href: "/risk-calculator", label: "Risk Calc", icon: Calculator, premium: true },
     { href: "/watchlist", label: "Watchlist", icon: Star, premium: false },
     { href: "/tips", label: "Tips", icon: Lightbulb, premium: false },
     { href: "/command-center", label: "Terminal", icon: Zap, premium: true },

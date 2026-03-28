@@ -495,10 +495,8 @@ export default function SimulatorPage() {
       
       setCurrentPrice(newClose);
       
-      if (priceSource === "simulated") {
-        localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
-        localStorage.setItem(`candles_${selectedSymbol}_${timeframe}`, JSON.stringify(newData));
-      }
+      localStorage.setItem(`price_${selectedSymbol}`, newClose.toString());
+      localStorage.setItem(`candles_${selectedSymbol}_${timeframe}`, JSON.stringify(newData));
       
       return newData;
     });

@@ -225,19 +225,19 @@ function CommandCenterContent() {
   };
 
   const tradeMutation = useMutation({
-    mutationFn: async (tradeData: { symbol: string; type: "buy" | "sell"; quantity: number; price: number }) => {
+    mutationFn: async (tradeData: { symbol: string; type: "buy" | "sell"; quantity: number; entryPrice: number }) => {
       const res = await apiRequest("POST", "/api/trades", tradeData);
       return res.json();
     },
     onSuccess: async (data, variables) => {
-      const total = variables.quantity * variables.price;
+      const total = variables.quantity * variables.entryPrice;
       setRecentTrades(prev => [
         { type: variables.type.toUpperCase(), symbol: variables.symbol, qty: variables.quantity, total },
         ...prev.slice(0, 4)
       ]);
       toast({
         title: `${variables.type === "buy" ? "Bought" : "Sold"} ${variables.symbol}`,
-        description: `${variables.quantity} shares at $${variables.price.toFixed(2)} = $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        description: `${variables.quantity} shares at $${variables.entryPrice.toFixed(2)} = $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
@@ -260,7 +260,7 @@ function CommandCenterContent() {
       symbol: quickTradeSymbol,
       type: orderType,
       quantity: parseInt(quantity),
-      price: stock.price,
+      entryPrice: stock.price,
     });
   };
 
