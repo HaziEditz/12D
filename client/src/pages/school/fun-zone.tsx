@@ -489,12 +489,6 @@ export default function SchoolFunZone() {
     setShowConfetti(true);
     awardTokensMutation.mutate(amount);
     setTimeout(() => setShowConfetti(false), 3000);
-    // Small chance (15%) for a random bonus drop notification
-    if (Math.random() < 0.15) {
-      const drops = ["🪙 Gold Coin", "📈 Bull Chart", "🐷 Piggy Bank"];
-      const drop = drops[Math.floor(Math.random() * drops.length)];
-      setTimeout(() => toast({ title: "🎁 Random Drop!", description: `You found a ${drop} while playing!` }), 1500);
-    }
   };
 
   const isPrimary = ageGroup === "primary";
@@ -506,25 +500,25 @@ export default function SchoolFunZone() {
   const tokenBalance = user?.classroomTokens ?? 0;
 
   const primaryGames = [
-    { id: "coin-rain" as Game, emoji: "🌧️", title: "Coin Rain", desc: "Catch coins before they hit the ground!", color: "from-amber-400 to-orange-500", tokens: "2–8" },
-    { id: "piggy-bank" as Game, emoji: "🐷", title: "Piggy Bank Builder", desc: "Sort money into the right jars", color: "from-pink-400 to-rose-500", tokens: "2–6" },
-    { id: "smart-shopper" as Game, emoji: "🛒", title: "Smart Shopper", desc: "Buy what you need without going over budget!", color: "from-green-400 to-emerald-500", tokens: "2–7" },
-    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble financial terms to earn tokens!", color: "from-violet-400 to-purple-500", tokens: "2–10" },
+    { id: "coin-rain" as Game, emoji: "🌧️", title: "Coin Rain", desc: "Catch coins before they hit the ground!", color: "from-amber-400 to-orange-500", tokens: "1–8" },
+    { id: "piggy-bank" as Game, emoji: "🐷", title: "Piggy Bank Builder", desc: "Sort money into the right jars", color: "from-pink-400 to-rose-500", tokens: "1–6" },
+    { id: "smart-shopper" as Game, emoji: "🛒", title: "Smart Shopper", desc: "Buy what you need without going over budget!", color: "from-green-400 to-emerald-500", tokens: "1–6" },
+    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble financial terms to earn tokens!", color: "from-violet-400 to-purple-500", tokens: "1–10" },
   ];
 
   const intermediateGames = [
-    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "3–12" },
-    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "3–10" },
-    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "3–14" },
-    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match finance terms to their definitions!", color: "from-rose-500 to-pink-600", tokens: "3–12" },
+    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "1–10" },
+    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "2–10" },
+    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "1–10" },
+    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match finance terms to their definitions!", color: "from-rose-500 to-pink-600", tokens: "1–8" },
   ];
 
   const hsGames = [
-    { id: "market-prediction" as Game, emoji: "📈", title: "Market Prediction", desc: "Advanced market analysis challenge", color: "from-teal-600 to-cyan-700", tokens: "5–18" },
-    { id: "investment-quiz" as Game, emoji: "🎓", title: "Investment Quiz", desc: "Advanced investment concepts", color: "from-purple-600 to-violet-700", tokens: "5–16" },
-    { id: "strategy-challenge" as Game, emoji: "🎯", title: "Strategy Challenge", desc: "Make real-world trading decisions", color: "from-blue-600 to-indigo-700", tokens: "6–20" },
-    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble advanced finance terms!", color: "from-amber-600 to-orange-700", tokens: "4–14" },
-    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match terms to definitions — beat the clock!", color: "from-rose-600 to-pink-700", tokens: "4–12" },
+    { id: "market-prediction" as Game, emoji: "📈", title: "Market Prediction", desc: "Advanced market analysis challenge", color: "from-teal-600 to-cyan-700", tokens: "1–10" },
+    { id: "investment-quiz" as Game, emoji: "🎓", title: "Investment Quiz", desc: "Advanced investment concepts", color: "from-purple-600 to-violet-700", tokens: "1–10" },
+    { id: "strategy-challenge" as Game, emoji: "🎯", title: "Strategy Challenge", desc: "Make real-world trading decisions", color: "from-blue-600 to-indigo-700", tokens: "2–12" },
+    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble advanced finance terms!", color: "from-amber-600 to-orange-700", tokens: "1–10" },
+    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match terms to definitions — beat the clock!", color: "from-rose-600 to-pink-700", tokens: "1–8" },
   ];
 
   const games = isPrimary ? primaryGames : isIntermediate ? intermediateGames : hsGames;
@@ -634,19 +628,8 @@ export default function SchoolFunZone() {
               </div>
             )}
 
-            {/* Simulator conversion info */}
-            <div className="rounded-xl p-4 bg-teal-500/10 border border-teal-500/20 flex items-start gap-3">
-              <TrendingUp className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-teal-300 font-bold text-sm">Simulator → Token Conversion</p>
-                <p className="text-teal-400/70 text-xs mt-0.5">Every $100 simulated profit converts to <span className="font-bold text-teal-300">1 token</span>. Trade smart to earn more tokens faster!</p>
-                <div className="flex gap-3 mt-2 text-xs text-teal-400/60">
-                  <span>$100 → 1 token</span>
-                  <span>$500 → 5 tokens</span>
-                  <span>$1,000 → 10 tokens</span>
-                </div>
-              </div>
-            </div>
+            {/* Simulator conversion */}
+            <SimulatorClaimPanel onEarn={handleEarnTokens} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sw-stagger">
               {games.map(game => (
@@ -709,10 +692,10 @@ export default function SchoolFunZone() {
                 <p className="text-white font-bold text-sm mb-3 text-center">Reward Chances — {SPIN_TIERS.find(t => t.id === spinTier)?.label}</p>
                 {spinTier === "basic" && (
                   <div className="space-y-2 text-xs">
-                    <div className="flex justify-between"><span className="text-slate-400">Tokens (small)</span><span className="text-amber-400 font-bold">40%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Token refund (~4–8)</span><span className="text-amber-400 font-bold">40%</span></div>
                     <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">30%</span></div>
                     <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">15%</span></div>
-                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">10%</span></div>
+                    <div className="flex justify-between"><span className="text-emerald-400">Token profit (~8–12)</span><span className="text-emerald-400 font-bold">10%</span></div>
                     <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">4%</span></div>
                     <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">1%</span></div>
                   </div>
@@ -720,23 +703,23 @@ export default function SchoolFunZone() {
                 {spinTier === "premium" && (
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">25%</span></div>
-                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">20%</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Tokens (small)</span><span className="text-slate-400 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-emerald-400">Token profit (~18–22)</span><span className="text-emerald-400 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Token refund (~14–18)</span><span className="text-amber-400 font-bold">20%</span></div>
                     <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">20%</span></div>
                     <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">8%</span></div>
-                    <div className="flex justify-between"><span className="text-emerald-400">Tokens (large)</span><span className="text-emerald-400 font-bold">5%</span></div>
+                    <div className="flex justify-between"><span className="text-yellow-300">Big win (~23–29)</span><span className="text-yellow-300 font-bold">5%</span></div>
                     <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">2%</span></div>
                   </div>
                 )}
                 {spinTier === "elite" && (
                   <div className="space-y-2 text-xs">
-                    <div className="flex justify-between"><span className="text-emerald-400">Tokens (large)</span><span className="text-emerald-400 font-bold">20%</span></div>
                     <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">25%</span></div>
+                    <div className="flex justify-between"><span className="text-emerald-400">Token profit (~43–57)</span><span className="text-emerald-400 font-bold">20%</span></div>
                     <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">20%</span></div>
-                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">15%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Token refund (~38–42)</span><span className="text-amber-400 font-bold">15%</span></div>
                     <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">10%</span></div>
                     <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">5%</span></div>
-                    <div className="flex justify-between"><span className="text-yellow-300">Tokens (XL)</span><span className="text-yellow-300 font-bold">5%</span></div>
+                    <div className="flex justify-between"><span className="text-yellow-300">Jackpot (~55–74)</span><span className="text-yellow-300 font-bold">5%</span></div>
                   </div>
                 )}
               </div>
@@ -1181,6 +1164,49 @@ export default function SchoolFunZone() {
   );
 }
 
+/* ===== SIMULATOR CLAIM PANEL ===== */
+function SimulatorClaimPanel({ onEarn }: { onEarn: (n: number) => void }) {
+  const { data: user, refetch } = useQuery<any>({ queryKey: ["/api/user"] });
+  const { toast } = useToast();
+  const totalProfit = Math.max(0, user?.totalProfit ?? 0);
+  const alreadyClaimed = user?.simulatorTokensClaimed ?? 0;
+  const claimable = Math.floor(totalProfit / 100) - alreadyClaimed;
+
+  const claimMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/fun-zone/claim-simulator", {}),
+    onSuccess: async (data: any) => {
+      if (data.tokensAwarded > 0) {
+        onEarn(0); // trigger confetti without double-awarding
+        toast({ title: `+${data.tokensAwarded} tokens!`, description: "Simulator profit claimed successfully." });
+        await refetch();
+      } else {
+        toast({ title: "Nothing to claim", description: "Earn more simulated profit to unlock tokens.", variant: "destructive" });
+      }
+    },
+  });
+
+  return (
+    <div className="rounded-xl p-4 bg-teal-500/10 border border-teal-500/20 flex items-start gap-3">
+      <TrendingUp className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-teal-300 font-bold text-sm">Simulator → Token Conversion</p>
+        <p className="text-teal-400/70 text-xs mt-0.5">Every $100 simulated profit earns <span className="font-bold text-teal-300">1 token</span>.</p>
+        <div className="flex flex-wrap gap-3 mt-2 text-xs text-teal-400/60">
+          <span>Your profit: <strong className={`${totalProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>${totalProfit.toFixed(0)}</strong></span>
+          <span>Claimed: <strong className="text-teal-300">{alreadyClaimed}t</strong></span>
+          <span>Available: <strong className={claimable > 0 ? "text-amber-300" : "text-slate-500"}>{claimable}t</strong></span>
+        </div>
+      </div>
+      <Button size="sm" disabled={claimable <= 0 || claimMutation.isPending}
+        onClick={() => claimMutation.mutate()}
+        className="shrink-0 bg-teal-500 hover:bg-teal-400 text-white text-xs font-bold"
+        data-testid="btn-claim-simulator">
+        {claimMutation.isPending ? "Claiming…" : claimable > 0 ? `Claim ${claimable}t` : "Nothing to claim"}
+      </Button>
+    </div>
+  );
+}
+
 /* ===== COIN RAIN GAME (Primary) ===== */
 function CoinRainGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBack: () => void }) {
   const [coins, setCoins] = useState<{ id: number; x: number; caught: boolean; missed: boolean }[]>([]);
@@ -1225,7 +1251,7 @@ function CoinRainGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBack:
     setScore(s => s + 1);
   };
 
-  const tokens = Math.max(0, Math.round(score * 1.5));
+  const tokens = Math.min(8, Math.max(1, Math.round(score * 0.5)));
 
   return (
     <SchoolLayout>
@@ -1305,7 +1331,7 @@ function PiggyBankGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBack
     else if (spent + item.cost <= budget) setBasket([...basket, id]);
   };
 
-  const tokens = Math.min(10, Math.max(5, Math.round(saved / 3)));
+  const tokens = Math.min(6, Math.max(1, Math.round(saved / 5)));
 
   return (
     <SchoolLayout>
@@ -1383,7 +1409,7 @@ function SmartShopperGame({ onEarn, onBack }: { onEarn: (n: number) => void; onB
     else if (total + item.price <= budget) setCart([...cart, id]);
   };
 
-  const tokens = Math.min(12, Math.max(5, needsBought * 2 + (total <= budget ? 3 : 0)));
+  const tokens = Math.min(6, Math.max(1, needsBought + (total <= budget ? 1 : 0)));
   const smartScore = needsBought;
 
   return (
@@ -1453,7 +1479,7 @@ function StockGuesserGame({ onEarn, onBack }: { onEarn: (n: number) => void; onB
 
   const current = stocks[round];
   const correct = answered === current.move;
-  const tokens = Math.round(score * 4);
+  const tokens = Math.min(10, Math.max(1, Math.round(score * 1.5)));
 
   const guess = (dir: "up" | "down") => {
     setAnswered(dir);
@@ -1539,7 +1565,7 @@ function BudgetBossGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBac
     const pct = allocations[c.key];
     return pct >= c.ideal[0] && pct <= c.ideal[1];
   }).length;
-  const tokens = Math.max(10, score * 4);
+  const tokens = Math.min(10, Math.max(2, score * 2));
 
   return (
     <SchoolLayout>
@@ -1662,7 +1688,7 @@ function QuizGame({ level, onEarn, onBack }: { level: "intermediate" | "high_sch
   };
 
   const current = questions[qIdx];
-  const tokens = Math.round(score * 3);
+  const tokens = Math.min(10, Math.max(1, score));
 
   const answer = (idx: number) => {
     setSelected(idx);
@@ -1736,7 +1762,7 @@ function MarketPredictionGame({ onEarn, onBack }: { onEarn: (n: number) => void;
   const [finished, setFinished] = useState(false);
 
   const current = scenarios[round];
-  const tokens = Math.round(score * 10);
+  const tokens = Math.min(10, Math.max(1, score * 3));
 
   const guess = (dir: string) => {
     setAnswered(dir);
@@ -1870,7 +1896,7 @@ function StrategyChallenge({ onEarn, onBack }: { onEarn: (n: number) => void; on
   const [finished, setFinished] = useState(false);
 
   const current = scenarios[idx];
-  const tokens = 20 + score * 6;
+  const tokens = Math.min(12, 2 + score * 2);
 
   const choose = (i: number) => {
     if (selected !== null) return;
@@ -2015,7 +2041,7 @@ function WordScrambleGame({ onEarn, onBack }: { onEarn: (n: number) => void; onB
     handleNext(correct);
   };
 
-  const tokens = 2 + score * Math.round(14 / words.length);
+  const tokens = Math.min(10, 1 + score);
 
   const reset = () => { setIdx(0); setScore(0); setInput(""); setFeedback(null); setFinished(false); };
 
@@ -2112,7 +2138,7 @@ function MarketMemoryGame({ onEarn, onBack }: { onEarn: (n: number) => void; onB
   };
 
   const score = Math.max(0, pairs.length * 2 - Math.max(0, moves - pairs.length));
-  const tokens = 3 + Math.min(score, 9);
+  const tokens = Math.min(8, 1 + Math.min(score, 7));
 
   const reset = () => { setFlipped([]); setMatched([]); setMoves(0); setFinished(false); };
 

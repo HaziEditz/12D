@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   lastLoginDate: text("last_login_date"),
   dailyRewardClaimedAt: text("daily_reward_claimed_at"),
   lastSeenAt: timestamp("last_seen_at"),
+  simulatorTokensClaimed: integer("simulator_tokens_claimed").default(0),
 });
 
 export const lessons = pgTable("lessons", {

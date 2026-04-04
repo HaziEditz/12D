@@ -274,6 +274,7 @@ export interface IStorage {
   respondToTradeOffer(id: string, userId: string, action: "accept" | "reject" | "cancel"): Promise<{ success: boolean; message: string }>;
   getTokenLeaderboard(): Promise<{ userId: string; displayName: string; classroomTokens: number; loginStreak: number }[]>;
   updateUserTokens(userId: string, delta: number): Promise<void>;
+  claimSimulatorTokens(userId: string): Promise<{ tokensAwarded: number; totalClaimed: number }>;
   addInventoryItem(userId: string, itemId: string, itemType: string, rarity: string, quantity: number): Promise<UserInventory>;
   saveSpinHistory(data: { userId: string; spinTier: string; tokensSpent: number; rewardType: string; rewardId?: string | null; rewardAmount?: number | null; rewardName: string; rewardEmoji: string; rarity: string }): Promise<void>;
   getMarketplaceListings(userId: string): Promise<any[]>;
@@ -1464,13 +1465,21 @@ export class DatabaseStorage implements IStorage {
     if (!user) return { success: false, message: "User not found" };
     const balance = user.classroomTokens ?? 0;
     if (balance < cost) return { success: false, message: "Not enough tokens" };
-    await db.update(users).set({ classroomTokens: balance - cost }).where(eq(users.id, userId));
-    const isLegend = bagId === "bag-legend";
+    // Validate cost matches expected bag price to prevent tampering
+    const VALID_BAGS: Record<string, number> = { "bag-starter": 15, "bag-crypto": 30, "bag-legend": 50 };
+    const expectedCost = VALID_BAGS[bagId];
+    if (!expectedCost) return { success: false, message: "Invalid bag" };
+    if (cost !== expectedCost) return { success: false, message: "Invalid bag cost" };
+    await db.update(users).set({ classroomTokens: balance - expectedCost }).where(eq(users.id, userId));
     const rand = Math.random();
     let rarity: string;
-    if (isLegend) {
+    // Per-bag rarity odds matching UI descriptions
+    if (bagId === "bag-legend") {
       rarity = rand < 0.05 ? "legendary" : rand < 0.25 ? "epic" : rand < 0.60 ? "rare" : "common";
+    } else if (bagId === "bag-crypto") {
+      rarity = rand < 0.03 ? "legendary" : rand < 0.15 ? "epic" : rand < 0.50 ? "rare" : "common";
     } else {
+      // bag-starter
       rarity = rand < 0.01 ? "legendary" : rand < 0.05 ? "epic" : rand < 0.30 ? "rare" : "common";
     }
     const pools: Record<string, string[]> = {
@@ -1547,6 +1556,22 @@ export class DatabaseStorage implements IStorage {
       const absDelta = Math.abs(delta);
       await db.update(users).set({ classroomTokens: sql`GREATEST(0, ${users.classroomTokens} - ${absDelta})` }).where(eq(users.id, userId));
     }
+  }
+
+  async claimSimulatorTokens(userId: string): Promise<{ tokensAwarded: number; totalClaimed: number }> {
+    const [user] = await db.select({ totalProfit: users.totalProfit, simulatorTokensClaimed: users.simulatorTokensClaimed })
+      .from(users).where(eq(users.id, userId));
+    if (!user) throw new Error("User not found");
+    const profit = Math.max(0, user.totalProfit ?? 0);
+    const alreadyClaimed = user.simulatorTokensClaimed ?? 0;
+    const claimable = Math.floor(profit / 100) - alreadyClaimed;
+    if (claimable <= 0) return { tokensAwarded: 0, totalClaimed: alreadyClaimed };
+    const newClaimed = alreadyClaimed + claimable;
+    await db.update(users).set({
+      classroomTokens: sql`${users.classroomTokens} + ${claimable}`,
+      simulatorTokensClaimed: newClaimed,
+    }).where(eq(users.id, userId));
+    return { tokensAwarded: claimable, totalClaimed: newClaimed };
   }
 
   async addInventoryItem(userId: string, itemId: string, itemType: string, rarity: string, quantity: number): Promise<UserInventory> {

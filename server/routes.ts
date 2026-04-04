@@ -2099,13 +2099,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = req.user as User;
       const { game, score, tokensEarned } = req.body;
-      const tokens = Number(tokensEarned) || 0;
+      // Server-side cap: no game can award more than 15 tokens per submission
+      const MAX_TOKENS_PER_GAME = 15;
+      const raw = Number(tokensEarned) || 0;
+      const tokens = Math.min(MAX_TOKENS_PER_GAME, Math.max(0, raw));
       if (tokens > 0) await storage.addClassroomTokens(user.id, tokens);
       if (game) {
         const saved = await storage.saveFunZoneScore({ userId: user.id, game, score: Number(score) || 0, tokensEarned: tokens });
         return res.json(saved);
       }
       res.json({ success: true, tokensEarned: tokens });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/fun-zone/claim-simulator", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.membershipTier !== "school" && user.role !== "student") {
+        return res.status(403).json({ message: "School members only" });
+      }
+      const result = await storage.claimSimulatorTokens(user.id);
+      res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -2269,10 +2285,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const outcome = weightedRandom(spinConfig.weights);
       let rewardType = "tokens", rewardAmount = 0, rewardId = null as string | null, rewardName = "", rewardEmoji = "🪙", rarity = "common";
 
-      if (outcome === "tokens_small")  { rewardAmount = Math.floor(Math.random() * 3) + 2; rewardName = `${rewardAmount} Tokens`; }
-      else if (outcome === "tokens_medium") { rewardAmount = Math.floor(Math.random() * 5) + 6; rewardName = `${rewardAmount} Tokens`; }
-      else if (outcome === "tokens_large")  { rewardAmount = Math.floor(Math.random() * 8) + 12; rewardName = `${rewardAmount} Tokens`; }
-      else if (outcome === "tokens_xl")     { rewardAmount = Math.floor(Math.random() * 10) + 22; rewardName = `${rewardAmount} Tokens`; }
+      // Token rewards: small = partial refund, medium = break-even to profit, large/xl = jackpot
+      if (outcome === "tokens_small")  { rewardAmount = cost + Math.floor(Math.random() * 4) - 1; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_medium") { rewardAmount = cost + Math.floor(Math.random() * 8) + 3; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_large")  { rewardAmount = cost + Math.floor(Math.random() * 15) + 8; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_xl")     { rewardAmount = cost + Math.floor(Math.random() * 20) + 20; rewardName = `${rewardAmount} Tokens`; }
       else {
         rewardType = "collectible";
         const rarityMatch = outcome.split("_")[1] as "common" | "rare" | "epic" | "legendary";
