@@ -1842,6 +1842,250 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // === PIN MESSAGES ===
+  app.post("/api/classroom/chat/:id/pin", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "teacher" && user.role !== "admin") return res.status(403).json({ message: "Only teachers can pin messages" });
+      const { pin } = req.body;
+      await storage.pinClassMessage(req.params.id, pin !== false);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/chat/pinned", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        classId = req.query.classId as string;
+        if (!classId) { const cls = await storage.getClassesByTeacher(user.id); classId = cls[0]?.id; }
+      } else {
+        const cls = await storage.getClassesByStudent(user.id);
+        classId = cls[0]?.id;
+      }
+      if (!classId) return res.json([]);
+      const pinned = await storage.getPinnedClassMessages(classId);
+      res.json(pinned);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // === MESSAGE REACTIONS ===
+  app.post("/api/classroom/chat/:id/react", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { emoji } = req.body;
+      if (!emoji) return res.status(400).json({ message: "Emoji required" });
+      const reaction = await storage.addMessageReaction({ messageId: req.params.id, userId: user.id, emoji });
+      res.json(reaction);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/classroom/chat/:id/react", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { emoji } = req.body;
+      await storage.removeMessageReaction(req.params.id, user.id, emoji);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/classroom/chat/reactions", requireAuth, async (req, res) => {
+    try {
+      const ids = (req.query.ids as string ?? "").split(",").filter(Boolean);
+      const reactions = await storage.getMessageReactions(ids);
+      res.json(reactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // === GROUP CHAT REACTIONS ===
+  app.post("/api/group-chats/:id/messages/:msgId/react", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { emoji } = req.body;
+      if (!emoji) return res.status(400).json({ message: "Emoji required" });
+      const reaction = await storage.addMessageReaction({ messageId: req.params.msgId, userId: user.id, emoji });
+      res.json(reaction);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/group-chats/:id/messages/:msgId/react", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { emoji } = req.body;
+      await storage.removeMessageReaction(req.params.msgId, user.id, emoji);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // === DIRECT MESSAGES ===
+  app.get("/api/dms/conversations", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        const cls = await storage.getClassesByTeacher(user.id);
+        classId = cls[0]?.id;
+      } else {
+        const cls = await storage.getClassesByStudent(user.id);
+        classId = cls[0]?.id;
+      }
+      if (!classId) return res.json([]);
+      const convos = await storage.getDMConversations(user.id, classId);
+      res.json(convos);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/dms/unread", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        const cls = await storage.getClassesByTeacher(user.id);
+        classId = cls[0]?.id;
+      } else {
+        const cls = await storage.getClassesByStudent(user.id);
+        classId = cls[0]?.id;
+      }
+      if (!classId) return res.json({ count: 0 });
+      const count = await storage.getDMUnreadCount(user.id, classId);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/dms/:userId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        const cls = await storage.getClassesByTeacher(user.id);
+        classId = cls[0]?.id;
+      } else {
+        const cls = await storage.getClassesByStudent(user.id);
+        classId = cls[0]?.id;
+      }
+      if (!classId) return res.json([]);
+      await storage.markDMsRead(user.id, req.params.userId, classId);
+      const messages = await storage.getDMMessages(user.id, req.params.userId, classId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dms/:userId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content, replyToId } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Message cannot be empty" });
+      let classId: string | undefined;
+      if (user.role === "teacher" || user.role === "admin") {
+        const cls = await storage.getClassesByTeacher(user.id);
+        classId = cls[0]?.id;
+      } else {
+        const cls = await storage.getClassesByStudent(user.id);
+        classId = cls[0]?.id;
+      }
+      if (!classId) return res.status(400).json({ message: "Not in a class" });
+      const msg = await storage.sendDM({ classId, senderId: user.id, receiverId: req.params.userId, content: content.trim(), replyToId });
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/dms/:userId/:msgId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      const msg = await storage.editDM(req.params.msgId, user.id, content);
+      if (!msg) return res.status(403).json({ message: "Cannot edit this message" });
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dms/:userId/:msgId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const ok = await storage.deleteDM(req.params.msgId, user.id);
+      if (!ok) return res.status(403).json({ message: "Cannot delete this message" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // === PRESENCE / TYPING ===
+  const typingMap = new Map<string, { userId: string; name: string; expires: number }[]>();
+
+  app.post("/api/classroom/ping", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.updateLastSeen(user.id);
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: true });
+    }
+  });
+
+  app.post("/api/classroom/typing", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { chatId } = req.body;
+      const key = chatId ?? "global";
+      const now = Date.now();
+      const entries = (typingMap.get(key) ?? []).filter(e => e.userId !== user.id && e.expires > now);
+      entries.push({ userId: user.id, name: user.displayName, expires: now + 4000 });
+      typingMap.set(key, entries);
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: true });
+    }
+  });
+
+  app.get("/api/classroom/typing", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { chatId } = req.query;
+      const key = (chatId as string) ?? "global";
+      const now = Date.now();
+      const entries = (typingMap.get(key) ?? []).filter(e => e.userId !== user.id && e.expires > now);
+      res.json(entries.map(e => e.name));
+    } catch {
+      res.json([]);
+    }
+  });
+
+  app.get("/api/classroom/online", requireAuth, async (req, res) => {
+    try {
+      const ids = (req.query.ids as string ?? "").split(",").filter(Boolean);
+      const result = await storage.getOnlineUsers(ids);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/fun-zone/leaderboard/:game", requireAuth, async (req, res) => {
     try {
       const leaderboard = await storage.getFunZoneLeaderboard(req.params.game);

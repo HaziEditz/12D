@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   loginStreak: integer("login_streak").default(0),
   lastLoginDate: text("last_login_date"),
   dailyRewardClaimedAt: text("daily_reward_claimed_at"),
+  lastSeenAt: timestamp("last_seen_at"),
 });
 
 export const lessons = pgTable("lessons", {
@@ -275,6 +276,8 @@ export const classGroupMessages = pgTable("class_group_messages", {
   messageType: text("message_type").default("message"),
   isDeleted: boolean("is_deleted").default(false),
   editedAt: timestamp("edited_at"),
+  replyToId: varchar("reply_to_id"),
+  isPinned: boolean("is_pinned").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -300,6 +303,28 @@ export const classGroupChatMessages = pgTable("class_group_chat_messages", {
   content: text("content").notNull(),
   isDeleted: boolean("is_deleted").default(false),
   editedAt: timestamp("edited_at"),
+  replyToId: varchar("reply_to_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classMessageReactions = pgTable("class_message_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  emoji: varchar("emoji", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classDirectMessages = pgTable("class_direct_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  receiverId: varchar("receiver_id").notNull(),
+  content: text("content").notNull(),
+  isDeleted: boolean("is_deleted").default(false),
+  editedAt: timestamp("edited_at"),
+  replyToId: varchar("reply_to_id"),
+  isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -335,6 +360,8 @@ export const insertClassGroupMessageSchema = createInsertSchema(classGroupMessag
 export const insertClassGroupChatSchema = createInsertSchema(classGroupChats).omit({ id: true, createdAt: true });
 export const insertClassGroupChatMemberSchema = createInsertSchema(classGroupChatMembers).omit({ id: true, addedAt: true });
 export const insertClassGroupChatMessageSchema = createInsertSchema(classGroupChatMessages).omit({ id: true, createdAt: true, editedAt: true });
+export const insertClassMessageReactionSchema = createInsertSchema(classMessageReactions).omit({ id: true, createdAt: true });
+export const insertClassDirectMessageSchema = createInsertSchema(classDirectMessages).omit({ id: true, createdAt: true, editedAt: true });
 
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -440,6 +467,10 @@ export type InsertClassGroupChatMember = z.infer<typeof insertClassGroupChatMemb
 export type ClassGroupChatMember = typeof classGroupChatMembers.$inferSelect;
 export type InsertClassGroupChatMessage = z.infer<typeof insertClassGroupChatMessageSchema>;
 export type ClassGroupChatMessage = typeof classGroupChatMessages.$inferSelect;
+export type InsertClassMessageReaction = z.infer<typeof insertClassMessageReactionSchema>;
+export type ClassMessageReaction = typeof classMessageReactions.$inferSelect;
+export type InsertClassDirectMessage = z.infer<typeof insertClassDirectMessageSchema>;
+export type ClassDirectMessage = typeof classDirectMessages.$inferSelect;
 
 // ===== CLASSROOM ECONOMY TABLES =====
 

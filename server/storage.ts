@@ -10,6 +10,7 @@ import {
   classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
   classroomAssets, studentAssets, userInventory, tradeOffers,
   classGroupChats, classGroupChatMembers, classGroupChatMessages,
+  classMessageReactions, classDirectMessages,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -29,6 +30,8 @@ import {
   type ClassGroupChat, type InsertClassGroupChat,
   type ClassGroupChatMember, type InsertClassGroupChatMember,
   type ClassGroupChatMessage, type InsertClassGroupChatMessage,
+  type ClassMessageReaction, type InsertClassMessageReaction,
+  type ClassDirectMessage, type InsertClassDirectMessage,
   type ClassroomEconomySettings, type InsertClassroomEconomySettings,
   type ClassroomCurrencyTransaction, type InsertClassroomCurrencyTransaction,
   type ClassroomExpense, type InsertClassroomExpense,
@@ -134,6 +137,24 @@ export interface IStorage {
   sendGroupChatMessage(data: InsertClassGroupChatMessage): Promise<ClassGroupChatMessage>;
   editGroupChatMessage(messageId: string, userId: string, content: string): Promise<ClassGroupChatMessage | undefined>;
   deleteGroupChatMessage(messageId: string, userId: string): Promise<boolean>;
+  // Pin/unpin class message
+  pinClassMessage(messageId: string, pin: boolean): Promise<void>;
+  getPinnedClassMessages(classId: string): Promise<(ClassGroupMessage & { senderName: string })[]>;
+  // Message reactions
+  addMessageReaction(data: InsertClassMessageReaction): Promise<ClassMessageReaction>;
+  removeMessageReaction(messageId: string, userId: string, emoji: string): Promise<void>;
+  getMessageReactions(messageIds: string[]): Promise<ClassMessageReaction[]>;
+  // Direct Messages
+  getDMConversations(userId: string, classId: string): Promise<{ partnerId: string; partnerName: string; partnerRole: string; lastMessage: string; lastAt: Date; unreadCount: number }[]>;
+  getDMMessages(userId: string, partnerId: string, classId: string, limit?: number): Promise<(ClassDirectMessage & { senderName: string })[]>;
+  sendDM(data: InsertClassDirectMessage): Promise<ClassDirectMessage>;
+  editDM(messageId: string, userId: string, content: string): Promise<ClassDirectMessage | undefined>;
+  deleteDM(messageId: string, userId: string): Promise<boolean>;
+  markDMsRead(userId: string, partnerId: string, classId: string): Promise<void>;
+  getDMUnreadCount(userId: string, classId: string): Promise<number>;
+  // Online presence
+  updateLastSeen(userId: string): Promise<void>;
+  getOnlineUsers(userIds: string[]): Promise<Record<string, boolean>>;
   
   // Achievements
   createAchievement(data: InsertAchievement): Promise<Achievement>;
@@ -720,6 +741,112 @@ export class DatabaseStorage implements IStorage {
     if (!msg[0] || msg[0].senderId !== userId) return false;
     await db.update(classGroupChatMessages).set({ isDeleted: true, content: "This message was deleted." }).where(eq(classGroupChatMessages.id, messageId));
     return true;
+  }
+
+  async pinClassMessage(messageId: string, pin: boolean): Promise<void> {
+    await db.update(classGroupMessages).set({ isPinned: pin }).where(eq(classGroupMessages.id, messageId));
+  }
+
+  async getPinnedClassMessages(classId: string): Promise<(ClassGroupMessage & { senderName: string })[]> {
+    const msgs = await db.select().from(classGroupMessages)
+      .where(and(eq(classGroupMessages.classId, classId), eq(classGroupMessages.isPinned, true)))
+      .orderBy(desc(classGroupMessages.createdAt)).limit(5);
+    const result = [];
+    for (const m of msgs) {
+      const u = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, m.senderId)).limit(1);
+      result.push({ ...m, senderName: u[0]?.displayName ?? "Unknown" });
+    }
+    return result;
+  }
+
+  async addMessageReaction(data: InsertClassMessageReaction): Promise<ClassMessageReaction> {
+    const existing = await db.select().from(classMessageReactions)
+      .where(and(eq(classMessageReactions.messageId, data.messageId), eq(classMessageReactions.userId, data.userId), eq(classMessageReactions.emoji, data.emoji)))
+      .limit(1);
+    if (existing[0]) return existing[0];
+    const [reaction] = await db.insert(classMessageReactions).values(data).returning();
+    return reaction;
+  }
+
+  async removeMessageReaction(messageId: string, userId: string, emoji: string): Promise<void> {
+    await db.delete(classMessageReactions).where(and(eq(classMessageReactions.messageId, messageId), eq(classMessageReactions.userId, userId), eq(classMessageReactions.emoji, emoji)));
+  }
+
+  async getMessageReactions(messageIds: string[]): Promise<ClassMessageReaction[]> {
+    if (!messageIds.length) return [];
+    return db.select().from(classMessageReactions).where(inArray(classMessageReactions.messageId, messageIds));
+  }
+
+  async getDMConversations(userId: string, classId: string): Promise<{ partnerId: string; partnerName: string; partnerRole: string; lastMessage: string; lastAt: Date; unreadCount: number }[]> {
+    const sent = await db.select().from(classDirectMessages).where(and(eq(classDirectMessages.classId, classId), eq(classDirectMessages.senderId, userId)));
+    const received = await db.select().from(classDirectMessages).where(and(eq(classDirectMessages.classId, classId), eq(classDirectMessages.receiverId, userId)));
+    const partnerIds = new Set<string>();
+    for (const m of sent) partnerIds.add(m.receiverId);
+    for (const m of received) partnerIds.add(m.senderId);
+    const result = [];
+    for (const partnerId of partnerIds) {
+      const partner = await db.select({ displayName: users.displayName, role: users.role }).from(users).where(eq(users.id, partnerId)).limit(1);
+      const allMsgs = [...sent.filter(m => m.receiverId === partnerId), ...received.filter(m => m.senderId === partnerId)]
+        .filter(m => !m.isDeleted).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      const unread = received.filter(m => m.senderId === partnerId && !m.isRead).length;
+      if (allMsgs.length > 0) {
+        result.push({ partnerId, partnerName: partner[0]?.displayName ?? "Unknown", partnerRole: partner[0]?.role ?? "student", lastMessage: allMsgs[0].content, lastAt: allMsgs[0].createdAt!, unreadCount: unread });
+      }
+    }
+    return result.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
+  }
+
+  async getDMMessages(userId: string, partnerId: string, classId: string, limit = 100): Promise<(ClassDirectMessage & { senderName: string })[]> {
+    const msgs = await db.select().from(classDirectMessages)
+      .where(and(eq(classDirectMessages.classId, classId), or(and(eq(classDirectMessages.senderId, userId), eq(classDirectMessages.receiverId, partnerId)), and(eq(classDirectMessages.senderId, partnerId), eq(classDirectMessages.receiverId, userId)))))
+      .orderBy(asc(classDirectMessages.createdAt)).limit(limit);
+    const result = [];
+    for (const m of msgs) {
+      const u = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, m.senderId)).limit(1);
+      result.push({ ...m, senderName: u[0]?.displayName ?? "Unknown" });
+    }
+    return result;
+  }
+
+  async sendDM(data: InsertClassDirectMessage): Promise<ClassDirectMessage> {
+    const [msg] = await db.insert(classDirectMessages).values(data).returning();
+    return msg;
+  }
+
+  async editDM(messageId: string, userId: string, content: string): Promise<ClassDirectMessage | undefined> {
+    const [msg] = await db.update(classDirectMessages).set({ content, editedAt: new Date() }).where(and(eq(classDirectMessages.id, messageId), eq(classDirectMessages.senderId, userId))).returning();
+    return msg;
+  }
+
+  async deleteDM(messageId: string, userId: string): Promise<boolean> {
+    const msg = await db.select().from(classDirectMessages).where(eq(classDirectMessages.id, messageId)).limit(1);
+    if (!msg[0] || msg[0].senderId !== userId) return false;
+    await db.update(classDirectMessages).set({ isDeleted: true, content: "This message was deleted." }).where(eq(classDirectMessages.id, messageId));
+    return true;
+  }
+
+  async markDMsRead(userId: string, partnerId: string, classId: string): Promise<void> {
+    await db.update(classDirectMessages).set({ isRead: true }).where(and(eq(classDirectMessages.classId, classId), eq(classDirectMessages.senderId, partnerId), eq(classDirectMessages.receiverId, userId)));
+  }
+
+  async getDMUnreadCount(userId: string, classId: string): Promise<number> {
+    const msgs = await db.select().from(classDirectMessages).where(and(eq(classDirectMessages.classId, classId), eq(classDirectMessages.receiverId, userId), eq(classDirectMessages.isRead, false)));
+    return msgs.length;
+  }
+
+  async updateLastSeen(userId: string): Promise<void> {
+    await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async getOnlineUsers(userIds: string[]): Promise<Record<string, boolean>> {
+    if (!userIds.length) return {};
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+    const onlineUsers = await db.select({ id: users.id, lastSeenAt: users.lastSeenAt }).from(users).where(inArray(users.id, userIds));
+    const result: Record<string, boolean> = {};
+    for (const u of onlineUsers) {
+      result[u.id] = u.lastSeenAt ? u.lastSeenAt > cutoff : false;
+    }
+    return result;
   }
 
   // Achievements
