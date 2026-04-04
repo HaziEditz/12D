@@ -2226,6 +2226,165 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Spin / Roulette ─────────────────────────────────────────────────
+  const SPIN_COLLECTIBLES = [
+    { id: "col-coin", emoji: "🪙", name: "Gold Coin", rarity: "common" },
+    { id: "col-chart-up", emoji: "📈", name: "Bull Chart", rarity: "common" },
+    { id: "col-piggy", emoji: "🐷", name: "Piggy Bank", rarity: "common" },
+    { id: "col-notepad", emoji: "📔", name: "Trade Journal", rarity: "common" },
+    { id: "col-rocket", emoji: "🚀", name: "Moon Rocket", rarity: "rare" },
+    { id: "col-crown", emoji: "👑", name: "Gold Crown", rarity: "rare" },
+    { id: "col-gem", emoji: "💚", name: "Emerald Gem", rarity: "rare" },
+    { id: "col-lightning", emoji: "⚡", name: "Lightning Bolt", rarity: "rare" },
+    { id: "col-diamond", emoji: "💎", name: "Diamond", rarity: "epic" },
+    { id: "col-fire", emoji: "🔥", name: "Fire Badge", rarity: "epic" },
+    { id: "col-dragon", emoji: "🐉", name: "Dragon", rarity: "epic" },
+    { id: "col-unicorn", emoji: "🦄", name: "Unicorn", rarity: "legendary" },
+    { id: "col-golden-bull", emoji: "🐂", name: "Golden Bull", rarity: "legendary" },
+  ];
+
+  const SPIN_TIERS: Record<string, { cost: number; weights: Record<string, number> }> = {
+    basic:   { cost: 5,  weights: { "tokens_small": 40, "tokens_medium": 10, "collectible_common": 30, "collectible_rare": 15, "collectible_epic": 4, "collectible_legendary": 1 } },
+    premium: { cost: 15, weights: { "tokens_small": 20, "tokens_medium": 20, "tokens_large": 5, "collectible_common": 20, "collectible_rare": 25, "collectible_epic": 8, "collectible_legendary": 2 } },
+    elite:   { cost: 35, weights: { "tokens_medium": 15, "tokens_large": 20, "tokens_xl": 5, "collectible_common": 10, "collectible_rare": 25, "collectible_epic": 20, "collectible_legendary": 5 } },
+  };
+
+  function weightedRandom(weights: Record<string, number>): string {
+    const total = Object.values(weights).reduce((a, b) => a + b, 0);
+    let rand = Math.random() * total;
+    for (const [key, w] of Object.entries(weights)) { rand -= w; if (rand <= 0) return key; }
+    return Object.keys(weights)[0];
+  }
+
+  app.post("/api/fun-zone/spin", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { tier } = req.body;
+      const spinConfig = SPIN_TIERS[tier];
+      if (!spinConfig) return res.status(400).json({ message: "Invalid spin tier" });
+      const cost = spinConfig.cost;
+      const balance = user.classroomTokens ?? 0;
+      if (balance < cost) return res.status(400).json({ message: "Not enough tokens" });
+
+      const outcome = weightedRandom(spinConfig.weights);
+      let rewardType = "tokens", rewardAmount = 0, rewardId = null as string | null, rewardName = "", rewardEmoji = "🪙", rarity = "common";
+
+      if (outcome === "tokens_small")  { rewardAmount = Math.floor(Math.random() * 3) + 2; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_medium") { rewardAmount = Math.floor(Math.random() * 5) + 6; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_large")  { rewardAmount = Math.floor(Math.random() * 8) + 12; rewardName = `${rewardAmount} Tokens`; }
+      else if (outcome === "tokens_xl")     { rewardAmount = Math.floor(Math.random() * 10) + 22; rewardName = `${rewardAmount} Tokens`; }
+      else {
+        rewardType = "collectible";
+        const rarityMatch = outcome.split("_")[1] as "common" | "rare" | "epic" | "legendary";
+        rarity = rarityMatch;
+        const pool = SPIN_COLLECTIBLES.filter(c => c.rarity === rarityMatch);
+        const chosen = pool[Math.floor(Math.random() * pool.length)];
+        rewardId = chosen.id; rewardName = chosen.name; rewardEmoji = chosen.emoji;
+      }
+
+      // Deduct tokens
+      await storage.updateUserTokens(user.id, -cost);
+      // Award tokens if token reward
+      if (rewardType === "tokens" && rewardAmount > 0) await storage.updateUserTokens(user.id, rewardAmount);
+      // Award collectible if collectible reward
+      if (rewardType === "collectible" && rewardId) {
+        await storage.addInventoryItem(user.id, rewardId, "collectible", rarity, 1);
+      }
+      // Save to spin_history
+      await storage.saveSpinHistory({ userId: user.id, spinTier: tier, tokensSpent: cost, rewardType, rewardId, rewardAmount: rewardType === "tokens" ? rewardAmount : null, rewardName, rewardEmoji, rarity });
+
+      res.json({ success: true, outcome, rewardType, rewardAmount, rewardId, rewardName, rewardEmoji, rarity, tokensSpent: cost, netTokens: rewardType === "tokens" ? rewardAmount - cost : -cost });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Daily Deals ─────────────────────────────────────────────────────
+  const DAILY_DEAL_POOL = [
+    { id: "title-bull", name: "Bull 🐂", type: "title", basePrice: 8, emoji: "🐂" },
+    { id: "title-hodler", name: "HODLer 💪", type: "title", basePrice: 10, emoji: "💪" },
+    { id: "title-day-trader", name: "Day Trader", type: "title", basePrice: 12, emoji: "📊" },
+    { id: "title-diamond", name: "Diamond Hands 💎", type: "title", basePrice: 15, emoji: "💎" },
+    { id: "title-analyst", name: "Chart Analyst 📊", type: "title", basePrice: 18, emoji: "📊" },
+    { id: "title-whale", name: "Crypto Whale 🐋", type: "title", basePrice: 25, emoji: "🐋" },
+    { id: "frame-silver", name: "Silver Frame", type: "frame", basePrice: 15, emoji: "⬜" },
+    { id: "frame-blue", name: "Neon Blue Frame", type: "frame", basePrice: 20, emoji: "🟦" },
+    { id: "frame-green", name: "Emerald Frame", type: "frame", basePrice: 20, emoji: "🟩" },
+    { id: "frame-fire", name: "Fire Frame 🔥", type: "frame", basePrice: 28, emoji: "🔥" },
+    { id: "sticker-rocket", name: "Rocket Sticker 🚀", type: "sticker", basePrice: 5, emoji: "🚀" },
+    { id: "sticker-gem", name: "Gem Sticker 💎", type: "sticker", basePrice: 8, emoji: "💎" },
+    { id: "sticker-crown", name: "Crown Sticker 👑", type: "sticker", basePrice: 10, emoji: "👑" },
+    { id: "sticker-money", name: "Money Bag 💰", type: "sticker", basePrice: 12, emoji: "💰" },
+    { id: "bag-starter", name: "Starter Pack", type: "blind_bag", basePrice: 15, emoji: "🎒" },
+    { id: "bag-crypto", name: "Crypto Pack", type: "blind_bag", basePrice: 30, emoji: "💎" },
+    { id: "pu-double-tokens", name: "2× Token Boost", type: "power_up", basePrice: 20, emoji: "🎯" },
+    { id: "pu-shield", name: "Loss Shield", type: "power_up", basePrice: 15, emoji: "🛡️" },
+  ];
+
+  app.get("/api/fun-zone/daily-deals", requireAuth, async (req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const seed = today.split("-").reduce((a, b) => a * 31 + parseInt(b), 1);
+      const shuffled = [...DAILY_DEAL_POOL].sort((a, b) => {
+        const ha = (seed * 9301 + (DAILY_DEAL_POOL.indexOf(a) * 49297)) % 233280;
+        const hb = (seed * 9301 + (DAILY_DEAL_POOL.indexOf(b) * 49297)) % 233280;
+        return ha - hb;
+      });
+      const deals = shuffled.slice(0, 5).map((item, i) => {
+        const discountPct = [30, 25, 35, 20, 40][i % 5];
+        const salePrice = Math.max(1, Math.floor(item.basePrice * (1 - discountPct / 100)));
+        return { ...item, salePrice, discountPct, expiresAt: new Date(new Date().setHours(23,59,59,0)).toISOString() };
+      });
+      res.json(deals);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Student Marketplace ──────────────────────────────────────────────
+  app.get("/api/marketplace", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const listings = await storage.getMarketplaceListings(user.id);
+      res.json(listings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/marketplace", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { inventoryId, price } = req.body;
+      if (!inventoryId || typeof price !== "number" || price < 1) return res.status(400).json({ message: "inventoryId and price (≥1) required" });
+      if (price > 200) return res.status(400).json({ message: "Max listing price is 200 tokens" });
+      const result = await storage.createMarketplaceListing(user.id, inventoryId, price);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/marketplace/:id/buy", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.buyMarketplaceListing(req.params.id, user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/marketplace/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.cancelMarketplaceListing(req.params.id, user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // PayPal routes with error handling
   app.get("/setup", async (req, res) => {
     try {

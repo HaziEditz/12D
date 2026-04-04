@@ -113,6 +113,12 @@ The School System is a completely separate, immersive visual environment at `/sc
 - **Inventory Tab**: Collection grid showing owned collectibles and power-ups by rarity.
 - **Trade Tab**: Send/accept/reject/cancel trade offers between classmates via `trade_offers` table. `GET /api/trades`, `POST /api/trades`, `POST /api/trades/:id/respond`.
 - **Token Leaderboard**: `GET /api/fun-zone/token-leaderboard`. Added as a 4th tab ("Tokens") on the global `/leaderboard` page.
+- **Spin / Roulette** (`view === "spin"`): 3 tiers — Basic (5t), Premium (15t), Elite (35t) — with animated SVG spin wheel. Tier-weighted random outcomes (tokens, common/rare/epic/legendary collectibles). `POST /api/fun-zone/spin`. History saved to `spin_history` table. SpinResultModal reveals reward after wheel settles.
+- **Student Marketplace** (`view === "market"`): Classmates list tradable collectibles at custom prices (max 200t). Instant secure token transfer. `GET /api/marketplace`, `POST /api/marketplace`, `POST /api/marketplace/:id/buy`, `DELETE /api/marketplace/:id`. `student_marketplace_listings` table (status: active/sold/cancelled). Items marked `tradable=false` while listed; restored on cancel. Cannot buy own listings.
+- **Daily Deals**: Shop tab now has a "Daily Deals" section — 5 date-seeded discounted items (20–40% off) with live countdown to midnight reset. `GET /api/fun-zone/daily-deals`. Works with existing purchase/open-bag/buy-item endpoints.
+- **Cinematic Blind Bag Reveal**: Multi-phase `BagRevealModal` — shake (900ms) → burst particles (500ms) → item reveal with glow + star-pop animation (600ms) → done.
+- **Random Game Drops**: 15% chance on `handleEarnTokens` to toast a random bonus item drop notification.
+- **Simulator → Token Conversion Panel**: Info panel in Games tab explains $100 simulated profit = 1 token with example rate table.
 - **Token Bug Fix**: `/api/fun-zone/score` now awards tokens before saving score, so missing game/score fields don't prevent token credit. `awardTokensMutation` calls `refreshUser()` on success.
 - **Chat System Full Overhaul** (`client/src/pages/school/chat.tsx`): Three tabs — "Class Chat", "Groups", "DMs". Complete redesign with all social features.
   - **Edit/Delete**: Three-dot menu (⋯) on hover with Reply/Edit/Pin/Delete options in a clean dropdown. No more absolute-positioned buttons.

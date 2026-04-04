@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check, Package, ArrowLeftRight, Flame, Calendar, Gift, RefreshCw, AlertCircle, Timer, Shuffle } from "lucide-react";
+import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check, Package, ArrowLeftRight, Flame, Calendar, Gift, RefreshCw, AlertCircle, Timer, Shuffle, TrendingUp, Tag, Store, Plus, X, Clock } from "lucide-react";
 
 type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge" | "word-scramble" | "market-memory";
-type View = "games" | "shop" | "inventory" | "trade";
+type View = "games" | "shop" | "inventory" | "trade" | "spin" | "market";
 
 const RARITY_CONFIG = {
   common:    { label: "Common",    color: "text-slate-300",  bg: "bg-slate-500/20 border-slate-500/30",   glow: "" },
@@ -101,6 +101,185 @@ const COSMETICS = {
   ],
 };
 
+const SPIN_TIERS = [
+  { id: "basic",   label: "Basic Spin",   cost: 5,  emoji: "🎰", color: "from-slate-600 to-slate-700", desc: "Common & rare rewards", bestOdds: "common" },
+  { id: "premium", label: "Premium Spin", cost: 15, emoji: "💫", color: "from-blue-700 to-indigo-800", desc: "Rare & epic rewards", bestOdds: "rare" },
+  { id: "elite",   label: "Elite Spin",   cost: 35, emoji: "✨", color: "from-purple-700 to-violet-800", desc: "Epic & legendary rewards", bestOdds: "epic" },
+];
+
+const SPIN_WHEEL_SEGMENTS = [
+  { label: "Tokens!", emoji: "🪙", color: "#f59e0b" },
+  { label: "Common", emoji: "🪙", color: "#64748b" },
+  { label: "Rare!", emoji: "🚀", color: "#3b82f6" },
+  { label: "Tokens!", emoji: "💰", color: "#10b981" },
+  { label: "Epic!!", emoji: "💎", color: "#8b5cf6" },
+  { label: "Common", emoji: "📈", color: "#64748b" },
+  { label: "Tokens!", emoji: "🪙", color: "#f59e0b" },
+  { label: "Legendary", emoji: "🦄", color: "#f97316" },
+];
+
+// ── Cinematic Bag Reveal ──────────────────────────────────────────
+function BagRevealModal({ item, rarity, onClose }: { item: any; rarity: string; onClose: () => void }) {
+  const [phase, setPhase] = useState<"shake" | "burst" | "reveal" | "done">("shake");
+  const rarityConf = RARITY_CONFIG[rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+  const itemInfo = COLLECTIBLE_CATALOG[item?.itemId] ?? { emoji: "🎁", name: "Mystery Item" };
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase("burst"), 900);
+    const t2 = setTimeout(() => setPhase("reveal"), 1400);
+    const t3 = setTimeout(() => setPhase("done"), 2000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  const glowColors: Record<string, string> = { legendary: "#f59e0b", epic: "#8b5cf6", rare: "#3b82f6", common: "#94a3b8" };
+  const glow = glowColors[rarity] ?? "#94a3b8";
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={phase === "done" ? onClose : undefined}>
+      <div className="relative flex flex-col items-center gap-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
+        {/* Particle burst */}
+        {phase === "burst" && (
+          <div className="absolute inset-0 pointer-events-none">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="absolute top-1/2 left-1/2 w-3 h-3 rounded-full"
+                style={{ background: glow, transform: `rotate(${i * 30}deg) translateX(0)`, animation: `burst-particle 0.6s ease-out forwards`, animationDelay: `${i * 20}ms` }} />
+            ))}
+          </div>
+        )}
+
+        {/* Bag animation (phase: shake) */}
+        {(phase === "shake" || phase === "burst") && (
+          <div className={`text-9xl ${phase === "shake" ? "animate-bounce" : "scale-150 opacity-0 transition-all duration-500"}`}
+            style={{ filter: phase === "shake" ? `drop-shadow(0 0 20px ${glow})` : "none" }}>
+            🎒
+          </div>
+        )}
+
+        {/* Reveal (phases: reveal + done) */}
+        {(phase === "reveal" || phase === "done") && (
+          <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${phase === "reveal" ? "opacity-0 scale-50" : "opacity-100 scale-100"}`}>
+            {/* Glow circle */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full blur-2xl opacity-60" style={{ background: glow, transform: "scale(1.5)" }} />
+              <div className={`relative text-9xl`} style={{ filter: `drop-shadow(0 0 30px ${glow})` }}>{itemInfo.emoji}</div>
+            </div>
+            <Badge className={`text-base px-4 py-1.5 font-black ${rarityConf.bg} ${rarityConf.color} border`}>
+              ✨ {rarityConf.label}
+            </Badge>
+            <div className="text-center">
+              <h2 className="text-white font-black text-2xl">{itemInfo.name}</h2>
+              <p className="text-slate-400 text-sm mt-1">Added to your collection!</p>
+            </div>
+            {/* Stars animation */}
+            <div className="flex gap-1">
+              {[...Array(rarity === "legendary" ? 5 : rarity === "epic" ? 4 : rarity === "rare" ? 3 : 2)].map((_, i) => (
+                <span key={i} className="text-2xl" style={{ animation: `star-pop 0.3s ease-out forwards`, animationDelay: `${i * 100}ms`, opacity: 0 }}>⭐</span>
+              ))}
+            </div>
+            {phase === "done" && (
+              <Button onClick={onClose} className="w-full rounded-xl font-black text-base mt-2" data-testid="btn-close-reveal">
+                Awesome! 🎉
+              </Button>
+            )}
+          </div>
+        )}
+        {phase === "shake" && (
+          <p className="text-white/60 text-sm animate-pulse">Opening your bag...</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Spin Wheel ────────────────────────────────────────────────────
+function SpinWheel({ spinning, finalAngle }: { spinning: boolean; finalAngle: number }) {
+  const size = 260;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 8;
+  const n = SPIN_WHEEL_SEGMENTS.length;
+
+  const slices = SPIN_WHEEL_SEGMENTS.map((seg, i) => {
+    const startAngle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const endAngle = ((i + 1) / n) * Math.PI * 2 - Math.PI / 2;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const midAngle = (startAngle + endAngle) / 2;
+    const tx = cx + (r * 0.67) * Math.cos(midAngle);
+    const ty = cy + (r * 0.67) * Math.sin(midAngle);
+    return { seg, d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`, tx, ty, midAngle };
+  });
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      {/* Pointer */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10 text-2xl" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,.6))" }}>▼</div>
+      {/* Wheel */}
+      <div style={{
+        width: size, height: size, borderRadius: "50%", overflow: "hidden",
+        transition: spinning ? "transform 3s cubic-bezier(0.17,0.67,0.12,0.99)" : "none",
+        transform: `rotate(${finalAngle}deg)`,
+        boxShadow: "0 0 30px rgba(99,102,241,0.4), inset 0 0 0 4px rgba(255,255,255,0.1)",
+      }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {slices.map(({ seg, d, tx, ty }, i) => (
+            <g key={i}>
+              <path d={d} fill={seg.color} stroke="rgba(0,0,0,0.3)" strokeWidth="1.5" />
+              <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize="14" fill="white" fontWeight="bold" style={{ pointerEvents: "none" }}>{seg.emoji}</text>
+            </g>
+          ))}
+          <circle cx={cx} cy={cy} r={18} fill="#1e293b" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ── Spin Result Modal ─────────────────────────────────────────────
+function SpinResultModal({ result, onClose }: { result: any; onClose: () => void }) {
+  const rarityConf = RARITY_CONFIG[result.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+  const isTokens = result.rewardType === "tokens";
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#0d1526] border border-white/20 rounded-3xl p-8 text-center max-w-xs w-full space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="text-7xl animate-bounce" style={{ filter: isTokens ? "drop-shadow(0 0 20px #f59e0b)" : `drop-shadow(0 0 20px ${rarityConf.color})` }}>
+          {result.rewardEmoji}
+        </div>
+        <div>
+          {!isTokens && <Badge className={`text-sm font-black mb-2 ${rarityConf.bg} ${rarityConf.color} border`}>✨ {rarityConf.label}</Badge>}
+          <h2 className="text-white font-black text-2xl mt-1">{result.rewardName}</h2>
+          <p className="text-slate-400 text-sm mt-1">{isTokens ? "Added to your token balance!" : "Added to your collection!"}</p>
+        </div>
+        <div className={`rounded-xl px-4 py-2 text-sm font-bold ${result.netTokens >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+          Net: {result.netTokens >= 0 ? "+" : ""}{result.netTokens} tokens
+        </div>
+        <Button onClick={onClose} className="w-full rounded-xl font-black">Collect!</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Daily Deal Countdown ──────────────────────────────────────────
+function DealCountdown() {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      const midnight = new Date(now); midnight.setHours(24, 0, 0, 0);
+      setSecs(Math.floor((midnight.getTime() - now.getTime()) / 1000));
+    };
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const h = Math.floor(secs / 3600).toString().padStart(2, "0");
+  const m = Math.floor((secs % 3600) / 60).toString().padStart(2, "0");
+  const s = (secs % 60).toString().padStart(2, "0");
+  return <span className="text-amber-400 font-mono font-black">{h}:{m}:{s}</span>;
+}
+
 export default function SchoolFunZone() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
@@ -112,8 +291,25 @@ export default function SchoolFunZone() {
   const [view, setView] = useState<View>("games");
   const [bagReveal, setBagReveal] = useState<{ item: any; rarity: string } | null>(null);
 
+  // Spin state
+  const [spinTier, setSpinTier] = useState<string>("basic");
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [spinAngle, setSpinAngle] = useState(0);
+  const [spinResult, setSpinResult] = useState<any | null>(null);
+
+  // Market state
+  const [listingItemId, setListingItemId] = useState<string>("");
+  const [listingPrice, setListingPrice] = useState<string>("10");
+  const [showListForm, setShowListForm] = useState(false);
+
   const { data: inventory = [], refetch: refetchInventory } = useQuery<any[]>({ queryKey: ["/api/inventory"] });
   const { data: tradeOffersList = [], refetch: refetchTrades } = useQuery<any[]>({ queryKey: ["/api/trades"] });
+  const { data: dailyDeals = [] } = useQuery<any[]>({ queryKey: ["/api/fun-zone/daily-deals"], refetchInterval: 60000 });
+  const { data: marketListings = [], refetch: refetchMarket } = useQuery<any[]>({
+    queryKey: ["/api/marketplace"],
+    refetchInterval: 10000,
+    enabled: view === "market",
+  });
 
   const awardTokensMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/fun-zone/score", { tokensEarned: amount }),
@@ -159,7 +355,7 @@ export default function SchoolFunZone() {
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         refreshUser();
       } else {
-        toast({ title: "Already claimed", description: "Come back tomorrow for your next reward!", variant: "default" });
+        toast({ title: "Already claimed!", description: data.message, variant: "destructive" });
       }
     },
   });
@@ -170,12 +366,12 @@ export default function SchoolFunZone() {
     },
     onSuccess: (data: any) => {
       if (data.success) {
-        toast({ title: "Purchased!", description: data.message });
+        toast({ title: "Got it!", description: "Added to your collection" });
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
         refreshUser(); refetchInventory();
       } else {
-        toast({ title: "Cannot buy", description: data.message, variant: "destructive" });
+        toast({ title: "Failed", description: data.message, variant: "destructive" });
       }
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -209,11 +405,96 @@ export default function SchoolFunZone() {
     },
   });
 
+  const spinMutation = useMutation({
+    mutationFn: async (tier: string) => {
+      const r = await apiRequest("POST", "/api/fun-zone/spin", { tier }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        setSpinResult(data);
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+        refreshUser(); refetchInventory();
+      } else {
+        toast({ title: "Spin failed", description: data.message, variant: "destructive" });
+      }
+      setIsSpinning(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setIsSpinning(false);
+    },
+  });
+
+  const createListingMutation = useMutation({
+    mutationFn: async ({ inventoryId, price }: { inventoryId: string; price: number }) => {
+      const r = await apiRequest("POST", "/api/marketplace", { inventoryId, price }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Listed!", description: "Your item is now on the marketplace" });
+        setShowListForm(false); setListingItemId(""); setListingPrice("10");
+        refetchInventory(); refetchMarket();
+      } else {
+        toast({ title: "Could not list", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const buyListingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await apiRequest("POST", `/api/marketplace/${id}/buy`, {}); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Purchased!", description: data.message });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        refetchInventory(); refetchMarket(); refreshUser();
+      } else {
+        toast({ title: "Failed", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const cancelListingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await apiRequest("DELETE", `/api/marketplace/${id}`, {}); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Listing cancelled" });
+        refetchInventory(); refetchMarket();
+      } else {
+        toast({ title: "Failed", description: data.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const handleSpin = () => {
+    if (isSpinning) return;
+    const tier = SPIN_TIERS.find(t => t.id === spinTier)!;
+    if (tokenBalance < tier.cost) { toast({ title: "Not enough tokens", variant: "destructive" }); return; }
+    setIsSpinning(true);
+    const extraRotations = 5 * 360;
+    const randomStop = Math.random() * 360;
+    setSpinAngle(prev => prev + extraRotations + randomStop);
+    // Hit server 2.5s in (while still spinning)
+    setTimeout(() => { spinMutation.mutate(spinTier); }, 2500);
+  };
+
   const handleEarnTokens = (amount: number) => {
     setTokensEarned(prev => prev + amount);
     setShowConfetti(true);
     awardTokensMutation.mutate(amount);
     setTimeout(() => setShowConfetti(false), 3000);
+    // Small chance (15%) for a random bonus drop notification
+    if (Math.random() < 0.15) {
+      const drops = ["🪙 Gold Coin", "📈 Bull Chart", "🐷 Piggy Bank"];
+      const drop = drops[Math.floor(Math.random() * drops.length)];
+      setTimeout(() => toast({ title: "🎁 Random Drop!", description: `You found a ${drop} while playing!` }), 1500);
+    }
   };
 
   const isPrimary = ageGroup === "primary";
@@ -267,8 +548,12 @@ export default function SchoolFunZone() {
     games: isPrimary ? "🎮 Fun Zone!" : isIntermediate ? "🎮 Game Zone" : "🎮 Challenge Arena",
     shop: "🛍️ Token Shop",
     inventory: "🎒 My Collection",
-    trade: "🔄 Trade Market",
+    trade: "🔄 Trade Offers",
+    spin: "🎰 Lucky Spin",
+    market: "🏪 Marketplace",
   };
+
+  const tradableItems = (inventory as any[]).filter(i => i.tradable && i.itemType === "collectible");
 
   return (
     <SchoolLayout>
@@ -276,19 +561,10 @@ export default function SchoolFunZone() {
         {showConfetti && <Confetti />}
 
         {/* Bag reveal modal */}
-        {bagReveal && (
-          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setBagReveal(null)}>
-            <div className={`rounded-3xl p-8 text-center max-w-xs w-full border-2 ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.bg ?? "bg-white/10 border-white/20"} ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.glow ?? ""}`} onClick={e => e.stopPropagation()}>
-              <div className="text-7xl mb-4 animate-bounce">{COLLECTIBLE_CATALOG[bagReveal.item?.itemId]?.emoji ?? "🎁"}</div>
-              <Badge className={`text-sm font-black mb-3 ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.bg ?? ""} ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.color ?? ""}`}>
-                ✨ {RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.label ?? bagReveal.rarity}
-              </Badge>
-              <h2 className="text-white font-black text-2xl mt-2">{COLLECTIBLE_CATALOG[bagReveal.item?.itemId]?.name ?? "Mystery Item"}</h2>
-              <p className="text-slate-400 text-sm mt-2 mb-5">Added to your collection!</p>
-              <Button onClick={() => setBagReveal(null)} className="w-full rounded-xl font-black" data-testid="btn-close-reveal">Awesome!</Button>
-            </div>
-          </div>
-        )}
+        {bagReveal && <BagRevealModal item={bagReveal.item} rarity={bagReveal.rarity} onClose={() => setBagReveal(null)} />}
+
+        {/* Spin result modal */}
+        {spinResult && <SpinResultModal result={spinResult} onClose={() => setSpinResult(null)} />}
 
         {/* Header */}
         <div className={`relative overflow-hidden rounded-2xl p-5 ${isPrimary ? "bg-gradient-to-r from-purple-400 to-pink-500" : "bg-gradient-to-r from-purple-700 to-violet-800"}`}>
@@ -297,7 +573,12 @@ export default function SchoolFunZone() {
             <div>
               <h1 className="text-xl font-black text-white">{viewLabels[view]}</h1>
               <p className="text-sm mt-0.5 text-white/70">
-                {view === "games" ? (isPrimary ? "Play games and earn tokens! 🪙" : "Earn tokens, unlock collectibles!") : view === "shop" ? "Spend tokens on cosmetics, bags & power-ups" : view === "inventory" ? "Your collected items and power-ups" : "Trade items with classmates"}
+                {view === "games" ? (isPrimary ? "Play games and earn tokens! 🪙" : "Earn tokens, unlock collectibles!")
+                  : view === "shop" ? "Spend tokens on cosmetics, bags & power-ups"
+                  : view === "inventory" ? "Your collected items and power-ups"
+                  : view === "trade" ? "P2P item trading with classmates"
+                  : view === "spin" ? "Spin for random rewards — all skills, no luck... well, maybe a little 🎰"
+                  : "Buy and sell items with classmates"}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -318,16 +599,21 @@ export default function SchoolFunZone() {
 
         {/* Navigation tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {(["games", "shop", "inventory", "trade"] as View[]).map(v => (
+          {(["games", "shop", "spin", "market", "inventory", "trade"] as View[]).map(v => (
             <button key={v} onClick={() => setView(v)} data-testid={`tab-${v}`}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all relative ${view === v ? "bg-primary text-primary-foreground" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"}`}>
-              {v === "games" ? <><Zap className="h-3.5 w-3.5" />Games</> : v === "shop" ? <><ShoppingBag className="h-3.5 w-3.5" />Shop</> : v === "inventory" ? <><Package className="h-3.5 w-3.5" />Collection</> : <><ArrowLeftRight className="h-3.5 w-3.5" />Trade</>}
+              {v === "games" ? <><Zap className="h-3.5 w-3.5" />Games</>
+                : v === "shop" ? <><ShoppingBag className="h-3.5 w-3.5" />Shop</>
+                : v === "spin" ? <><Shuffle className="h-3.5 w-3.5" />Spin</>
+                : v === "market" ? <><Store className="h-3.5 w-3.5" />Market</>
+                : v === "inventory" ? <><Package className="h-3.5 w-3.5" />Collection</>
+                : <><ArrowLeftRight className="h-3.5 w-3.5" />Trades</>}
               {v === "trade" && pendingIncoming > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-black">{pendingIncoming}</span>}
             </button>
           ))}
         </div>
 
-        {/* GAMES VIEW */}
+        {/* ── GAMES VIEW ── */}
         {view === "games" && (
           <>
             {claimedToday ? (
@@ -347,6 +633,21 @@ export default function SchoolFunZone() {
                 </Button>
               </div>
             )}
+
+            {/* Simulator conversion info */}
+            <div className="rounded-xl p-4 bg-teal-500/10 border border-teal-500/20 flex items-start gap-3">
+              <TrendingUp className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-teal-300 font-bold text-sm">Simulator → Token Conversion</p>
+                <p className="text-teal-400/70 text-xs mt-0.5">Every $100 simulated profit converts to <span className="font-bold text-teal-300">1 token</span>. Trade smart to earn more tokens faster!</p>
+                <div className="flex gap-3 mt-2 text-xs text-teal-400/60">
+                  <span>$100 → 1 token</span>
+                  <span>$500 → 5 tokens</span>
+                  <span>$1,000 → 10 tokens</span>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sw-stagger">
               {games.map(game => (
                 <div key={game.id} onClick={() => setActiveGame(game.id)}
@@ -367,16 +668,233 @@ export default function SchoolFunZone() {
           </>
         )}
 
-        {/* SHOP VIEW */}
+        {/* ── SPIN VIEW ── */}
+        {view === "spin" && (
+          <div className="space-y-6">
+            {/* Tier selection */}
+            <div>
+              <h2 className="font-black text-white text-lg mb-3 flex items-center gap-2"><Shuffle className="h-5 w-5 text-purple-400" />Choose Your Spin</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {SPIN_TIERS.map(tier => (
+                  <button key={tier.id} onClick={() => setSpinTier(tier.id)} data-testid={`spin-tier-${tier.id}`}
+                    className={`rounded-2xl p-4 text-left transition-all border-2 bg-gradient-to-br ${tier.color} ${spinTier === tier.id ? "border-white scale-[1.02]" : "border-transparent opacity-80 hover:opacity-100"}`}>
+                    <div className="text-3xl mb-2">{tier.emoji}</div>
+                    <p className="text-white font-black">{tier.label}</p>
+                    <p className="text-white/60 text-xs mt-0.5">{tier.desc}</p>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Coins className="h-3.5 w-3.5 text-amber-300" />
+                      <span className="text-white font-black">{tier.cost} tokens</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Spin wheel + button */}
+            <div className="flex flex-col items-center gap-6">
+              <SpinWheel spinning={isSpinning} finalAngle={spinAngle} />
+              <div className="text-center">
+                <Button onClick={handleSpin} disabled={isSpinning || tokenBalance < (SPIN_TIERS.find(t => t.id === spinTier)?.cost ?? 999) || spinMutation.isPending}
+                  className="px-10 py-4 rounded-2xl font-black text-lg bg-gradient-to-r from-purple-600 to-violet-700 hover:from-purple-500 hover:to-violet-600 text-white disabled:opacity-50 transition-all"
+                  data-testid="btn-spin">
+                  {isSpinning ? <><RefreshCw className="h-5 w-5 mr-2 animate-spin" />Spinning...</> : `🎰 Spin for ${SPIN_TIERS.find(t => t.id === spinTier)?.cost} tokens`}
+                </Button>
+                {tokenBalance < (SPIN_TIERS.find(t => t.id === spinTier)?.cost ?? 999) && (
+                  <p className="text-rose-400 text-xs mt-2 font-bold">Not enough tokens — earn more by playing games!</p>
+                )}
+              </div>
+
+              {/* Odds breakdown */}
+              <div className="w-full max-w-sm rounded-2xl bg-white/5 border border-white/10 p-4">
+                <p className="text-white font-bold text-sm mb-3 text-center">Reward Chances — {SPIN_TIERS.find(t => t.id === spinTier)?.label}</p>
+                {spinTier === "basic" && (
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between"><span className="text-slate-400">Tokens (small)</span><span className="text-amber-400 font-bold">40%</span></div>
+                    <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">30%</span></div>
+                    <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">15%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">10%</span></div>
+                    <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">4%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">1%</span></div>
+                  </div>
+                )}
+                {spinTier === "premium" && (
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">25%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Tokens (small)</span><span className="text-slate-400 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">8%</span></div>
+                    <div className="flex justify-between"><span className="text-emerald-400">Tokens (large)</span><span className="text-emerald-400 font-bold">5%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">2%</span></div>
+                  </div>
+                )}
+                {spinTier === "elite" && (
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between"><span className="text-emerald-400">Tokens (large)</span><span className="text-emerald-400 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-blue-300">Rare collectible</span><span className="text-blue-300 font-bold">25%</span></div>
+                    <div className="flex justify-between"><span className="text-purple-300">Epic collectible</span><span className="text-purple-300 font-bold">20%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-400">Tokens (medium)</span><span className="text-amber-400 font-bold">15%</span></div>
+                    <div className="flex justify-between"><span className="text-slate-300">Common collectible</span><span className="text-slate-300 font-bold">10%</span></div>
+                    <div className="flex justify-between"><span className="text-amber-300">Legendary</span><span className="text-amber-300 font-bold">5%</span></div>
+                    <div className="flex justify-between"><span className="text-yellow-300">Tokens (XL)</span><span className="text-yellow-300 font-bold">5%</span></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MARKETPLACE VIEW ── */}
+        {view === "market" && (
+          <div className="space-y-5">
+            {/* Header + list button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-black text-white text-lg flex items-center gap-2"><Store className="h-5 w-5 text-teal-400" />Student Marketplace</h2>
+                <p className="text-slate-400 text-xs mt-0.5">Buy and sell collectibles with your classmates. Token transfers are instant and secure.</p>
+              </div>
+              <Button onClick={() => setShowListForm(!showListForm)} size="sm" className="rounded-xl font-bold bg-teal-600 hover:bg-teal-500 text-white gap-1.5" data-testid="btn-toggle-list-form">
+                <Plus className="h-3.5 w-3.5" />List Item
+              </Button>
+            </div>
+
+            {/* Create listing form */}
+            {showListForm && (
+              <div className="rounded-2xl p-5 bg-white/5 border border-white/10 space-y-4">
+                <h3 className="font-black text-white">List an Item for Sale</h3>
+                {tradableItems.length === 0 ? (
+                  <p className="text-slate-400 text-sm">No tradable items in your collection. Open some mystery bags first!</p>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Select Item</label>
+                      <select value={listingItemId} onChange={e => setListingItemId(e.target.value)} data-testid="select-listing-item"
+                        className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white focus:outline-none focus:border-teal-500/50">
+                        <option value="">— Choose an item —</option>
+                        {tradableItems.map((item: any) => {
+                          const info = COLLECTIBLE_CATALOG[item.itemId];
+                          return <option key={item.id} value={item.id}>{info?.emoji} {info?.name ?? item.itemId} ({item.rarity})</option>;
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Price (tokens)</label>
+                      <input type="number" min="1" max="200" value={listingPrice} onChange={e => setListingPrice(e.target.value)}
+                        data-testid="input-listing-price"
+                        className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white focus:outline-none focus:border-teal-500/50" />
+                      <p className="text-slate-500 text-xs mt-1">Min: 1 token · Max: 200 tokens</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={() => createListingMutation.mutate({ inventoryId: listingItemId, price: parseInt(listingPrice) })}
+                        disabled={!listingItemId || !listingPrice || createListingMutation.isPending}
+                        className="flex-1 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold" data-testid="btn-create-listing">
+                        {createListingMutation.isPending ? "Listing..." : "List for Sale"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowListForm(false)} className="rounded-xl border-white/20 text-slate-400" data-testid="btn-cancel-list">Cancel</Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Active listings */}
+            {(marketListings as any[]).length === 0 ? (
+              <div className="rounded-2xl p-12 bg-white/5 border border-white/10 text-center">
+                <Store className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-white font-bold text-lg">No listings yet!</p>
+                <p className="text-slate-400 text-sm mt-1">Be the first to list an item from your collection.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(marketListings as any[]).map((listing: any) => {
+                  const rarityConf = RARITY_CONFIG[listing.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+                  const isOwn = listing.sellerId === user?.id;
+                  return (
+                    <div key={listing.id} className={`rounded-2xl p-4 border transition-all ${rarityConf.bg} ${rarityConf.glow}`} data-testid={`listing-${listing.id}`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="text-4xl">{listing.itemEmoji}</div>
+                        <Badge className={`text-xs ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>
+                      </div>
+                      <h3 className="font-black text-white text-sm">{listing.itemName}</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Seller: {listing.sellerName}</p>
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-1.5">
+                          <Coins className="h-4 w-4 text-amber-400" />
+                          <span className="text-amber-400 font-black text-base">{listing.price}</span>
+                        </div>
+                        {isOwn ? (
+                          <Button size="sm" variant="outline" className="rounded-lg text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                            onClick={() => cancelListingMutation.mutate(listing.id)} disabled={cancelListingMutation.isPending}
+                            data-testid={`btn-cancel-listing-${listing.id}`}>Remove</Button>
+                        ) : (
+                          <Button size="sm" className="rounded-lg text-xs bg-teal-600 hover:bg-teal-500 text-white font-bold"
+                            onClick={() => buyListingMutation.mutate(listing.id)}
+                            disabled={buyListingMutation.isPending || tokenBalance < listing.price}
+                            data-testid={`btn-buy-listing-${listing.id}`}>
+                            {tokenBalance < listing.price ? <Lock className="h-3 w-3" /> : "Buy"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SHOP VIEW ── */}
         {view === "shop" && (
           <div className="space-y-6">
+            {/* Daily Deals */}
+            <div className="rounded-2xl bg-gradient-to-br from-amber-600/20 to-orange-600/20 border border-amber-500/30 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-amber-400" />
+                  <h2 className="font-black text-lg text-white">Daily Deals</h2>
+                  <Badge className="bg-amber-500/30 text-amber-300 border-0 text-xs">Resets in <DealCountdown /></Badge>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                {(dailyDeals as any[]).map((deal: any) => {
+                  const isOwned = owned.includes(deal.id);
+                  return (
+                    <div key={deal.id} className="rounded-xl bg-black/20 border border-white/10 p-3 flex flex-col items-center text-center gap-1.5" data-testid={`daily-deal-${deal.id}`}>
+                      <div className="text-3xl sw-float">{deal.emoji}</div>
+                      <p className="text-white font-bold text-xs leading-tight">{deal.name}</p>
+                      <div className="flex items-center gap-1">
+                        <span className="text-slate-500 text-xs line-through">{deal.basePrice}</span>
+                        <span className="text-amber-400 font-black text-sm">{deal.salePrice}</span>
+                        <span className="text-emerald-400 text-xs font-bold">-{deal.discountPct}%</span>
+                      </div>
+                      {isOwned ? (
+                        <Badge className="text-xs bg-emerald-500/20 text-emerald-400 border-0">Owned ✓</Badge>
+                      ) : (
+                        <Button size="sm" className="w-full h-6 text-xs rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold"
+                          onClick={() => deal.type === "blind_bag"
+                            ? openBagMutation.mutate({ bagId: deal.id, cost: deal.salePrice })
+                            : deal.type === "power_up"
+                              ? buyItemMutation.mutate({ itemId: deal.id, itemType: "power_up", cost: deal.salePrice })
+                              : purchaseMutation.mutate({ cosmeticId: deal.id, cost: deal.salePrice })
+                          }
+                          disabled={tokenBalance < deal.salePrice || purchaseMutation.isPending || openBagMutation.isPending || buyItemMutation.isPending}
+                          data-testid={`btn-buy-deal-${deal.id}`}>
+                          {tokenBalance < deal.salePrice ? <Lock className="h-3 w-3" /> : "Deal!"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Blind Bags */}
             <div>
               <div className="flex items-center gap-2 mb-3"><Package className="h-5 w-5 text-purple-400" /><h2 className="font-black text-lg text-white">Mystery Bags</h2><span className="text-sm text-slate-400">Open to get a random collectible!</span></div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {BLIND_BAGS.map(bag => (
                   <div key={bag.id} className={`rounded-2xl p-5 bg-gradient-to-br ${bag.color} border border-white/10`} data-testid={`bag-${bag.id}`}>
-                    <div className="text-4xl mb-2">{bag.emoji}</div>
+                    <div className="text-4xl mb-2 sw-float">{bag.emoji}</div>
                     <h3 className="text-white font-black text-base">{bag.name}</h3>
                     <p className="text-white/60 text-xs mt-1 mb-3">{bag.desc}</p>
                     <div className="flex items-center justify-between">
@@ -548,7 +1066,7 @@ export default function SchoolFunZone() {
           </div>
         )}
 
-        {/* INVENTORY VIEW */}
+        {/* ── INVENTORY VIEW ── */}
         {view === "inventory" && (
           <div className="space-y-4">
             {inventory.length === 0 ? (
@@ -562,9 +1080,10 @@ export default function SchoolFunZone() {
               <>
                 <div className="flex items-center justify-between">
                   <p className="text-white font-bold">{inventory.length} item{inventory.length !== 1 ? "s" : ""} in collection</p>
+                  <p className="text-slate-400 text-xs">{tradableItems.length} tradable</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {inventory.map((item: any) => {
+                  {(inventory as any[]).map((item: any) => {
                     const col = item.itemType === "collectible" ? COLLECTIBLE_CATALOG[item.itemId] : null;
                     const pu = item.itemType === "power_up" ? POWER_UP_CATALOG[item.itemId] : null;
                     const rarityConf = item.rarity ? RARITY_CONFIG[item.rarity as keyof typeof RARITY_CONFIG] : null;
@@ -574,9 +1093,11 @@ export default function SchoolFunZone() {
                         <p className="text-white font-bold text-xs">{col?.name ?? pu?.name ?? item.itemId}</p>
                         {rarityConf && <Badge className={`text-xs mt-1 ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>}
                         {item.quantity > 1 && <p className="text-slate-400 text-xs mt-1">×{item.quantity}</p>}
+                        {!item.tradable && item.itemType === "collectible" && <p className="text-amber-400 text-xs mt-1">Listed</p>}
                         {item.tradable && item.itemType === "collectible" && (
                           <Button size="sm" variant="outline" className="w-full mt-2 h-6 text-xs rounded-lg border-white/20 text-slate-300"
-                            onClick={() => setView("trade")} data-testid={`btn-trade-item-${item.id}`}>Trade</Button>
+                            onClick={() => { setListingItemId(item.id); setShowListForm(true); setView("market"); }}
+                            data-testid={`btn-list-item-${item.id}`}>Sell</Button>
                         )}
                       </div>
                     );
@@ -587,10 +1108,9 @@ export default function SchoolFunZone() {
           </div>
         )}
 
-        {/* TRADE VIEW */}
+        {/* ── TRADE VIEW ── */}
         {view === "trade" && (
           <div className="space-y-5">
-            {/* Incoming trades */}
             <div>
               <h2 className="font-black text-white text-base mb-3 flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-400" />Incoming Offers {pendingIncoming > 0 && <Badge className="bg-rose-500 text-white text-xs">{pendingIncoming}</Badge>}</h2>
               {tradeOffersList.filter((t: any) => t.toUserId === user?.id && t.status === "pending").length === 0 ? (
@@ -618,12 +1138,10 @@ export default function SchoolFunZone() {
                 </div>
               )}
             </div>
-
-            {/* My offers */}
             <div>
               <h2 className="font-black text-white text-base mb-3">My Sent Offers</h2>
               {tradeOffersList.filter((t: any) => t.fromUserId === user?.id).length === 0 ? (
-                <div className="rounded-xl p-6 bg-white/5 border border-white/10 text-center text-slate-400 text-sm">No sent offers yet. Go to your Collection to trade items!</div>
+                <div className="rounded-xl p-6 bg-white/5 border border-white/10 text-center text-slate-400 text-sm">No sent offers yet. Use the Marketplace to sell items!</div>
               ) : (
                 <div className="space-y-3">
                   {tradeOffersList.filter((t: any) => t.fromUserId === user?.id).slice(0, 10).map((trade: any) => (
@@ -647,14 +1165,18 @@ export default function SchoolFunZone() {
                 </div>
               )}
             </div>
-
-            <div className="rounded-xl p-4 bg-blue-500/10 border border-blue-500/20">
-              <p className="text-blue-300 text-sm font-bold">How to trade</p>
-              <p className="text-blue-400/70 text-xs mt-1">Go to your Collection tab, tap an item, and select "Trade" to send an offer to a classmate.</p>
+            <div className="rounded-xl p-4 bg-teal-500/10 border border-teal-500/20">
+              <p className="text-teal-300 text-sm font-bold">Tip: Use the Marketplace!</p>
+              <p className="text-teal-400/70 text-xs mt-1">The new Marketplace lets you list items at a set price for any classmate to buy instantly — no back-and-forth needed.</p>
             </div>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes burst-particle { 0% { transform: rotate(var(--r, 0deg)) translateX(0); opacity: 1; } 100% { transform: rotate(var(--r, 0deg)) translateX(80px); opacity: 0; } }
+        @keyframes star-pop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 70% { transform: scale(1.3) rotate(10deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+      `}</style>
     </SchoolLayout>
   );
 }

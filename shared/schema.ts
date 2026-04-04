@@ -712,12 +712,45 @@ export const tradeOffers = pgTable("trade_offers", {
   respondedAt: timestamp("responded_at"),
 });
 
+export const studentMarketplaceListings = pgTable("student_marketplace_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  sellerId: varchar("seller_id").notNull(),
+  sellerName: varchar("seller_name", { length: 100 }).notNull(),
+  inventoryId: varchar("inventory_id").notNull(),
+  itemId: varchar("item_id", { length: 100 }).notNull(),
+  itemType: varchar("item_type", { length: 50 }).notNull(),
+  itemName: varchar("item_name", { length: 100 }).notNull(),
+  itemEmoji: varchar("item_emoji", { length: 20 }).notNull(),
+  rarity: varchar("rarity", { length: 20 }),
+  price: integer("price").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const spinHistory = pgTable("spin_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  spinTier: varchar("spin_tier", { length: 20 }).notNull(),
+  tokensSpent: integer("tokens_spent").notNull(),
+  rewardType: varchar("reward_type", { length: 50 }).notNull(),
+  rewardId: varchar("reward_id", { length: 100 }),
+  rewardAmount: integer("reward_amount"),
+  rewardName: varchar("reward_name", { length: 100 }),
+  rewardEmoji: varchar("reward_emoji", { length: 20 }),
+  rarity: varchar("rarity", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserInventorySchema = createInsertSchema(userInventory).omit({ id: true, createdAt: true });
 export const insertTradeOfferSchema = createInsertSchema(tradeOffers).omit({ id: true, createdAt: true, respondedAt: true });
+export const insertMarketplaceListingSchema = createInsertSchema(studentMarketplaceListings).omit({ id: true, createdAt: true });
 export type UserInventory = typeof userInventory.$inferSelect;
 export type InsertUserInventory = z.infer<typeof insertUserInventorySchema>;
 export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type InsertTradeOffer = z.infer<typeof insertTradeOfferSchema>;
+export type MarketplaceListing = typeof studentMarketplaceListings.$inferSelect;
+export type SpinHistory = typeof spinHistory.$inferSelect;
 
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),

@@ -8,7 +8,7 @@ import {
   classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
   classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
-  classroomAssets, studentAssets, userInventory, tradeOffers,
+  classroomAssets, studentAssets, userInventory, tradeOffers, studentMarketplaceListings, spinHistory,
   classGroupChats, classGroupChatMembers, classGroupChatMessages,
   classMessageReactions, classDirectMessages,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
@@ -273,6 +273,13 @@ export interface IStorage {
   createTradeOffer(fromUserId: string, toUserId: string, offeredInventoryIds: string[], requestedInventoryIds: string[], tokenBonus: number, message: string): Promise<TradeOffer>;
   respondToTradeOffer(id: string, userId: string, action: "accept" | "reject" | "cancel"): Promise<{ success: boolean; message: string }>;
   getTokenLeaderboard(): Promise<{ userId: string; displayName: string; classroomTokens: number; loginStreak: number }[]>;
+  updateUserTokens(userId: string, delta: number): Promise<void>;
+  addInventoryItem(userId: string, itemId: string, itemType: string, rarity: string, quantity: number): Promise<UserInventory>;
+  saveSpinHistory(data: { userId: string; spinTier: string; tokensSpent: number; rewardType: string; rewardId?: string | null; rewardAmount?: number | null; rewardName: string; rewardEmoji: string; rarity: string }): Promise<void>;
+  getMarketplaceListings(userId: string): Promise<any[]>;
+  createMarketplaceListing(userId: string, inventoryId: string, price: number): Promise<{ success: boolean; message: string; listing?: any }>;
+  buyMarketplaceListing(listingId: string, buyerId: string): Promise<{ success: boolean; message: string }>;
+  cancelMarketplaceListing(listingId: string, userId: string): Promise<{ success: boolean; message: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1531,6 +1538,111 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.classroomTokens))
       .limit(50);
     return results;
+  }
+
+  async updateUserTokens(userId: string, delta: number): Promise<void> {
+    if (delta >= 0) {
+      await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${delta}` }).where(eq(users.id, userId));
+    } else {
+      const absDelta = Math.abs(delta);
+      await db.update(users).set({ classroomTokens: sql`GREATEST(0, ${users.classroomTokens} - ${absDelta})` }).where(eq(users.id, userId));
+    }
+  }
+
+  async addInventoryItem(userId: string, itemId: string, itemType: string, rarity: string, quantity: number): Promise<UserInventory> {
+    return await this.addToInventory({ userId, itemId, itemType, rarity, quantity, tradable: true });
+  }
+
+  async saveSpinHistory(data: { userId: string; spinTier: string; tokensSpent: number; rewardType: string; rewardId?: string | null; rewardAmount?: number | null; rewardName: string; rewardEmoji: string; rarity: string }): Promise<void> {
+    await db.insert(spinHistory).values({
+      userId: data.userId, spinTier: data.spinTier, tokensSpent: data.tokensSpent,
+      rewardType: data.rewardType, rewardId: data.rewardId ?? null, rewardAmount: data.rewardAmount ?? null,
+      rewardName: data.rewardName, rewardEmoji: data.rewardEmoji, rarity: data.rarity,
+    });
+  }
+
+  async getMarketplaceListings(userId: string): Promise<any[]> {
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return [];
+    return await db.select().from(studentMarketplaceListings)
+      .where(and(eq(studentMarketplaceListings.classId, classId), eq(studentMarketplaceListings.status, "active")))
+      .orderBy(desc(studentMarketplaceListings.createdAt));
+  }
+
+  private async getUserClassId(userId: string): Promise<string | null> {
+    const user = await this.getUserById(userId);
+    if (!user) return null;
+    if (user.role === "teacher" || user.role === "admin") {
+      const cls = await db.select().from(classes).where(eq(classes.teacherId, userId)).limit(1);
+      return cls[0]?.id ?? null;
+    }
+    const enrollment = await db.select().from(classStudents).where(eq(classStudents.studentId, userId)).limit(1);
+    return enrollment[0]?.classId ?? null;
+  }
+
+  async createMarketplaceListing(userId: string, inventoryId: string, price: number): Promise<{ success: boolean; message: string; listing?: any }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    const [invItem] = await db.select().from(userInventory).where(and(eq(userInventory.id, inventoryId), eq(userInventory.userId, userId)));
+    if (!invItem) return { success: false, message: "Item not found in your inventory" };
+    if (!invItem.tradable) return { success: false, message: "This item cannot be traded" };
+    // Check if already listed
+    const existing = await db.select().from(studentMarketplaceListings)
+      .where(and(eq(studentMarketplaceListings.inventoryId, inventoryId), eq(studentMarketplaceListings.status, "active")));
+    if (existing.length > 0) return { success: false, message: "Item is already listed" };
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return { success: false, message: "You must be in a class to list items" };
+    // Look up item name/emoji
+    const COLLECTIBLE_INFO: Record<string, { emoji: string; name: string }> = {
+      "col-coin": { emoji: "🪙", name: "Gold Coin" }, "col-chart-up": { emoji: "📈", name: "Bull Chart" },
+      "col-piggy": { emoji: "🐷", name: "Piggy Bank" }, "col-notepad": { emoji: "📔", name: "Trade Journal" },
+      "col-lock": { emoji: "🔒", name: "Safety Lock" }, "col-receipt": { emoji: "🧾", name: "Trade Receipt" },
+      "col-rocket": { emoji: "🚀", name: "Moon Rocket" }, "col-crown": { emoji: "👑", name: "Gold Crown" },
+      "col-gem": { emoji: "💚", name: "Emerald Gem" }, "col-trophy": { emoji: "🏆", name: "Bronze Trophy" },
+      "col-lightning": { emoji: "⚡", name: "Lightning Bolt" }, "col-diamond": { emoji: "💎", name: "Diamond" },
+      "col-fire": { emoji: "🔥", name: "Fire Badge" }, "col-dragon": { emoji: "🐉", name: "Dragon" },
+      "col-crystal-ball": { emoji: "🔮", name: "Crystal Ball" }, "col-unicorn": { emoji: "🦄", name: "Unicorn" },
+      "col-rainbow-star": { emoji: "🌟", name: "Rainbow Star" }, "col-golden-bull": { emoji: "🐂", name: "Golden Bull" },
+      "pu-double-tokens": { emoji: "🎯", name: "2× Token Boost" }, "pu-shield": { emoji: "🛡️", name: "Loss Shield" },
+      "pu-xp-boost": { emoji: "⚡", name: "XP Boost" },
+    };
+    const info = COLLECTIBLE_INFO[invItem.itemId] ?? { emoji: "🎁", name: invItem.itemId };
+    const [listing] = await db.insert(studentMarketplaceListings).values({
+      classId, sellerId: userId, sellerName: user.displayName,
+      inventoryId, itemId: invItem.itemId, itemType: invItem.itemType,
+      itemName: info.name, itemEmoji: info.emoji, rarity: invItem.rarity, price,
+    }).returning();
+    // Reserve item (mark as not tradable until sold/cancelled)
+    await db.update(userInventory).set({ tradable: false }).where(eq(userInventory.id, inventoryId));
+    return { success: true, message: "Listed successfully!", listing };
+  }
+
+  async buyMarketplaceListing(listingId: string, buyerId: string): Promise<{ success: boolean; message: string }> {
+    const [listing] = await db.select().from(studentMarketplaceListings).where(eq(studentMarketplaceListings.id, listingId));
+    if (!listing || listing.status !== "active") return { success: false, message: "Listing not found or already sold" };
+    if (listing.sellerId === buyerId) return { success: false, message: "You can't buy your own listing" };
+    const buyer = await this.getUserById(buyerId);
+    if (!buyer) return { success: false, message: "Buyer not found" };
+    if ((buyer.classroomTokens ?? 0) < listing.price) return { success: false, message: "Not enough tokens" };
+    // Transfer tokens
+    await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} - ${listing.price}` }).where(eq(users.id, buyerId));
+    await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${listing.price}` }).where(eq(users.id, listing.sellerId));
+    // Transfer item
+    await db.update(userInventory).set({ userId: buyerId, tradable: true }).where(eq(userInventory.id, listing.inventoryId));
+    // Mark listing sold
+    await db.update(studentMarketplaceListings).set({ status: "sold" }).where(eq(studentMarketplaceListings.id, listingId));
+    return { success: true, message: `Purchased ${listing.itemName}!` };
+  }
+
+  async cancelMarketplaceListing(listingId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    const [listing] = await db.select().from(studentMarketplaceListings).where(eq(studentMarketplaceListings.id, listingId));
+    if (!listing || listing.status !== "active") return { success: false, message: "Listing not found or already completed" };
+    if (listing.sellerId !== userId) return { success: false, message: "Not your listing" };
+    await db.update(userInventory).set({ tradable: true }).where(eq(userInventory.id, listing.inventoryId));
+    await db.update(studentMarketplaceListings).set({ status: "cancelled" }).where(eq(studentMarketplaceListings.id, listingId));
+    return { success: true, message: "Listing cancelled" };
   }
 
   async checkAndAwardAchievements(userId: string): Promise<void> {
