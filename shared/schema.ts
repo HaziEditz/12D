@@ -35,6 +35,9 @@ export const users = pgTable("users", {
   purchasedCosmetics: text("purchased_cosmetics").default("[]"),
   equippedTitle: text("equipped_title"),
   equippedFrame: text("equipped_frame"),
+  loginStreak: integer("login_streak").default(0),
+  lastLoginDate: text("last_login_date"),
+  dailyRewardClaimedAt: text("daily_reward_claimed_at"),
 });
 
 export const lessons = pgTable("lessons", {
@@ -615,6 +618,39 @@ export type ClassroomAuctionBid = typeof classroomAuctionBids.$inferSelect;
 export type ClassroomStoreItem = typeof classroomStoreItems.$inferSelect;
 export type InsertClassroomStoreItem = z.infer<typeof insertClassroomStoreItemSchema>;
 export type ClassroomStorePurchase = typeof classroomStorePurchases.$inferSelect;
+
+// ===== FUN ZONE ECONOMY: INVENTORY & TRADING =====
+
+export const userInventory = pgTable("user_inventory", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  itemId: varchar("item_id", { length: 100 }).notNull(),
+  itemType: varchar("item_type", { length: 50 }).notNull(), // "collectible" | "power_up"
+  rarity: varchar("rarity", { length: 20 }), // "common" | "rare" | "epic" | "legendary"
+  quantity: integer("quantity").notNull().default(1),
+  tradable: boolean("tradable").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const tradeOffers = pgTable("trade_offers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromUserId: varchar("from_user_id").notNull(),
+  toUserId: varchar("to_user_id").notNull(),
+  offeredInventoryIds: text("offered_inventory_ids").notNull().default("[]"),
+  requestedInventoryIds: text("requested_inventory_ids").notNull().default("[]"),
+  tokenBonus: integer("token_bonus").default(0),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+});
+
+export const insertUserInventorySchema = createInsertSchema(userInventory).omit({ id: true, createdAt: true });
+export const insertTradeOfferSchema = createInsertSchema(tradeOffers).omit({ id: true, createdAt: true, respondedAt: true });
+export type UserInventory = typeof userInventory.$inferSelect;
+export type InsertUserInventory = z.infer<typeof insertUserInventorySchema>;
+export type TradeOffer = typeof tradeOffers.$inferSelect;
+export type InsertTradeOffer = z.infer<typeof insertTradeOfferSchema>;
 
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),

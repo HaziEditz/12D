@@ -7,9 +7,50 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check } from "lucide-react";
+import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check, Package, ArrowLeftRight, Flame, Calendar, Gift, RefreshCw, AlertCircle, Timer, Shuffle } from "lucide-react";
 
-type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge";
+type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge" | "word-scramble" | "market-memory";
+type View = "games" | "shop" | "inventory" | "trade";
+
+const RARITY_CONFIG = {
+  common:    { label: "Common",    color: "text-slate-300",  bg: "bg-slate-500/20 border-slate-500/30",   glow: "" },
+  rare:      { label: "Rare",      color: "text-blue-300",   bg: "bg-blue-500/20 border-blue-500/30",     glow: "shadow-blue-500/20" },
+  epic:      { label: "Epic",      color: "text-purple-300", bg: "bg-purple-500/20 border-purple-500/30", glow: "shadow-purple-500/30" },
+  legendary: { label: "Legendary", color: "text-amber-300",  bg: "bg-amber-500/20 border-amber-500/30",  glow: "shadow-amber-500/30 shadow-lg" },
+};
+
+const COLLECTIBLE_CATALOG: Record<string, { emoji: string; name: string; rarity: keyof typeof RARITY_CONFIG }> = {
+  "col-coin":         { emoji: "🪙", name: "Gold Coin",      rarity: "common" },
+  "col-chart-up":     { emoji: "📈", name: "Bull Chart",     rarity: "common" },
+  "col-piggy":        { emoji: "🐷", name: "Piggy Bank",     rarity: "common" },
+  "col-notepad":      { emoji: "📔", name: "Trade Journal",  rarity: "common" },
+  "col-lock":         { emoji: "🔒", name: "Safety Lock",    rarity: "common" },
+  "col-receipt":      { emoji: "🧾", name: "Trade Receipt",  rarity: "common" },
+  "col-rocket":       { emoji: "🚀", name: "Moon Rocket",    rarity: "rare" },
+  "col-crown":        { emoji: "👑", name: "Gold Crown",     rarity: "rare" },
+  "col-gem":          { emoji: "💚", name: "Emerald Gem",    rarity: "rare" },
+  "col-trophy":       { emoji: "🏆", name: "Bronze Trophy",  rarity: "rare" },
+  "col-lightning":    { emoji: "⚡", name: "Lightning Bolt", rarity: "rare" },
+  "col-diamond":      { emoji: "💎", name: "Diamond",        rarity: "epic" },
+  "col-fire":         { emoji: "🔥", name: "Fire Badge",     rarity: "epic" },
+  "col-dragon":       { emoji: "🐉", name: "Dragon",         rarity: "epic" },
+  "col-crystal-ball": { emoji: "🔮", name: "Crystal Ball",   rarity: "epic" },
+  "col-unicorn":      { emoji: "🦄", name: "Unicorn",        rarity: "legendary" },
+  "col-rainbow-star": { emoji: "🌟", name: "Rainbow Star",   rarity: "legendary" },
+  "col-golden-bull":  { emoji: "🐂", name: "Golden Bull",   rarity: "legendary" },
+};
+
+const POWER_UP_CATALOG: Record<string, { emoji: string; name: string; desc: string; cost: number }> = {
+  "pu-double-tokens": { emoji: "🎯", name: "2× Token Boost", desc: "Next game awards double tokens", cost: 20 },
+  "pu-shield":        { emoji: "🛡️", name: "Loss Shield",    desc: "Protect tokens from one bad game", cost: 15 },
+  "pu-xp-boost":      { emoji: "⚡", name: "XP Boost",       desc: "+50 XP bonus on next game finish", cost: 25 },
+};
+
+const BLIND_BAGS = [
+  { id: "bag-starter", emoji: "🎒", name: "Starter Pack", desc: "70% Common · 25% Rare · 4% Epic · 1% Legendary", cost: 15, color: "from-slate-600 to-slate-700" },
+  { id: "bag-crypto",  emoji: "💎", name: "Crypto Pack",  desc: "50% Common · 35% Rare · 12% Epic · 3% Legendary", cost: 30, color: "from-blue-700 to-cyan-700" },
+  { id: "bag-legend",  emoji: "🔮", name: "Legend Pack",  desc: "40% Common · 35% Rare · 20% Epic · 5% Legendary", cost: 50, color: "from-purple-700 to-violet-800" },
+];
 
 const COSMETICS = {
   titles: [
@@ -41,7 +82,11 @@ export default function SchoolFunZone() {
   const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [tokensEarned, setTokensEarned] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [view, setView] = useState<"games" | "shop">("games");
+  const [view, setView] = useState<View>("games");
+  const [bagReveal, setBagReveal] = useState<{ item: any; rarity: string } | null>(null);
+
+  const { data: inventory = [], refetch: refetchInventory } = useQuery<any[]>({ queryKey: ["/api/inventory"] });
+  const { data: tradeOffersList = [], refetch: refetchTrades } = useQuery<any[]>({ queryKey: ["/api/trades"] });
 
   const awardTokensMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/fun-zone/score", { tokensEarned: amount }),
@@ -49,8 +94,10 @@ export default function SchoolFunZone() {
   });
 
   const purchaseMutation = useMutation({
-    mutationFn: ({ cosmeticId, cost }: { cosmeticId: string; cost: number }) =>
-      apiRequest("POST", "/api/school/shop/purchase", { cosmeticId, cost }),
+    mutationFn: async ({ cosmeticId, cost }: { cosmeticId: string; cost: number }) => {
+      const res = await apiRequest("POST", "/api/school/shop/purchase", { cosmeticId, cost });
+      return res.json();
+    },
     onSuccess: (data: any) => {
       if (data.success) {
         toast({ title: "Purchased!", description: data.message });
@@ -60,6 +107,9 @@ export default function SchoolFunZone() {
         toast({ title: "Could not purchase", description: data.message, variant: "destructive" });
       }
     },
+    onError: (err: any) => {
+      toast({ title: "Purchase failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const equipMutation = useMutation({
@@ -68,6 +118,64 @@ export default function SchoolFunZone() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       refreshUser();
+    },
+  });
+
+  const dailyClaimMutation = useMutation({
+    mutationFn: async () => { const r = await apiRequest("POST", "/api/fun-zone/daily-claim", {}); return r.json(); },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: `🎁 Day ${data.streak} Streak!`, description: `+${data.tokens} tokens earned!` });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        refreshUser();
+      } else {
+        toast({ title: "Already claimed", description: "Come back tomorrow for your next reward!", variant: "default" });
+      }
+    },
+  });
+
+  const buyItemMutation = useMutation({
+    mutationFn: async ({ itemId, itemType, cost }: { itemId: string; itemType: string; cost: number }) => {
+      const r = await apiRequest("POST", "/api/shop/buy-item", { itemId, itemType, cost }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Purchased!", description: data.message });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+        refreshUser(); refetchInventory();
+      } else {
+        toast({ title: "Cannot buy", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const openBagMutation = useMutation({
+    mutationFn: async ({ bagId, cost }: { bagId: string; cost: number }) => {
+      const r = await apiRequest("POST", "/api/shop/open-bag", { bagId, cost }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        setBagReveal({ item: data.item, rarity: data.rarity });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+        refreshUser(); refetchInventory();
+      } else {
+        toast({ title: "Cannot open", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const respondTradeMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: string }) => {
+      const r = await apiRequest("POST", `/api/trades/${id}/respond`, { action }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: data.success ? "Done!" : "Error", description: data.message, variant: data.success ? "default" : "destructive" });
+      refetchTrades();
+      if (data.success) { queryClient.invalidateQueries({ queryKey: ["/api/user"] }); queryClient.invalidateQueries({ queryKey: ["/api/inventory"] }); refetchInventory(); }
     },
   });
 
@@ -87,21 +195,25 @@ export default function SchoolFunZone() {
   const tokenBalance = user?.classroomTokens ?? 0;
 
   const primaryGames = [
-    { id: "coin-rain" as Game, emoji: "🌧️", title: "Coin Rain", desc: "Catch coins before they hit the ground!", color: "from-amber-400 to-orange-500", tokens: "5–15" },
-    { id: "piggy-bank" as Game, emoji: "🐷", title: "Piggy Bank Builder", desc: "Sort money into the right jars", color: "from-pink-400 to-rose-500", tokens: "5–10" },
-    { id: "smart-shopper" as Game, emoji: "🛒", title: "Smart Shopper", desc: "Buy what you need without going over budget!", color: "from-green-400 to-emerald-500", tokens: "5–12" },
+    { id: "coin-rain" as Game, emoji: "🌧️", title: "Coin Rain", desc: "Catch coins before they hit the ground!", color: "from-amber-400 to-orange-500", tokens: "2–8" },
+    { id: "piggy-bank" as Game, emoji: "🐷", title: "Piggy Bank Builder", desc: "Sort money into the right jars", color: "from-pink-400 to-rose-500", tokens: "2–6" },
+    { id: "smart-shopper" as Game, emoji: "🛒", title: "Smart Shopper", desc: "Buy what you need without going over budget!", color: "from-green-400 to-emerald-500", tokens: "2–7" },
+    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble financial terms to earn tokens!", color: "from-violet-400 to-purple-500", tokens: "2–10" },
   ];
 
   const intermediateGames = [
-    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "10–25" },
-    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "10–20" },
-    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "10–30" },
+    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "3–12" },
+    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "3–10" },
+    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "3–14" },
+    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match finance terms to their definitions!", color: "from-rose-500 to-pink-600", tokens: "3–12" },
   ];
 
   const hsGames = [
-    { id: "market-prediction" as Game, emoji: "📈", title: "Market Prediction", desc: "Advanced market analysis challenge", color: "from-teal-600 to-cyan-700", tokens: "15–40" },
-    { id: "investment-quiz" as Game, emoji: "🎓", title: "Investment Quiz", desc: "Advanced investment concepts", color: "from-purple-600 to-violet-700", tokens: "15–35" },
-    { id: "strategy-challenge" as Game, emoji: "🎯", title: "Strategy Challenge", desc: "Build a winning portfolio strategy", color: "from-blue-600 to-indigo-700", tokens: "20–50" },
+    { id: "market-prediction" as Game, emoji: "📈", title: "Market Prediction", desc: "Advanced market analysis challenge", color: "from-teal-600 to-cyan-700", tokens: "5–18" },
+    { id: "investment-quiz" as Game, emoji: "🎓", title: "Investment Quiz", desc: "Advanced investment concepts", color: "from-purple-600 to-violet-700", tokens: "5–16" },
+    { id: "strategy-challenge" as Game, emoji: "🎯", title: "Strategy Challenge", desc: "Make real-world trading decisions", color: "from-blue-600 to-indigo-700", tokens: "6–20" },
+    { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble advanced finance terms!", color: "from-amber-600 to-orange-700", tokens: "4–14" },
+    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match terms to definitions — beat the clock!", color: "from-rose-600 to-pink-700", tokens: "4–12" },
   ];
 
   const games = isPrimary ? primaryGames : isIntermediate ? intermediateGames : hsGames;
@@ -114,81 +226,188 @@ export default function SchoolFunZone() {
   if (activeGame === "finance-quiz" || activeGame === "investment-quiz") return <QuizGame level={isIntermediate ? "intermediate" : "high_school"} onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
   if (activeGame === "market-prediction") return <MarketPredictionGame onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
   if (activeGame === "strategy-challenge") return <StrategyChallenge onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
+  if (activeGame === "word-scramble") return <WordScrambleGame onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
+  if (activeGame === "market-memory") return <MarketMemoryGame onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
+
+  const loginStreak = (user as any)?.loginStreak ?? 0;
+  const claimedToday = (user as any)?.dailyRewardClaimedAt === new Date().toISOString().split("T")[0];
+  const pendingIncoming = tradeOffersList.filter((t: any) => t.toUserId === user?.id && t.status === "pending").length;
+
+  const viewLabels: Record<View, string> = {
+    games: isPrimary ? "🎮 Fun Zone!" : isIntermediate ? "🎮 Game Zone" : "🎮 Challenge Arena",
+    shop: "🛍️ Token Shop",
+    inventory: "🎒 My Collection",
+    trade: "🔄 Trade Market",
+  };
 
   return (
     <SchoolLayout>
-      <div className="p-5 max-w-4xl mx-auto space-y-6">
+      <div className="p-5 max-w-4xl mx-auto space-y-5">
         {showConfetti && <Confetti />}
 
+        {/* Bag reveal modal */}
+        {bagReveal && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setBagReveal(null)}>
+            <div className={`rounded-3xl p-8 text-center max-w-xs w-full border-2 ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.bg ?? "bg-white/10 border-white/20"} ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.glow ?? ""}`} onClick={e => e.stopPropagation()}>
+              <div className="text-7xl mb-4 animate-bounce">{COLLECTIBLE_CATALOG[bagReveal.item?.itemId]?.emoji ?? "🎁"}</div>
+              <Badge className={`text-sm font-black mb-3 ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.bg ?? ""} ${RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.color ?? ""}`}>
+                ✨ {RARITY_CONFIG[bagReveal.rarity as keyof typeof RARITY_CONFIG]?.label ?? bagReveal.rarity}
+              </Badge>
+              <h2 className="text-white font-black text-2xl mt-2">{COLLECTIBLE_CATALOG[bagReveal.item?.itemId]?.name ?? "Mystery Item"}</h2>
+              <p className="text-slate-400 text-sm mt-2 mb-5">Added to your collection!</p>
+              <Button onClick={() => setBagReveal(null)} className="w-full rounded-xl font-black" data-testid="btn-close-reveal">Awesome!</Button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
-        <div className={`relative overflow-hidden rounded-2xl p-6 ${isPrimary ? "bg-gradient-to-r from-purple-400 to-pink-500" : "bg-gradient-to-r from-purple-700 to-violet-800"}`}>
+        <div className={`relative overflow-hidden rounded-2xl p-5 ${isPrimary ? "bg-gradient-to-r from-purple-400 to-pink-500" : "bg-gradient-to-r from-purple-700 to-violet-800"}`}>
           <div className="absolute inset-0 sw-shimmer-bg opacity-20" />
-          <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-black text-white">
-                {view === "shop" ? "🛍️ Token Shop" : isPrimary ? "🎮 Fun Zone!" : isIntermediate ? "🎮 Game Zone" : "🎮 Challenge Arena"}
-              </h1>
-              <p className={`text-sm mt-1 ${isPrimary ? "text-purple-100" : "text-purple-200"}`}>
-                {view === "shop" ? "Spend your tokens on cosmetics and titles" : isPrimary ? "Play games and earn tokens! 🪙" : isIntermediate ? "Put your skills to the test" : "Advanced finance challenges"}
+              <h1 className="text-xl font-black text-white">{viewLabels[view]}</h1>
+              <p className="text-sm mt-0.5 text-white/70">
+                {view === "games" ? (isPrimary ? "Play games and earn tokens! 🪙" : "Earn tokens, unlock collectibles!") : view === "shop" ? "Spend tokens on cosmetics, bags & power-ups" : view === "inventory" ? "Your collected items and power-ups" : "Trade items with classmates"}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/30 rounded-xl px-4 py-2.5">
-                <Coins className="h-5 w-5 text-amber-400" />
-                <div>
-                  <p className="text-xl font-black text-amber-300">{tokenBalance}</p>
-                  <p className="text-amber-400 text-xs">Tokens</p>
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-500/30 rounded-xl px-3 py-2">
+                <Coins className="h-4 w-4 text-amber-400" />
+                <p className="text-lg font-black text-amber-300">{tokenBalance}</p>
+                {loginStreak > 0 && <span className="text-xs text-orange-400 font-bold flex items-center gap-0.5"><Flame className="h-3 w-3" />{loginStreak}</span>}
               </div>
-              <Button
-                size="sm"
-                variant={view === "shop" ? "default" : "secondary"}
-                onClick={() => setView(view === "shop" ? "games" : "shop")}
-                className="rounded-xl"
-                data-testid="btn-toggle-shop"
-              >
-                {view === "shop" ? <><Zap className="h-4 w-4 mr-1.5" />Games</> : <><ShoppingBag className="h-4 w-4 mr-1.5" />Shop</>}
-              </Button>
+              {!claimedToday && (
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs gap-1"
+                  onClick={() => dailyClaimMutation.mutate()} disabled={dailyClaimMutation.isPending} data-testid="btn-daily-claim">
+                  <Gift className="h-3.5 w-3.5" />Daily
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {view === "shop" ? (
+        {/* Navigation tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(["games", "shop", "inventory", "trade"] as View[]).map(v => (
+            <button key={v} onClick={() => setView(v)} data-testid={`tab-${v}`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all relative ${view === v ? "bg-primary text-primary-foreground" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"}`}>
+              {v === "games" ? <><Zap className="h-3.5 w-3.5" />Games</> : v === "shop" ? <><ShoppingBag className="h-3.5 w-3.5" />Shop</> : v === "inventory" ? <><Package className="h-3.5 w-3.5" />Collection</> : <><ArrowLeftRight className="h-3.5 w-3.5" />Trade</>}
+              {v === "trade" && pendingIncoming > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-black">{pendingIncoming}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* GAMES VIEW */}
+        {view === "games" && (
+          <>
+            {claimedToday ? (
+              <div className="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                <div><p className="text-emerald-300 font-bold text-sm">Daily reward claimed!</p><p className="text-emerald-400/70 text-xs">Streak: {loginStreak} day{loginStreak !== 1 ? "s" : ""} 🔥 Come back tomorrow for more tokens!</p></div>
+              </div>
+            ) : (
+              <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Gift className="h-5 w-5 text-amber-400 shrink-0" />
+                  <div><p className="text-amber-300 font-bold text-sm">Daily reward available!</p><p className="text-amber-400/70 text-xs">Day {loginStreak + 1} — Claim {5 + Math.min(loginStreak, 6) * 2} tokens + streak bonus</p></div>
+                </div>
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-500 shrink-0 rounded-xl font-bold text-xs"
+                  onClick={() => dailyClaimMutation.mutate()} disabled={dailyClaimMutation.isPending} data-testid="btn-daily-claim-games">
+                  {dailyClaimMutation.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : "Claim!"}
+                </Button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {games.map(game => (
+                <div key={game.id} onClick={() => setActiveGame(game.id)}
+                  className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer hover:scale-105 hover:-translate-y-1 transition-all duration-200 shadow-lg`}
+                  data-testid={`game-card-${game.id}`}>
+                  <div className="text-5xl mb-3">{game.emoji}</div>
+                  <h3 className="font-black text-white text-lg leading-tight">{game.title}</h3>
+                  <p className="text-white/75 text-xs mt-1 mb-3">{game.desc}</p>
+                  <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-3 py-1 w-fit">
+                    <Coins className="h-3.5 w-3.5 text-amber-300" />
+                    <span className="text-white text-xs font-bold">{game.tokens} tokens</span>
+                  </div>
+                  <ChevronRight className="absolute bottom-4 right-4 h-5 w-5 text-white/40" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* SHOP VIEW */}
+        {view === "shop" && (
           <div className="space-y-6">
+            {/* Blind Bags */}
+            <div>
+              <div className="flex items-center gap-2 mb-3"><Package className="h-5 w-5 text-purple-400" /><h2 className="font-black text-lg text-white">Mystery Bags</h2><span className="text-sm text-slate-400">Open to get a random collectible!</span></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {BLIND_BAGS.map(bag => (
+                  <div key={bag.id} className={`rounded-2xl p-5 bg-gradient-to-br ${bag.color} border border-white/10`} data-testid={`bag-${bag.id}`}>
+                    <div className="text-4xl mb-2">{bag.emoji}</div>
+                    <h3 className="text-white font-black text-base">{bag.name}</h3>
+                    <p className="text-white/60 text-xs mt-1 mb-3">{bag.desc}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5"><Coins className="h-4 w-4 text-amber-300" /><span className="text-white font-black">{bag.cost}</span></div>
+                      <Button size="sm" className="rounded-xl text-xs font-black bg-white/20 hover:bg-white/30 text-white border-0"
+                        onClick={() => openBagMutation.mutate({ bagId: bag.id, cost: bag.cost })}
+                        disabled={openBagMutation.isPending || tokenBalance < bag.cost}
+                        data-testid={`btn-open-${bag.id}`}>
+                        {tokenBalance < bag.cost ? <Lock className="h-3 w-3" /> : openBagMutation.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Open!"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Power-Ups */}
+            <div>
+              <div className="flex items-center gap-2 mb-3"><Zap className="h-5 w-5 text-yellow-400" /><h2 className="font-black text-lg text-white">Power-Ups</h2><span className="text-sm text-slate-400">One-time use boosts</span></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {Object.entries(POWER_UP_CATALOG).map(([id, pu]) => (
+                  <div key={id} className="rounded-xl p-4 bg-white/5 border border-white/10 flex flex-col gap-2" data-testid={`powerup-${id}`}>
+                    <div className="text-3xl">{pu.emoji}</div>
+                    <p className="font-bold text-white text-sm">{pu.name}</p>
+                    <p className="text-slate-400 text-xs flex-1">{pu.desc}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-amber-400" /><span className="font-black text-amber-400 text-sm">{pu.cost}</span></div>
+                      <Button size="sm" className="h-7 text-xs rounded-lg" onClick={() => buyItemMutation.mutate({ itemId: id, itemType: "power_up", cost: pu.cost })}
+                        disabled={buyItemMutation.isPending || tokenBalance < pu.cost} data-testid={`btn-buy-${id}`}>
+                        {tokenBalance < pu.cost ? <Lock className="h-3 w-3" /> : "Buy"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Titles */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h2 className="font-black text-lg">Titles</h2>
-                <span className="text-sm text-muted-foreground">Show off a special title next to your name</span>
-              </div>
+              <div className="flex items-center gap-2 mb-3"><Sparkles className="h-5 w-5 text-primary" /><h2 className="font-black text-lg text-white">Titles</h2><span className="text-sm text-slate-400">Show off next to your name</span></div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {COSMETICS.titles.map(item => {
                   const isOwned = owned.includes(item.id);
                   const isEquipped = equippedTitle === item.id;
                   return (
-                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-border bg-card"}`} data-testid={`cosmetic-title-${item.id}`}>
+                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-title-${item.id}`}>
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm">{item.label}</span>
+                        <span className="font-bold text-sm text-white">{item.label}</span>
                         {isEquipped && <Badge className="bg-primary text-primary-foreground text-xs">Equipped</Badge>}
                       </div>
                       <div className="flex items-center gap-2 mt-auto pt-1">
-                        <Coins className="h-3.5 w-3.5 text-amber-400" />
-                        <span className="text-sm font-bold text-amber-500">{item.cost}</span>
+                        <Coins className="h-3.5 w-3.5 text-amber-400" /><span className="text-sm font-bold text-amber-400">{item.cost}</span>
                         {isOwned ? (
                           <Button size="sm" variant={isEquipped ? "outline" : "default"} className="ml-auto h-7 text-xs rounded-lg"
                             onClick={() => equipMutation.mutate({ type: "title", value: isEquipped ? null : item.id })}
-                            disabled={equipMutation.isPending}
-                            data-testid={`btn-equip-title-${item.id}`}
-                          >
+                            disabled={equipMutation.isPending} data-testid={`btn-equip-title-${item.id}`}>
                             {isEquipped ? "Unequip" : "Equip"}
                           </Button>
                         ) : (
                           <Button size="sm" className="ml-auto h-7 text-xs rounded-lg"
                             onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
-                            disabled={purchaseMutation.isPending || tokenBalance < item.cost}
-                            data-testid={`btn-buy-title-${item.id}`}
-                          >
+                            disabled={purchaseMutation.isPending || tokenBalance < item.cost} data-testid={`btn-buy-title-${item.id}`}>
                             {tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
                           </Button>
                         )}
@@ -201,43 +420,29 @@ export default function SchoolFunZone() {
 
             {/* Frames */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Star className="h-5 w-5 text-amber-500" />
-                <h2 className="font-black text-lg">Profile Frames</h2>
-                <span className="text-sm text-muted-foreground">Style your avatar in the leaderboard</span>
-              </div>
+              <div className="flex items-center gap-2 mb-3"><Star className="h-5 w-5 text-amber-500" /><h2 className="font-black text-lg text-white">Profile Frames</h2><span className="text-sm text-slate-400">Style your avatar</span></div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {COSMETICS.frames.map(item => {
                   const isOwned = owned.includes(item.id);
                   const isEquipped = equippedFrame === item.id;
                   return (
-                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-border bg-card"}`} data-testid={`cosmetic-frame-${item.id}`}>
+                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-frame-${item.id}`}>
                       <div className="flex items-center gap-3">
-                        <div className={`h-10 w-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 ${item.color} flex items-center justify-center text-lg shrink-0`}>
-                          {user?.displayName?.[0]?.toUpperCase() ?? "?"}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-bold text-sm">{item.label}</p>
-                          {isEquipped && <Badge className="bg-primary text-primary-foreground text-xs mt-0.5">Equipped</Badge>}
-                        </div>
+                        <div className={`h-10 w-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 ${item.color} flex items-center justify-center text-lg shrink-0`}>{user?.displayName?.[0]?.toUpperCase() ?? "?"}</div>
+                        <div className="flex-1"><p className="font-bold text-sm text-white">{item.label}</p>{isEquipped && <Badge className="bg-primary text-primary-foreground text-xs mt-0.5">Equipped</Badge>}</div>
                       </div>
                       <div className="flex items-center gap-2 mt-auto pt-1">
-                        <Coins className="h-3.5 w-3.5 text-amber-400" />
-                        <span className="text-sm font-bold text-amber-500">{item.cost}</span>
+                        <Coins className="h-3.5 w-3.5 text-amber-400" /><span className="text-sm font-bold text-amber-400">{item.cost}</span>
                         {isOwned ? (
                           <Button size="sm" variant={isEquipped ? "outline" : "default"} className="ml-auto h-7 text-xs rounded-lg"
                             onClick={() => equipMutation.mutate({ type: "frame", value: isEquipped ? null : item.id })}
-                            disabled={equipMutation.isPending}
-                            data-testid={`btn-equip-frame-${item.id}`}
-                          >
+                            disabled={equipMutation.isPending} data-testid={`btn-equip-frame-${item.id}`}>
                             {isEquipped ? "Unequip" : "Equip"}
                           </Button>
                         ) : (
                           <Button size="sm" className="ml-auto h-7 text-xs rounded-lg"
                             onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
-                            disabled={purchaseMutation.isPending || tokenBalance < item.cost}
-                            data-testid={`btn-buy-frame-${item.id}`}
-                          >
+                            disabled={purchaseMutation.isPending || tokenBalance < item.cost} data-testid={`btn-buy-frame-${item.id}`}>
                             {tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
                           </Button>
                         )}
@@ -247,40 +452,114 @@ export default function SchoolFunZone() {
                 })}
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="rounded-xl p-4 bg-muted/30 border border-border text-center">
-              <p className="text-sm text-muted-foreground">Earn more tokens by playing games in the Fun Zone. Equipped titles and frames appear in the school leaderboard.</p>
+        {/* INVENTORY VIEW */}
+        {view === "inventory" && (
+          <div className="space-y-4">
+            {inventory.length === 0 ? (
+              <div className="rounded-2xl p-12 bg-white/5 border border-white/10 text-center">
+                <Package className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-white font-bold text-lg">No items yet!</p>
+                <p className="text-slate-400 text-sm mt-1">Open mystery bags in the Shop to start your collection.</p>
+                <Button className="mt-4 rounded-xl" onClick={() => setView("shop")}>Go to Shop</Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-white font-bold">{inventory.length} item{inventory.length !== 1 ? "s" : ""} in collection</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {inventory.map((item: any) => {
+                    const col = item.itemType === "collectible" ? COLLECTIBLE_CATALOG[item.itemId] : null;
+                    const pu = item.itemType === "power_up" ? POWER_UP_CATALOG[item.itemId] : null;
+                    const rarityConf = item.rarity ? RARITY_CONFIG[item.rarity as keyof typeof RARITY_CONFIG] : null;
+                    return (
+                      <div key={item.id} className={`rounded-xl p-4 border text-center ${rarityConf?.bg ?? "bg-white/5 border-white/10"} ${rarityConf?.glow ?? ""}`} data-testid={`inventory-item-${item.id}`}>
+                        <div className="text-4xl mb-2">{col?.emoji ?? pu?.emoji ?? "📦"}</div>
+                        <p className="text-white font-bold text-xs">{col?.name ?? pu?.name ?? item.itemId}</p>
+                        {rarityConf && <Badge className={`text-xs mt-1 ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>}
+                        {item.quantity > 1 && <p className="text-slate-400 text-xs mt-1">×{item.quantity}</p>}
+                        {item.tradable && item.itemType === "collectible" && (
+                          <Button size="sm" variant="outline" className="w-full mt-2 h-6 text-xs rounded-lg border-white/20 text-slate-300"
+                            onClick={() => setView("trade")} data-testid={`btn-trade-item-${item.id}`}>Trade</Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TRADE VIEW */}
+        {view === "trade" && (
+          <div className="space-y-5">
+            {/* Incoming trades */}
+            <div>
+              <h2 className="font-black text-white text-base mb-3 flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-400" />Incoming Offers {pendingIncoming > 0 && <Badge className="bg-rose-500 text-white text-xs">{pendingIncoming}</Badge>}</h2>
+              {tradeOffersList.filter((t: any) => t.toUserId === user?.id && t.status === "pending").length === 0 ? (
+                <div className="rounded-xl p-6 bg-white/5 border border-white/10 text-center text-slate-400 text-sm">No incoming trade offers</div>
+              ) : (
+                <div className="space-y-3">
+                  {tradeOffersList.filter((t: any) => t.toUserId === user?.id && t.status === "pending").map((trade: any) => (
+                    <div key={trade.id} className="rounded-xl p-4 bg-white/5 border border-white/10 space-y-2" data-testid={`trade-incoming-${trade.id}`}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-white font-bold text-sm">Trade Offer</p>
+                        <Badge className="bg-amber-500/20 text-amber-300 text-xs">Pending</Badge>
+                      </div>
+                      {trade.message && <p className="text-slate-400 text-xs italic">"{trade.message}"</p>}
+                      {trade.tokenBonus > 0 && <p className="text-amber-300 text-xs font-bold">+ {trade.tokenBonus} tokens bonus</p>}
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs"
+                          onClick={() => respondTradeMutation.mutate({ id: trade.id, action: "accept" })}
+                          disabled={respondTradeMutation.isPending} data-testid={`btn-accept-trade-${trade.id}`}>Accept</Button>
+                        <Button size="sm" variant="outline" className="flex-1 rounded-xl text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                          onClick={() => respondTradeMutation.mutate({ id: trade.id, action: "reject" })}
+                          disabled={respondTradeMutation.isPending} data-testid={`btn-reject-trade-${trade.id}`}>Decline</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* My offers */}
+            <div>
+              <h2 className="font-black text-white text-base mb-3">My Sent Offers</h2>
+              {tradeOffersList.filter((t: any) => t.fromUserId === user?.id).length === 0 ? (
+                <div className="rounded-xl p-6 bg-white/5 border border-white/10 text-center text-slate-400 text-sm">No sent offers yet. Go to your Collection to trade items!</div>
+              ) : (
+                <div className="space-y-3">
+                  {tradeOffersList.filter((t: any) => t.fromUserId === user?.id).slice(0, 10).map((trade: any) => (
+                    <div key={trade.id} className="rounded-xl p-4 bg-white/5 border border-white/10 flex items-center justify-between gap-3" data-testid={`trade-sent-${trade.id}`}>
+                      <div>
+                        <p className="text-white font-bold text-sm">Offer to classmate</p>
+                        {trade.message && <p className="text-slate-500 text-xs">"{trade.message}"</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`text-xs ${trade.status === "pending" ? "bg-amber-500/20 text-amber-300" : trade.status === "accepted" ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}>
+                          {trade.status}
+                        </Badge>
+                        {trade.status === "pending" && (
+                          <Button size="sm" variant="outline" className="h-6 text-xs rounded-lg border-rose-500/30 text-rose-400"
+                            onClick={() => respondTradeMutation.mutate({ id: trade.id, action: "cancel" })}
+                            disabled={respondTradeMutation.isPending}>Cancel</Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl p-4 bg-blue-500/10 border border-blue-500/20">
+              <p className="text-blue-300 text-sm font-bold">How to trade</p>
+              <p className="text-blue-400/70 text-xs mt-1">Go to your Collection tab, tap an item, and select "Trade" to send an offer to a classmate.</p>
             </div>
           </div>
-        ) : (
-          <>
-            {/* Games Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {games.map(game => (
-                <div
-                  key={game.id}
-                  onClick={() => setActiveGame(game.id)}
-                  className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer hover:scale-105 hover:-translate-y-1 transition-all duration-200 shadow-lg`}
-                  data-testid={`game-card-${game.id}`}
-                >
-                  <div className="text-5xl mb-3 sw-bounce-in">{game.emoji}</div>
-                  <h3 className="font-black text-white text-lg leading-tight">{game.title}</h3>
-                  <p className="text-white/75 text-xs mt-1 mb-3">{game.desc}</p>
-                  <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-3 py-1 w-fit">
-                    <Coins className="h-3.5 w-3.5 text-amber-300" />
-                    <span className="text-white text-xs font-bold">{game.tokens} tokens</span>
-                  </div>
-                  <ChevronRight className="absolute bottom-4 right-4 h-5 w-5 text-white/40" />
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-xl p-4 bg-white/5 border border-white/10 text-center">
-              <p className={`text-sm font-semibold ${isPrimary ? "text-amber-700" : "text-slate-400"}`}>
-                {isPrimary ? "🌟 Play games to fill your Token Jar! Visit the Shop to spend them!" : "Earn tokens in games and spend them in the Token Shop!"}
-              </p>
-            </div>
-          </>
         )}
       </div>
     </SchoolLayout>
@@ -1046,6 +1325,215 @@ function StrategyChallenge({ onEarn, onBack }: { onEarn: (n: number) => void; on
               <p className="text-slate-300 text-xs leading-relaxed">{current.explanation}</p>
             </div>
           )}
+        </div>
+      </div>
+    </SchoolLayout>
+  );
+}
+
+/* ===== WORD SCRAMBLE GAME ===== */
+const SCRAMBLE_WORDS = [
+  { word: "DIVIDEND", hint: "Profit paid to shareholders" },
+  { word: "LIQUIDITY", hint: "Ease of converting assets to cash" },
+  { word: "PORTFOLIO", hint: "Collection of investments" },
+  { word: "INFLATION", hint: "General rise in prices over time" },
+  { word: "COMPOUND", hint: "Interest earned on interest" },
+  { word: "LEVERAGE", hint: "Using borrowed money to invest" },
+  { word: "RECESSION", hint: "Two quarters of declining growth" },
+  { word: "ARBITRAGE", hint: "Profiting from price differences" },
+  { word: "HEDGING", hint: "Reducing risk with offsetting positions" },
+  { word: "VOLATILITY", hint: "Degree of price fluctuation" },
+  { word: "EQUITY", hint: "Ownership stake in a company" },
+  { word: "FUTURES", hint: "Contract to buy/sell at a future date" },
+  { word: "DEFICIT", hint: "When spending exceeds income" },
+  { word: "SURPLUS", hint: "When income exceeds spending" },
+  { word: "COLLATERAL", hint: "Asset pledged as loan security" },
+];
+
+function scramble(word: string): string {
+  const arr = word.split("");
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.join("") === word ? scramble(word) : arr.join("");
+}
+
+function WordScrambleGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBack: () => void }) {
+  const [words] = useState(() => shuffleArray(SCRAMBLE_WORDS).slice(0, 8));
+  const [idx, setIdx] = useState(0);
+  const [scrambled] = useState(() => words.map(w => scramble(w.word)));
+  const [input, setInput] = useState("");
+  const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(20);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const idxRef = useRef(idx);
+  const wordsLenRef = useRef(words.length);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+
+  const handleNext = useCallback((correct: boolean) => {
+    clearInterval(timerRef.current!);
+    if (correct) setScore(s => s + 1);
+    if (idxRef.current + 1 >= wordsLenRef.current) { setFinished(true); return; }
+    setTimeout(() => { setIdx(i => i + 1); setFeedback(null); }, 800);
+  }, []);
+
+  useEffect(() => {
+    setTimeLeft(20);
+    setInput("");
+    setFeedback(null);
+    clearInterval(timerRef.current!);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) { clearInterval(timerRef.current!); handleNext(false); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current!);
+  }, [idx, handleNext]);
+
+  const submit = () => {
+    const correct = input.trim().toUpperCase() === words[idx].word;
+    setFeedback(correct ? "correct" : "wrong");
+    handleNext(correct);
+  };
+
+  const tokens = 2 + score * Math.round(14 / words.length);
+
+  const reset = () => { setIdx(0); setScore(0); setInput(""); setFeedback(null); setFinished(false); };
+
+  if (finished) return (
+    <SchoolLayout><div className="p-5 max-w-xl mx-auto">
+      <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={reset} onBack={onBack}
+        title="Scramble Complete!" message={score >= 6 ? "Finance vocabulary master! 🧠" : score >= 4 ? "Great effort! 🎉" : "Keep studying those terms! 💪"} />
+    </div></SchoolLayout>
+  );
+
+  return (
+    <SchoolLayout>
+      <div className="p-5 max-w-xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="text-slate-400 hover:text-white font-semibold text-sm">← Back</button>
+          <h2 className="font-black text-white text-lg">🔤 Word Scramble</h2>
+          <span className="text-teal-400 font-bold text-sm">{score}/{words.length}</span>
+        </div>
+        <Progress value={(idx / words.length) * 100} className="h-2" />
+        <div className="rounded-2xl p-6 bg-white/5 border border-white/10 space-y-5">
+          <div className="flex items-center justify-between">
+            <Badge className="bg-violet-500/20 text-violet-300">Word {idx + 1} of {words.length}</Badge>
+            <div className={`flex items-center gap-1 font-bold text-sm ${timeLeft <= 5 ? "text-rose-400" : "text-slate-400"}`}>
+              <Timer className="h-3.5 w-3.5" />{timeLeft}s
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-3xl font-black text-white tracking-widest bg-white/5 rounded-xl py-4 px-6">{scrambled[idx]}</p>
+            <p className="text-slate-400 text-sm mt-2 italic">Hint: {words[idx].hint}</p>
+          </div>
+          {feedback && (
+            <div className={`rounded-lg p-2.5 text-center ${feedback === "correct" ? "bg-emerald-500/20 border border-emerald-500/30" : "bg-rose-500/20 border border-rose-500/30"}`}>
+              <p className={`font-bold text-sm ${feedback === "correct" ? "text-emerald-400" : "text-rose-400"}`}>
+                {feedback === "correct" ? "✓ Correct!" : `✗ It was: ${words[idx].word}`}
+              </p>
+            </div>
+          )}
+          {!feedback && (
+            <div className="flex gap-2">
+              <input className="flex-1 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-center text-lg px-4 py-3 uppercase outline-none focus:border-violet-500/50"
+                value={input} onChange={e => setInput(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === "Enter" && input.trim() && submit()}
+                placeholder="Type answer..." autoFocus data-testid="input-scramble" />
+              <Button onClick={submit} disabled={!input.trim()} className="rounded-xl bg-violet-600 hover:bg-violet-500 font-black px-6" data-testid="btn-scramble-submit">
+                <Shuffle className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </SchoolLayout>
+  );
+}
+
+/* ===== MARKET MEMORY GAME ===== */
+const MEMORY_PAIRS = [
+  { term: "P/E Ratio", def: "Price ÷ Earnings per share" },
+  { term: "Bull Market", def: "Prices rising 20%+ from lows" },
+  { term: "Bear Market", def: "Prices falling 20%+ from highs" },
+  { term: "Dividend", def: "Profit share paid to investors" },
+  { term: "ETF", def: "Exchange Traded Fund" },
+  { term: "Short Sell", def: "Selling borrowed shares" },
+  { term: "Blue Chip", def: "Large, stable, reputable company" },
+  { term: "Yield", def: "Annual income ÷ investment cost" },
+];
+
+function MarketMemoryGame({ onEarn, onBack }: { onEarn: (n: number) => void; onBack: () => void }) {
+  const pairs = MEMORY_PAIRS.slice(0, 6);
+  const [cards] = useState(() => {
+    const all = [...pairs.map((p, i) => ({ id: `t${i}`, text: p.term, pairId: i })), ...pairs.map((p, i) => ({ id: `d${i}`, text: p.def, pairId: i }))];
+    return shuffleArray(all);
+  });
+  const [flipped, setFlipped] = useState<string[]>([]);
+  const [matched, setMatched] = useState<number[]>([]);
+  const [moves, setMoves] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+  const flip = (id: string) => {
+    if (flipped.length >= 2 || flipped.includes(id) || matched.includes(cards.find(c => c.id === id)!.pairId)) return;
+    const next = [...flipped, id];
+    setFlipped(next);
+    if (next.length === 2) {
+      setMoves(m => m + 1);
+      const [a, b] = next.map(fid => cards.find(c => c.id === fid)!);
+      if (a.pairId === b.pairId) {
+        const newMatched = [...matched, a.pairId];
+        setMatched(newMatched);
+        setFlipped([]);
+        if (newMatched.length === pairs.length) setFinished(true);
+      } else {
+        setTimeout(() => setFlipped([]), 1000);
+      }
+    }
+  };
+
+  const score = Math.max(0, pairs.length * 2 - Math.max(0, moves - pairs.length));
+  const tokens = 3 + Math.min(score, 9);
+
+  const reset = () => { setFlipped([]); setMatched([]); setMoves(0); setFinished(false); };
+
+  if (finished) return (
+    <SchoolLayout><div className="p-5 max-w-xl mx-auto">
+      <GameResult score={score} tokens={tokens} onEarn={() => onEarn(tokens)} onPlay={reset} onBack={onBack}
+        title="Memory Complete!" message={moves <= pairs.length + 2 ? "Finance genius! 🧠" : moves <= pairs.length + 5 ? "Nice memory! 🎉" : "Keep practicing! 💪"} />
+    </div></SchoolLayout>
+  );
+
+  return (
+    <SchoolLayout>
+      <div className="p-5 max-w-xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="text-slate-400 hover:text-white font-semibold text-sm">← Back</button>
+          <h2 className="font-black text-white text-lg">🃏 Market Memory</h2>
+          <span className="text-teal-400 font-bold text-sm">{matched.length}/{pairs.length} matched</span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Moves: {moves}</span><span>Match terms with definitions!</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {cards.map(card => {
+            const isFlipped = flipped.includes(card.id) || matched.includes(card.pairId);
+            const isMatched = matched.includes(card.pairId);
+            return (
+              <button key={card.id} onClick={() => flip(card.id)}
+                className={`rounded-xl p-3 min-h-[70px] text-xs font-bold transition-all text-center flex items-center justify-center leading-tight ${
+                  isMatched ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 cursor-default" :
+                  isFlipped ? "bg-blue-500/20 border border-blue-500/30 text-blue-200" :
+                  "bg-white/5 border border-white/10 text-transparent hover:bg-white/10 cursor-pointer"
+                }`} data-testid={`memory-card-${card.id}`}>
+                {isFlipped ? card.text : "?"}
+              </button>
+            );
+          })}
         </div>
       </div>
     </SchoolLayout>

@@ -8,7 +8,7 @@ import {
   classroomEconomySettings, classroomCurrencyTransactions, classroomExpenses, classroomExpensePayments,
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
   classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
-  classroomAssets, studentAssets,
+  classroomAssets, studentAssets, userInventory, tradeOffers,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -35,7 +35,9 @@ import {
   type ClassroomStoreItem, type InsertClassroomStoreItem,
   type ClassroomStorePurchase,
   type ClassroomChallenge, type InsertClassroomChallenge,
-  type ClassroomAsset, type InsertClassroomAsset, type StudentAsset
+  type ClassroomAsset, type InsertClassroomAsset, type StudentAsset,
+  type UserInventory, type InsertUserInventory,
+  type TradeOffer
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -224,6 +226,16 @@ export interface IStorage {
   equipCosmetic(userId: string, type: "title" | "frame", value: string | null): Promise<void>;
   saveFunZoneScore(data: InsertFunZoneScore): Promise<FunZoneScore>;
   getFunZoneLeaderboard(game: string): Promise<{ userId: string; displayName: string; score: number }[]>;
+  claimDailyReward(userId: string): Promise<{ success: boolean; tokens: number; streak: number; message: string }>;
+  getInventory(userId: string): Promise<UserInventory[]>;
+  addToInventory(data: InsertUserInventory): Promise<UserInventory>;
+  removeFromInventory(id: string, userId: string): Promise<void>;
+  buyShopItem(userId: string, itemId: string, itemType: string, cost: number): Promise<{ success: boolean; message: string; item?: UserInventory }>;
+  openBlindBag(userId: string, bagId: string, cost: number): Promise<{ success: boolean; item?: UserInventory; rarity?: string; message: string }>;
+  getTradeOffers(userId: string): Promise<TradeOffer[]>;
+  createTradeOffer(fromUserId: string, toUserId: string, offeredInventoryIds: string[], requestedInventoryIds: string[], tokenBonus: number, message: string): Promise<TradeOffer>;
+  respondToTradeOffer(id: string, userId: string, action: "accept" | "reject" | "cancel"): Promise<{ success: boolean; message: string }>;
+  getTokenLeaderboard(): Promise<{ userId: string; displayName: string; classroomTokens: number; loginStreak: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1155,6 +1167,140 @@ export class DatabaseStorage implements IStorage {
       .where(eq(funZoneScores.game, game))
       .orderBy(desc(funZoneScores.score))
       .limit(20);
+    return results;
+  }
+
+  async claimDailyReward(userId: string): Promise<{ success: boolean; tokens: number; streak: number; message: string }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, tokens: 0, streak: 0, message: "User not found" };
+    const today = new Date().toISOString().split("T")[0];
+    if (user.dailyRewardClaimedAt === today) {
+      return { success: false, tokens: 0, streak: user.loginStreak ?? 0, message: "Already claimed today" };
+    }
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const streak = user.lastLoginDate === yesterday ? (user.loginStreak ?? 0) + 1 : 1;
+    const base = 5;
+    const streakBonus = Math.min(streak - 1, 6) * 2;
+    const tokens = base + streakBonus;
+    await db.update(users).set({
+      classroomTokens: sql`${users.classroomTokens} + ${tokens}`,
+      loginStreak: streak,
+      lastLoginDate: today,
+      dailyRewardClaimedAt: today,
+    }).where(eq(users.id, userId));
+    return { success: true, tokens, streak, message: `Day ${streak} streak! +${tokens} tokens` };
+  }
+
+  async getInventory(userId: string): Promise<UserInventory[]> {
+    return await db.select().from(userInventory).where(eq(userInventory.userId, userId)).orderBy(desc(userInventory.createdAt));
+  }
+
+  async addToInventory(data: InsertUserInventory): Promise<UserInventory> {
+    const existing = await db.select().from(userInventory)
+      .where(and(eq(userInventory.userId, data.userId), eq(userInventory.itemId, data.itemId), eq(userInventory.itemType, data.itemType)));
+    if (existing.length > 0 && data.itemType === "power_up") {
+      const [updated] = await db.update(userInventory)
+        .set({ quantity: sql`${userInventory.quantity} + 1` })
+        .where(eq(userInventory.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+    const [item] = await db.insert(userInventory).values(data).returning();
+    return item;
+  }
+
+  async removeFromInventory(id: string, userId: string): Promise<void> {
+    await db.delete(userInventory).where(and(eq(userInventory.id, id), eq(userInventory.userId, userId)));
+  }
+
+  async buyShopItem(userId: string, itemId: string, itemType: string, cost: number): Promise<{ success: boolean; message: string; item?: UserInventory }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    const balance = user.classroomTokens ?? 0;
+    if (balance < cost) return { success: false, message: "Not enough tokens" };
+    await db.update(users).set({ classroomTokens: balance - cost }).where(eq(users.id, userId));
+    const item = await this.addToInventory({ userId, itemId, itemType, rarity: null, quantity: 1, tradable: true });
+    return { success: true, message: "Purchased!", item };
+  }
+
+  async openBlindBag(userId: string, bagId: string, cost: number): Promise<{ success: boolean; item?: UserInventory; rarity?: string; message: string }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    const balance = user.classroomTokens ?? 0;
+    if (balance < cost) return { success: false, message: "Not enough tokens" };
+    await db.update(users).set({ classroomTokens: balance - cost }).where(eq(users.id, userId));
+    const isLegend = bagId === "bag-legend";
+    const rand = Math.random();
+    let rarity: string;
+    if (isLegend) {
+      rarity = rand < 0.05 ? "legendary" : rand < 0.25 ? "epic" : rand < 0.60 ? "rare" : "common";
+    } else {
+      rarity = rand < 0.01 ? "legendary" : rand < 0.05 ? "epic" : rand < 0.30 ? "rare" : "common";
+    }
+    const pools: Record<string, string[]> = {
+      common: ["col-coin", "col-chart-up", "col-piggy", "col-notepad", "col-lock", "col-receipt"],
+      rare: ["col-rocket", "col-crown", "col-gem", "col-trophy", "col-lightning"],
+      epic: ["col-diamond", "col-fire", "col-dragon", "col-crystal-ball"],
+      legendary: ["col-unicorn", "col-rainbow-star", "col-golden-bull"],
+    };
+    const pool = pools[rarity];
+    const itemId = pool[Math.floor(Math.random() * pool.length)];
+    const item = await this.addToInventory({ userId, itemId, itemType: "collectible", rarity, quantity: 1, tradable: true });
+    return { success: true, item, rarity, message: `Got a ${rarity} collectible!` };
+  }
+
+  async getTradeOffers(userId: string): Promise<TradeOffer[]> {
+    return await db.select().from(tradeOffers)
+      .where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)))
+      .orderBy(desc(tradeOffers.createdAt))
+      .limit(50);
+  }
+
+  async createTradeOffer(fromUserId: string, toUserId: string, offeredInventoryIds: string[], requestedInventoryIds: string[], tokenBonus: number, message: string): Promise<TradeOffer> {
+    const [offer] = await db.insert(tradeOffers).values({
+      fromUserId, toUserId,
+      offeredInventoryIds: JSON.stringify(offeredInventoryIds),
+      requestedInventoryIds: JSON.stringify(requestedInventoryIds),
+      tokenBonus: tokenBonus || 0,
+      status: "pending",
+      message,
+    }).returning();
+    return offer;
+  }
+
+  async respondToTradeOffer(id: string, userId: string, action: "accept" | "reject" | "cancel"): Promise<{ success: boolean; message: string }> {
+    const [offer] = await db.select().from(tradeOffers).where(eq(tradeOffers.id, id));
+    if (!offer) return { success: false, message: "Trade not found" };
+    if (offer.status !== "pending") return { success: false, message: "Trade is no longer pending" };
+    if (action === "cancel" && offer.fromUserId !== userId) return { success: false, message: "Not your trade" };
+    if ((action === "accept" || action === "reject") && offer.toUserId !== userId) return { success: false, message: "Not your trade" };
+    if (action === "accept") {
+      const offeredIds: string[] = JSON.parse(offer.offeredInventoryIds || "[]");
+      const requestedIds: string[] = JSON.parse(offer.requestedInventoryIds || "[]");
+      for (const invId of offeredIds) {
+        await db.update(userInventory).set({ userId: offer.toUserId }).where(and(eq(userInventory.id, invId), eq(userInventory.userId, offer.fromUserId)));
+      }
+      for (const invId of requestedIds) {
+        await db.update(userInventory).set({ userId: offer.fromUserId }).where(and(eq(userInventory.id, invId), eq(userInventory.userId, offer.toUserId)));
+      }
+      if (offer.tokenBonus && offer.tokenBonus > 0) {
+        const from = await this.getUserById(offer.fromUserId);
+        if (from && (from.classroomTokens ?? 0) >= offer.tokenBonus) {
+          await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} - ${offer.tokenBonus}` }).where(eq(users.id, offer.fromUserId));
+          await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${offer.tokenBonus}` }).where(eq(users.id, offer.toUserId));
+        }
+      }
+    }
+    await db.update(tradeOffers).set({ status: action === "accept" ? "accepted" : action === "reject" ? "rejected" : "cancelled", respondedAt: new Date() }).where(eq(tradeOffers.id, id));
+    return { success: true, message: action === "accept" ? "Trade accepted!" : action === "reject" ? "Trade rejected" : "Trade cancelled" };
+  }
+
+  async getTokenLeaderboard(): Promise<{ userId: string; displayName: string; classroomTokens: number; loginStreak: number }[]> {
+    const results = await db.select({ userId: users.id, displayName: users.displayName, classroomTokens: users.classroomTokens, loginStreak: users.loginStreak })
+      .from(users)
+      .where(sql`${users.classroomTokens} > 0`)
+      .orderBy(desc(users.classroomTokens))
+      .limit(50);
     return results;
   }
 

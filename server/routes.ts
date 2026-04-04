@@ -1739,6 +1739,96 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/fun-zone/daily-claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.claimDailyReward(user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/inventory", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const items = await storage.getInventory(user.id);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/shop/buy-item", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { itemId, itemType, cost } = req.body;
+      if (!itemId || !itemType || typeof cost !== "number") return res.status(400).json({ message: "Invalid request" });
+      const result = await storage.buyShopItem(user.id, itemId, itemType, cost);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/shop/open-bag", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bagId, cost } = req.body;
+      if (!bagId || typeof cost !== "number") return res.status(400).json({ message: "Invalid request" });
+      const result = await storage.openBlindBag(user.id, bagId, cost);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/trades", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const trades = await storage.getTradeOffers(user.id);
+      res.json(trades);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/trades/offer", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { toUserId, offeredInventoryIds, requestedInventoryIds, tokenBonus, message } = req.body;
+      if (!toUserId) return res.status(400).json({ message: "Target user required" });
+      if (!Array.isArray(offeredInventoryIds) && !Array.isArray(requestedInventoryIds)) {
+        return res.status(400).json({ message: "Must offer or request at least one item" });
+      }
+      const offer = await storage.createTradeOffer(user.id, toUserId, offeredInventoryIds || [], requestedInventoryIds || [], tokenBonus || 0, message || "");
+      res.json(offer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/trades/:id/respond", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { action } = req.body;
+      if (!["accept", "reject", "cancel"].includes(action)) return res.status(400).json({ message: "Invalid action" });
+      const result = await storage.respondToTradeOffer(req.params.id, user.id, action);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/fun-zone/token-leaderboard", requireAuth, async (req, res) => {
+    try {
+      const leaders = await storage.getTokenLeaderboard();
+      res.json(leaders);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // PayPal routes with error handling
   app.get("/setup", async (req, res) => {
     try {

@@ -106,7 +106,13 @@ The School System is a completely separate, immersive visual environment at `/sc
 - **Assignments**: profit_target, lesson_completion, portfolio_balance types with student progress tracking
 - **Class Group Chat**: `classGroupMessages` table (classId, senderId, content, messageType). `GET/POST /api/classroom/chat`. Teacher can post announcements (pinned card styling). Polls every 3s.
 - **Class Leaderboard**: Rankings scoped to class via `/api/leaderboard?scope=class`
-- **Fun Zone Games**: Age-adapted mini-games (Coin Rain, Piggy Bank Builder, Stock Guesser, Budget Boss, Finance Quiz, Market Prediction, Investment Quiz, Strategy Challenge)
+- **Fun Zone Games**: Age-adapted mini-games (Coin Rain, Piggy Bank Builder, Stock Guesser, Budget Boss, Finance Quiz, Market Prediction, Investment Quiz, Strategy Challenge, Word Scramble, Market Memory). Token rewards rebalanced: Primary 2–8, Intermediate 3–14, HS 5–20.
+- **Daily Reward & Login Streak**: `loginStreak`, `lastLoginDate`, `dailyRewardClaimedAt` on users table. `POST /api/fun-zone/daily-claim` returns `{ success, tokens, streak }`. Base 5 tokens + 2 per streak day capped at day 6 (max 17).
+- **Mystery Blind Bags**: Starter (15 tokens), Crypto (30), Legend (50). `POST /api/shop/open-bag`. Returns random collectible from `user_inventory` table with rarity tiers (common/rare/epic/legendary). Reveal modal shown on open.
+- **Power-Ups**: 3 types stored in `user_inventory`. `POST /api/shop/buy-item`.
+- **Inventory Tab**: Collection grid showing owned collectibles and power-ups by rarity.
+- **Trade Tab**: Send/accept/reject/cancel trade offers between classmates via `trade_offers` table. `GET /api/trades`, `POST /api/trades`, `POST /api/trades/:id/respond`.
+- **Token Leaderboard**: `GET /api/fun-zone/token-leaderboard`. Added as a 4th tab ("Tokens") on the global `/leaderboard` page.
 - **Simulator Settings**: Persisted to `localStorage["school-sim-settings"]` — theme (default/neon/ocean/sunset/matrix), layout (standard/compact/wide), showGrid, showVolume
 - **School World Economy**: Full virtual classroom economy. Tables: `economySettings`, `economyBalances`, `economyTransactions`, `economySavings`, `economyJobs`, `economyExpenses`, `economyAuctions`, `economyAuctionBids`, `economyStoreItems`, `economyPurchases`, `economyChallenges`, `classroomAssets`, `studentAssets`.
   - Students: earn coins from lessons (50), quizzes (25 if ≥60%), assignments (100); manage savings with interest; bid in auctions; buy from store; purchase assets (property/business/investment) that add to net worth and generate passive income; view net worth breakdown and class leaderboard.
