@@ -54,23 +54,50 @@ const BLIND_BAGS = [
 
 const COSMETICS = {
   titles: [
-    { id: "title-bull", label: "Bull 🐂", cost: 10, preview: "Bull 🐂" },
-    { id: "title-bear", label: "Bear 🐻", cost: 10, preview: "Bear 🐻" },
-    { id: "title-day-trader", label: "Day Trader", cost: 15, preview: "Day Trader" },
-    { id: "title-diamond", label: "Diamond Hands 💎", cost: 20, preview: "Diamond Hands 💎" },
-    { id: "title-risk", label: "Risk Taker", cost: 20, preview: "Risk Taker" },
-    { id: "title-scholar", label: "The Scholar 📚", cost: 25, preview: "The Scholar 📚" },
-    { id: "title-maker", label: "Market Maker", cost: 30, preview: "Market Maker" },
-    { id: "title-investor", label: "Top Investor ⭐", cost: 40, preview: "Top Investor ⭐" },
-    { id: "title-professor", label: "The Professor 🎓", cost: 50, preview: "The Professor 🎓" },
+    { id: "title-bull", label: "Bull 🐂", cost: 8, preview: "Bull 🐂" },
+    { id: "title-bear", label: "Bear 🐻", cost: 8, preview: "Bear 🐻" },
+    { id: "title-hodler", label: "HODLer 💪", cost: 10, preview: "HODLer 💪" },
+    { id: "title-day-trader", label: "Day Trader", cost: 12, preview: "Day Trader" },
+    { id: "title-diamond", label: "Diamond Hands 💎", cost: 15, preview: "Diamond Hands 💎" },
+    { id: "title-risk", label: "Risk Taker", cost: 15, preview: "Risk Taker" },
+    { id: "title-analyst", label: "Chart Analyst 📊", cost: 18, preview: "Chart Analyst 📊" },
+    { id: "title-scholar", label: "The Scholar 📚", cost: 20, preview: "The Scholar 📚" },
+    { id: "title-whale", label: "Crypto Whale 🐋", cost: 25, preview: "Crypto Whale 🐋" },
+    { id: "title-maker", label: "Market Maker", cost: 25, preview: "Market Maker" },
+    { id: "title-degen", label: "Finance Degen 🎲", cost: 30, preview: "Finance Degen 🎲" },
+    { id: "title-investor", label: "Top Investor ⭐", cost: 35, preview: "Top Investor ⭐" },
+    { id: "title-professor", label: "The Professor 🎓", cost: 45, preview: "The Professor 🎓" },
+    { id: "title-legend", label: "Living Legend 👑", cost: 60, preview: "Living Legend 👑" },
   ],
   frames: [
-    { id: "frame-silver", label: "Silver Frame", cost: 20, color: "ring-2 ring-slate-400" },
-    { id: "frame-blue", label: "Neon Blue Frame", cost: 25, color: "ring-2 ring-blue-400 ring-offset-1" },
-    { id: "frame-gold", label: "Gold Frame", cost: 50, color: "ring-2 ring-amber-400 ring-offset-1" },
-    { id: "frame-fire", label: "Fire Frame 🔥", cost: 35, color: "ring-2 ring-orange-500 ring-offset-1" },
-    { id: "frame-diamond", label: "Diamond Frame 💎", cost: 75, color: "ring-[3px] ring-cyan-400 ring-offset-2" },
-    { id: "frame-rainbow", label: "Rainbow Frame 🌈", cost: 100, color: "ring-2 ring-purple-500 ring-offset-1" },
+    { id: "frame-silver", label: "Silver Frame", cost: 15, color: "ring-2 ring-slate-400" },
+    { id: "frame-blue", label: "Neon Blue Frame", cost: 20, color: "ring-2 ring-blue-400 ring-offset-1" },
+    { id: "frame-green", label: "Emerald Frame", cost: 20, color: "ring-2 ring-emerald-400 ring-offset-1" },
+    { id: "frame-fire", label: "Fire Frame 🔥", cost: 28, color: "ring-2 ring-orange-500 ring-offset-1" },
+    { id: "frame-gold", label: "Gold Frame ✨", cost: 40, color: "ring-2 ring-amber-400 ring-offset-1" },
+    { id: "frame-diamond", label: "Diamond Frame 💎", cost: 60, color: "ring-[3px] ring-cyan-400 ring-offset-2" },
+    { id: "frame-rainbow", label: "Rainbow Frame 🌈", cost: 80, color: "ring-2 ring-purple-500 ring-offset-1" },
+    { id: "frame-neon", label: "Neon Glow ⚡", cost: 50, color: "ring-[3px] ring-lime-400 ring-offset-2" },
+  ],
+  stickers: [
+    { id: "sticker-rocket", label: "Rocket Sticker 🚀", cost: 5, emoji: "🚀", desc: "Show in your profile" },
+    { id: "sticker-chart", label: "Moon Chart 📈", cost: 5, emoji: "📈", desc: "Show in your profile" },
+    { id: "sticker-gem", label: "Gem Sticker 💎", cost: 8, emoji: "💎", desc: "Show in your profile" },
+    { id: "sticker-fire", label: "On Fire 🔥", cost: 8, emoji: "🔥", desc: "Show in your profile" },
+    { id: "sticker-crown", label: "Crown Sticker 👑", cost: 10, emoji: "👑", desc: "Show in your profile" },
+    { id: "sticker-brain", label: "Big Brain 🧠", cost: 10, emoji: "🧠", desc: "Show in your profile" },
+    { id: "sticker-money", label: "Money Bag 💰", cost: 12, emoji: "💰", desc: "Show in your profile" },
+    { id: "sticker-star", label: "Star Power ⭐", cost: 15, emoji: "⭐", desc: "Show in your profile" },
+    { id: "sticker-dragon", label: "Dragon Sticker 🐉", cost: 20, emoji: "🐉", desc: "Rare sticker!" },
+    { id: "sticker-unicorn", label: "Unicorn 🦄", cost: 25, emoji: "🦄", desc: "Ultra rare sticker!" },
+  ],
+  badges: [
+    { id: "badge-early", label: "Early Adopter 🌱", cost: 0, emoji: "🌱", desc: "Free for all students!" },
+    { id: "badge-active", label: "Active Trader 📊", cost: 15, emoji: "📊", desc: "For dedicated traders" },
+    { id: "badge-streak-7", label: "7-Day Streak 🔥", cost: 20, emoji: "🔥", desc: "Show your dedication" },
+    { id: "badge-top-gamer", label: "Game Champion 🎮", cost: 25, emoji: "🎮", desc: "For top Fun Zone players" },
+    { id: "badge-scholar", label: "Finance Scholar 🎓", cost: 30, emoji: "🎓", desc: "For lesson completers" },
+    { id: "badge-whale", label: "Portfolio Whale 🐋", cost: 50, emoji: "🐋", desc: "For big portfolio holders" },
   ],
 };
 
@@ -90,7 +117,10 @@ export default function SchoolFunZone() {
 
   const awardTokensMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/fun-zone/score", { tokensEarned: amount }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/user"] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      await refreshUser();
+    },
   });
 
   const purchaseMutation = useMutation({
@@ -317,19 +347,20 @@ export default function SchoolFunZone() {
                 </Button>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sw-stagger">
               {games.map(game => (
                 <div key={game.id} onClick={() => setActiveGame(game.id)}
-                  className={`relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer hover:scale-105 hover:-translate-y-1 transition-all duration-200 shadow-lg`}
+                  className={`sw-game-card relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br ${game.color} cursor-pointer shadow-lg`}
                   data-testid={`game-card-${game.id}`}>
-                  <div className="text-5xl mb-3">{game.emoji}</div>
+                  <div className="text-5xl mb-3 sw-float">{game.emoji}</div>
                   <h3 className="font-black text-white text-lg leading-tight">{game.title}</h3>
                   <p className="text-white/75 text-xs mt-1 mb-3">{game.desc}</p>
                   <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-3 py-1 w-fit">
                     <Coins className="h-3.5 w-3.5 text-amber-300" />
-                    <span className="text-white text-xs font-bold">{game.tokens} tokens</span>
+                    <span className="text-white text-xs font-bold">up to {game.tokens} tokens</span>
                   </div>
                   <ChevronRight className="absolute bottom-4 right-4 h-5 w-5 text-white/40" />
+                  <div className="absolute inset-0 sw-shimmer-bg opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none" />
                 </div>
               ))}
             </div>
@@ -386,15 +417,16 @@ export default function SchoolFunZone() {
             {/* Titles */}
             <div>
               <div className="flex items-center gap-2 mb-3"><Sparkles className="h-5 w-5 text-primary" /><h2 className="font-black text-lg text-white">Titles</h2><span className="text-sm text-slate-400">Show off next to your name</span></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sw-stagger">
                 {COSMETICS.titles.map(item => {
                   const isOwned = owned.includes(item.id);
                   const isEquipped = equippedTitle === item.id;
                   return (
-                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-title-${item.id}`}>
+                    <div key={item.id} className={`sw-shop-item rounded-xl border p-4 flex flex-col gap-2 ${isEquipped ? "border-primary bg-primary/10 sw-glow-pulse" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-title-${item.id}`}>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm text-white">{item.label}</span>
                         {isEquipped && <Badge className="bg-primary text-primary-foreground text-xs">Equipped</Badge>}
+                        {isOwned && !isEquipped && <Badge className="bg-emerald-500/20 text-emerald-400 text-xs border-0">Owned</Badge>}
                       </div>
                       <div className="flex items-center gap-2 mt-auto pt-1">
                         <Coins className="h-3.5 w-3.5 text-amber-400" /><span className="text-sm font-bold text-amber-400">{item.cost}</span>
@@ -421,12 +453,12 @@ export default function SchoolFunZone() {
             {/* Frames */}
             <div>
               <div className="flex items-center gap-2 mb-3"><Star className="h-5 w-5 text-amber-500" /><h2 className="font-black text-lg text-white">Profile Frames</h2><span className="text-sm text-slate-400">Style your avatar</span></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sw-stagger">
                 {COSMETICS.frames.map(item => {
                   const isOwned = owned.includes(item.id);
                   const isEquipped = equippedFrame === item.id;
                   return (
-                    <div key={item.id} className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${isEquipped ? "border-primary bg-primary/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-frame-${item.id}`}>
+                    <div key={item.id} className={`sw-shop-item rounded-xl border p-4 flex flex-col gap-2 ${isEquipped ? "border-primary bg-primary/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-frame-${item.id}`}>
                       <div className="flex items-center gap-3">
                         <div className={`h-10 w-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 ${item.color} flex items-center justify-center text-lg shrink-0`}>{user?.displayName?.[0]?.toUpperCase() ?? "?"}</div>
                         <div className="flex-1"><p className="font-bold text-sm text-white">{item.label}</p>{isEquipped && <Badge className="bg-primary text-primary-foreground text-xs mt-0.5">Equipped</Badge>}</div>
@@ -447,6 +479,67 @@ export default function SchoolFunZone() {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stickers */}
+            <div>
+              <div className="flex items-center gap-2 mb-3"><span className="text-xl">🎨</span><h2 className="font-black text-lg text-white">Stickers</h2><span className="text-sm text-slate-400">Express yourself on your profile</span></div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sw-stagger">
+                {COSMETICS.stickers.map(item => {
+                  const isOwned = owned.includes(item.id);
+                  return (
+                    <div key={item.id} className={`sw-shop-item rounded-xl border p-3 flex flex-col items-center gap-1.5 text-center ${isOwned ? "border-emerald-500/30 bg-emerald-500/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-sticker-${item.id}`}>
+                      <div className="text-3xl sw-float">{item.emoji}</div>
+                      <p className="font-bold text-xs text-white leading-tight">{item.label}</p>
+                      <p className="text-slate-500 text-xs">{item.desc}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Coins className="h-3 w-3 text-amber-400" /><span className="text-xs font-black text-amber-400">{item.cost}</span>
+                      </div>
+                      {isOwned ? (
+                        <Badge className="bg-emerald-500/20 text-emerald-400 text-xs border-0 mt-0.5">Owned ✓</Badge>
+                      ) : (
+                        <Button size="sm" className="w-full h-6 text-xs rounded-lg mt-0.5"
+                          onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
+                          disabled={purchaseMutation.isPending || tokenBalance < item.cost} data-testid={`btn-buy-sticker-${item.id}`}>
+                          {tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Badges */}
+            <div>
+              <div className="flex items-center gap-2 mb-3"><span className="text-xl">🏅</span><h2 className="font-black text-lg text-white">Badges</h2><span className="text-sm text-slate-400">Show your achievements</span></div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sw-stagger">
+                {COSMETICS.badges.map(item => {
+                  const isOwned = owned.includes(item.id);
+                  return (
+                    <div key={item.id} className={`sw-shop-item rounded-xl border p-4 flex items-center gap-3 ${isOwned ? "border-amber-500/30 bg-amber-500/10" : "border-white/10 bg-white/5"}`} data-testid={`cosmetic-badge-${item.id}`}>
+                      <div className="text-3xl sw-badge-spin">{item.emoji}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-white">{item.label}</p>
+                        <p className="text-slate-400 text-xs">{item.desc}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Coins className="h-3 w-3 text-amber-400" />
+                          <span className="text-xs font-black text-amber-400">{item.cost === 0 ? "FREE" : item.cost}</span>
+                        </div>
+                      </div>
+                      {isOwned ? (
+                        <Badge className="bg-amber-500/20 text-amber-400 text-xs border-0 shrink-0">Owned</Badge>
+                      ) : (
+                        <Button size="sm" className="h-7 text-xs rounded-lg shrink-0"
+                          onClick={() => purchaseMutation.mutate({ cosmeticId: item.id, cost: item.cost })}
+                          disabled={purchaseMutation.isPending || tokenBalance < item.cost} data-testid={`btn-buy-badge-${item.id}`}>
+                          {item.cost === 0 ? "Claim" : tokenBalance < item.cost ? <Lock className="h-3 w-3" /> : "Buy"}
+                        </Button>
+                      )}
                     </div>
                   );
                 })}

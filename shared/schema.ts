@@ -273,6 +273,33 @@ export const classGroupMessages = pgTable("class_group_messages", {
   senderId: varchar("sender_id").notNull(),
   content: text("content").notNull(),
   messageType: text("message_type").default("message"),
+  isDeleted: boolean("is_deleted").default(false),
+  editedAt: timestamp("edited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classGroupChats = pgTable("class_group_chats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  createdById: varchar("created_by_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const classGroupChatMembers = pgTable("class_group_chat_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const classGroupChatMessages = pgTable("class_group_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  content: text("content").notNull(),
+  isDeleted: boolean("is_deleted").default(false),
+  editedAt: timestamp("edited_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -304,7 +331,10 @@ export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit(
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertClassroomEventSchema = createInsertSchema(classroomEvents).omit({ id: true, createdAt: true });
 export const insertFunZoneScoreSchema = createInsertSchema(funZoneScores).omit({ id: true, createdAt: true });
-export const insertClassGroupMessageSchema = createInsertSchema(classGroupMessages).omit({ id: true, createdAt: true });
+export const insertClassGroupMessageSchema = createInsertSchema(classGroupMessages).omit({ id: true, createdAt: true, editedAt: true });
+export const insertClassGroupChatSchema = createInsertSchema(classGroupChats).omit({ id: true, createdAt: true });
+export const insertClassGroupChatMemberSchema = createInsertSchema(classGroupChatMembers).omit({ id: true, addedAt: true });
+export const insertClassGroupChatMessageSchema = createInsertSchema(classGroupChatMessages).omit({ id: true, createdAt: true, editedAt: true });
 
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -404,6 +434,12 @@ export type InsertFunZoneScore = z.infer<typeof insertFunZoneScoreSchema>;
 export type FunZoneScore = typeof funZoneScores.$inferSelect;
 export type InsertClassGroupMessage = z.infer<typeof insertClassGroupMessageSchema>;
 export type ClassGroupMessage = typeof classGroupMessages.$inferSelect;
+export type InsertClassGroupChat = z.infer<typeof insertClassGroupChatSchema>;
+export type ClassGroupChat = typeof classGroupChats.$inferSelect;
+export type InsertClassGroupChatMember = z.infer<typeof insertClassGroupChatMemberSchema>;
+export type ClassGroupChatMember = typeof classGroupChatMembers.$inferSelect;
+export type InsertClassGroupChatMessage = z.infer<typeof insertClassGroupChatMessageSchema>;
+export type ClassGroupChatMessage = typeof classGroupChatMessages.$inferSelect;
 
 // ===== CLASSROOM ECONOMY TABLES =====
 

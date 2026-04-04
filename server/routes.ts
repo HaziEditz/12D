@@ -1693,6 +1693,155 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Edit a class chat message (own messages only)
+  app.put("/api/classroom/chat/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+      const updated = await storage.editClassGroupMessage(req.params.id, user.id, content.trim());
+      if (!updated) return res.status(403).json({ message: "Cannot edit this message" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete a class chat message (own messages only)
+  app.delete("/api/classroom/chat/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const ok = await storage.deleteClassGroupMessage(req.params.id, user.id);
+      if (!ok) return res.status(403).json({ message: "Cannot delete this message" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Group Chats
+  app.get("/api/group-chats", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let classId = req.query.classId as string | undefined;
+      if (!classId) {
+        if (user.role === "teacher" || user.role === "admin") {
+          const tc = await storage.getClassesByTeacher(user.id);
+          classId = tc[0]?.id;
+        } else {
+          const sc = await storage.getClassesByStudent(user.id);
+          classId = sc[0]?.id;
+        }
+      }
+      if (!classId) return res.json([]);
+      const chats = await storage.getGroupChats(classId, user.id);
+      res.json(chats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { name, memberIds, classId: reqClassId } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Group name required" });
+      let classId = reqClassId;
+      if (!classId) {
+        if (user.role === "teacher" || user.role === "admin") {
+          const tc = await storage.getClassesByTeacher(user.id);
+          classId = tc[0]?.id;
+        } else {
+          const sc = await storage.getClassesByStudent(user.id);
+          classId = sc[0]?.id;
+        }
+      }
+      if (!classId) return res.status(400).json({ message: "No class found" });
+      const chat = await storage.createGroupChat({ classId, name: name.trim(), createdById: user.id }, memberIds ?? []);
+      res.json(chat);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/group-chats/:id/members", requireAuth, async (req, res) => {
+    try {
+      const members = await storage.getGroupChatMembers(req.params.id);
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats/:id/members", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: "userId required" });
+      await storage.addGroupChatMember(req.params.id, userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/group-chats/:id/members/:userId", requireAuth, async (req, res) => {
+    try {
+      await storage.removeGroupChatMember(req.params.id, req.params.userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/group-chats/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const messages = await storage.getGroupChatMessages(req.params.id, user.id, 200);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+      const member = await storage.getGroupChatMembers(req.params.id);
+      if (!member.find(m => m.userId === user.id)) return res.status(403).json({ message: "Not a member" });
+      const msg = await storage.sendGroupChatMessage({ chatId: req.params.id, senderId: user.id, content: content.trim() });
+      const sender = await storage.getUserById(user.id);
+      res.json({ ...msg, senderName: sender?.displayName ?? "Unknown", senderRole: user.role });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/group-chats/:id/messages/:msgId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+      const updated = await storage.editGroupChatMessage(req.params.msgId, user.id, content.trim());
+      if (!updated) return res.status(403).json({ message: "Cannot edit this message" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/group-chats/:id/messages/:msgId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const ok = await storage.deleteGroupChatMessage(req.params.msgId, user.id);
+      if (!ok) return res.status(403).json({ message: "Cannot delete this message" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.get("/api/fun-zone/leaderboard/:game", requireAuth, async (req, res) => {
     try {
       const leaderboard = await storage.getFunZoneLeaderboard(req.params.game);
@@ -1706,9 +1855,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = req.user as User;
       const { game, score, tokensEarned } = req.body;
-      const saved = await storage.saveFunZoneScore({ userId: user.id, game, score, tokensEarned: tokensEarned || 0 });
-      if (tokensEarned > 0) await storage.addClassroomTokens(user.id, tokensEarned);
-      res.json(saved);
+      const tokens = Number(tokensEarned) || 0;
+      if (tokens > 0) await storage.addClassroomTokens(user.id, tokens);
+      if (game) {
+        const saved = await storage.saveFunZoneScore({ userId: user.id, game, score: Number(score) || 0, tokensEarned: tokens });
+        return res.json(saved);
+      }
+      res.json({ success: true, tokensEarned: tokens });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

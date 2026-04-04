@@ -9,6 +9,7 @@ import {
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
   classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
   classroomAssets, studentAssets, userInventory, tradeOffers,
+  classGroupChats, classGroupChatMembers, classGroupChatMessages,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -25,6 +26,9 @@ import {
   type ClassroomEvent, type InsertClassroomEvent,
   type FunZoneScore, type InsertFunZoneScore,
   type ClassGroupMessage, type InsertClassGroupMessage,
+  type ClassGroupChat, type InsertClassGroupChat,
+  type ClassGroupChatMember, type InsertClassGroupChatMember,
+  type ClassGroupChatMessage, type InsertClassGroupChatMessage,
   type ClassroomEconomySettings, type InsertClassroomEconomySettings,
   type ClassroomCurrencyTransaction, type InsertClassroomCurrencyTransaction,
   type ClassroomExpense, type InsertClassroomExpense,
@@ -115,9 +119,21 @@ export interface IStorage {
   getClassesByStudent(studentId: string): Promise<Class[]>;
 
   // Class Group Chat
-  getClassGroupMessages(classId: string, limit?: number): Promise<(ClassGroupMessage & { senderName: string })[]>;
+  getClassGroupMessages(classId: string, limit?: number): Promise<(ClassGroupMessage & { senderName: string; senderRole: string })[]>;
   createClassGroupMessage(data: InsertClassGroupMessage): Promise<ClassGroupMessage>;
   getClassGroupMessageCount(classId: string, since?: Date): Promise<number>;
+  editClassGroupMessage(messageId: string, userId: string, content: string): Promise<ClassGroupMessage | undefined>;
+  deleteClassGroupMessage(messageId: string, userId: string): Promise<boolean>;
+  // Group Chats (within a class)
+  getGroupChats(classId: string, userId: string): Promise<(ClassGroupChat & { memberCount: number; lastMessage?: string })[]>;
+  createGroupChat(data: InsertClassGroupChat, memberIds: string[]): Promise<ClassGroupChat>;
+  getGroupChatMembers(chatId: string): Promise<{ userId: string; displayName: string; role: string }[]>;
+  addGroupChatMember(chatId: string, userId: string): Promise<void>;
+  removeGroupChatMember(chatId: string, userId: string): Promise<void>;
+  getGroupChatMessages(chatId: string, userId: string, limit?: number): Promise<(ClassGroupChatMessage & { senderName: string; senderRole: string })[]>;
+  sendGroupChatMessage(data: InsertClassGroupChatMessage): Promise<ClassGroupChatMessage>;
+  editGroupChatMessage(messageId: string, userId: string, content: string): Promise<ClassGroupChatMessage | undefined>;
+  deleteGroupChatMessage(messageId: string, userId: string): Promise<boolean>;
   
   // Achievements
   createAchievement(data: InsertAchievement): Promise<Achievement>;
@@ -594,13 +610,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Class Group Chat
-  async getClassGroupMessages(classId: string, limit = 100): Promise<(ClassGroupMessage & { senderName: string })[]> {
+  async getClassGroupMessages(classId: string, limit = 100): Promise<(ClassGroupMessage & { senderName: string; senderRole: string })[]> {
     const messages = await db.select().from(classGroupMessages)
       .where(eq(classGroupMessages.classId, classId))
       .orderBy(asc(classGroupMessages.createdAt))
       .limit(limit);
     const senderIds = [...new Set(messages.map(m => m.senderId))];
-    const senders = senderIds.length > 0 ? await db.select({ id: users.id, displayName: users.displayName, role: users.role }).from(users) : [];
+    const senders = senderIds.length > 0 ? await db.select({ id: users.id, displayName: users.displayName, role: users.role }).from(users).where(inArray(users.id, senderIds)) : [];
     return messages.map(m => ({
       ...m,
       senderName: senders.find(s => s.id === m.senderId)?.displayName ?? "Unknown",
@@ -618,6 +634,92 @@ export class DatabaseStorage implements IStorage {
       ? await db.select().from(classGroupMessages).where(and(eq(classGroupMessages.classId, classId), sql`${classGroupMessages.createdAt} > ${since}`))
       : await db.select().from(classGroupMessages).where(eq(classGroupMessages.classId, classId));
     return msgs.length;
+  }
+
+  async editClassGroupMessage(messageId: string, userId: string, content: string): Promise<ClassGroupMessage | undefined> {
+    const [msg] = await db.update(classGroupMessages)
+      .set({ content, editedAt: new Date() })
+      .where(and(eq(classGroupMessages.id, messageId), eq(classGroupMessages.senderId, userId)))
+      .returning();
+    return msg;
+  }
+
+  async deleteClassGroupMessage(messageId: string, userId: string): Promise<boolean> {
+    const msg = await db.select().from(classGroupMessages).where(eq(classGroupMessages.id, messageId)).limit(1);
+    if (!msg[0]) return false;
+    if (msg[0].senderId !== userId) return false;
+    await db.update(classGroupMessages).set({ isDeleted: true, content: "This message was deleted." }).where(eq(classGroupMessages.id, messageId));
+    return true;
+  }
+
+  async getGroupChats(classId: string, userId: string): Promise<(ClassGroupChat & { memberCount: number; lastMessage?: string })[]> {
+    const memberEntries = await db.select({ chatId: classGroupChatMembers.chatId }).from(classGroupChatMembers).where(eq(classGroupChatMembers.userId, userId));
+    const chatIds = memberEntries.map(e => e.chatId);
+    if (chatIds.length === 0) return [];
+    const chats = await db.select().from(classGroupChats).where(and(eq(classGroupChats.classId, classId), inArray(classGroupChats.id, chatIds)));
+    const result = await Promise.all(chats.map(async c => {
+      const members = await db.select().from(classGroupChatMembers).where(eq(classGroupChatMembers.chatId, c.id));
+      const lastMsgs = await db.select().from(classGroupChatMessages).where(eq(classGroupChatMessages.chatId, c.id)).orderBy(desc(classGroupChatMessages.createdAt)).limit(1);
+      return { ...c, memberCount: members.length, lastMessage: lastMsgs[0]?.isDeleted ? "Message deleted" : lastMsgs[0]?.content };
+    }));
+    return result;
+  }
+
+  async createGroupChat(data: InsertClassGroupChat, memberIds: string[]): Promise<ClassGroupChat> {
+    const [chat] = await db.insert(classGroupChats).values(data).returning();
+    const uniqueIds = [...new Set([data.createdById, ...memberIds])];
+    await db.insert(classGroupChatMembers).values(uniqueIds.map(uid => ({ chatId: chat.id, userId: uid })));
+    return chat;
+  }
+
+  async getGroupChatMembers(chatId: string): Promise<{ userId: string; displayName: string; role: string }[]> {
+    const members = await db.select({ userId: classGroupChatMembers.userId }).from(classGroupChatMembers).where(eq(classGroupChatMembers.chatId, chatId));
+    const userIds = members.map(m => m.userId);
+    if (userIds.length === 0) return [];
+    const userList = await db.select({ id: users.id, displayName: users.displayName, role: users.role }).from(users).where(inArray(users.id, userIds));
+    return userList.map(u => ({ userId: u.id, displayName: u.displayName ?? "Unknown", role: u.role }));
+  }
+
+  async addGroupChatMember(chatId: string, userId: string): Promise<void> {
+    const existing = await db.select().from(classGroupChatMembers).where(and(eq(classGroupChatMembers.chatId, chatId), eq(classGroupChatMembers.userId, userId))).limit(1);
+    if (!existing[0]) await db.insert(classGroupChatMembers).values({ chatId, userId });
+  }
+
+  async removeGroupChatMember(chatId: string, userId: string): Promise<void> {
+    await db.delete(classGroupChatMembers).where(and(eq(classGroupChatMembers.chatId, chatId), eq(classGroupChatMembers.userId, userId)));
+  }
+
+  async getGroupChatMessages(chatId: string, userId: string, limit = 100): Promise<(ClassGroupChatMessage & { senderName: string; senderRole: string })[]> {
+    const member = await db.select().from(classGroupChatMembers).where(and(eq(classGroupChatMembers.chatId, chatId), eq(classGroupChatMembers.userId, userId))).limit(1);
+    if (!member[0]) return [];
+    const messages = await db.select().from(classGroupChatMessages).where(eq(classGroupChatMessages.chatId, chatId)).orderBy(asc(classGroupChatMessages.createdAt)).limit(limit);
+    const senderIds = [...new Set(messages.map(m => m.senderId))];
+    const senders = senderIds.length > 0 ? await db.select({ id: users.id, displayName: users.displayName, role: users.role }).from(users).where(inArray(users.id, senderIds)) : [];
+    return messages.map(m => ({
+      ...m,
+      senderName: senders.find(s => s.id === m.senderId)?.displayName ?? "Unknown",
+      senderRole: senders.find(s => s.id === m.senderId)?.role ?? "student",
+    }));
+  }
+
+  async sendGroupChatMessage(data: InsertClassGroupChatMessage): Promise<ClassGroupChatMessage> {
+    const [msg] = await db.insert(classGroupChatMessages).values(data).returning();
+    return msg;
+  }
+
+  async editGroupChatMessage(messageId: string, userId: string, content: string): Promise<ClassGroupChatMessage | undefined> {
+    const [msg] = await db.update(classGroupChatMessages)
+      .set({ content, editedAt: new Date() })
+      .where(and(eq(classGroupChatMessages.id, messageId), eq(classGroupChatMessages.senderId, userId)))
+      .returning();
+    return msg;
+  }
+
+  async deleteGroupChatMessage(messageId: string, userId: string): Promise<boolean> {
+    const msg = await db.select().from(classGroupChatMessages).where(eq(classGroupChatMessages.id, messageId)).limit(1);
+    if (!msg[0] || msg[0].senderId !== userId) return false;
+    await db.update(classGroupChatMessages).set({ isDeleted: true, content: "This message was deleted." }).where(eq(classGroupChatMessages.id, messageId));
+    return true;
   }
 
   // Achievements
