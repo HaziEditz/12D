@@ -225,3 +225,16 @@ The Academy (`/lessons`) and School Worlds Academy (`/school/lessons`) share a c
 - `client/src/lib/levels.ts` updated with new XP curve matching backend.
 - All cards accept `variant="primary"` for kid-friendly amber styling on School Worlds (when `class.ageGroup === "primary"`).
 - Wired into `client/src/pages/lessons.tsx`, `client/src/pages/school/lessons.tsx`, and `client/src/pages/lesson-detail.tsx`.
+
+### Phase 2 (April 2026)
+
+**Bug fixes**: Gamification mutations (lesson complete, quiz attempt, daily-challenge claim, lucky-bonus claim) now also call `refreshUser()` from `auth-context` so the React state actually picks up new XP/streak/freeze values. Previously only the React Query cache was invalidated, but the auth-context state held the stale snapshot, so cards like `StreakBadge` (which reads `user.lessonStreak` directly from auth) showed stale numbers.
+
+**Quiz must be passed to complete a lesson**: In `lesson-detail.tsx`, the lesson now queries `/api/lessons/:id/quiz` to determine if a quiz exists and what the best attempt was. If a quiz exists and the user hasn't scored ≥60%, the "Mark Complete" button switches to "Take Quiz to Complete" (disabled-style), shows a toast, and scrolls to the quiz. When the quiz is passed, the quiz's `onPassed` callback automatically fires `markCompleteMutation` so the lesson is awarded right away.
+
+**Teacher → Student lesson assignments**:
+- Schema: added `lessonId` (nullable varchar) and `createdAt` to `assignments`. New type value `"lesson"` represents a per-lesson assignment.
+- Storage: `getStudentLessonAssignments(userId)` returns all `type="lesson"` assignments across the student's classes, joined with the lesson and the user's lesson-completion status.
+- Routes: `GET /api/academy/assignments` (student) returns the above. `GET /api/teacher/assignments/:id/progress` now returns one row per student in the assignment's class with `completed`/`completedAt`, inferring completion from `lessonProgress` for `type="lesson"`, so teachers can see who hasn't started.
+- Teacher UI (`client/src/pages/school/teacher-dashboard.tsx`): Assignment dialog now offers a `Lesson` type with a lesson dropdown; auto-fills title/description from the chosen lesson. Each assignment card now shows class name, lesson title (when applicable), an overdue indicator, and a per-class progress bar (`X/Y done`).
+- Student UI: New `client/src/components/assignments-panel.tsx`, mounted in both `/lessons` and `/school/lessons` next to the streak badge — shows incomplete assignments first (overdue first), with due dates and a clickable lesson link.

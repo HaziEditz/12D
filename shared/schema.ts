@@ -108,9 +108,11 @@ export const assignments = pgTable("assignments", {
   classId: varchar("class_id"), // Added classId to link assignment to a class
   title: text("title").notNull(),
   description: text("description").notNull(),
-  type: text("type").notNull().default("profit_target"), // profit_target, lesson_completion, portfolio_balance
+  type: text("type").notNull().default("profit_target"), // profit_target, lesson_completion, portfolio_balance, lesson
   targetValue: real("target_value").notNull().default(0),
+  lessonId: varchar("lesson_id"), // For type="lesson" — the specific lesson to complete
   dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const assignmentProgress = pgTable("assignment_progress", {

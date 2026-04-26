@@ -4,9 +4,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Gift } from "lucide-react";
 import { fireConfetti } from "@/lib/confetti";
+import { useAuth } from "@/lib/auth-context";
 
 export function LuckyBonusCard({ variant = "default" }: { variant?: "default" | "primary" }) {
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const [revealed, setRevealed] = useState<{ emoji: string; name: string; xp: number; tokens: number } | null>(null);
   const [spinning, setSpinning] = useState(false);
   const isPrimary = variant === "primary";
@@ -34,6 +36,7 @@ export function LuckyBonusCard({ variant = "default" }: { variant?: "default" | 
       }
       queryClient.invalidateQueries({ queryKey: ["/api/academy/lucky-bonus"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      refreshUser();
     },
   });
 

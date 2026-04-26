@@ -14,7 +14,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
-import type { Lesson, LessonProgress } from "@shared/schema";
+import type { Lesson, LessonProgress, Quiz, QuizAttempt } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,7 @@ import { EnhancedQuizSection } from "@/components/enhanced-quiz";
 import { LessonCompletionModal, type CompletionResult } from "@/components/lesson-completion-modal";
 
 export default function LessonDetailPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [, navigate] = useLocation();
   const [match, params] = useRoute("/lessons/:id");
   const { toast } = useToast();
@@ -47,6 +47,17 @@ export default function LessonDetailPage() {
   const lessonProgress = progress?.find(p => p.lessonId === lessonId);
   const isCompleted = lessonProgress?.completed ?? false;
 
+  // Quiz info — required to complete the lesson when one exists
+  const { data: quizData } = useQuery<{ quiz: Quiz | null; bestAttempt: QuizAttempt | null }>({
+    queryKey: ["/api/lessons", lessonId, "quiz"],
+    enabled: !!lessonId,
+  });
+  const hasQuiz = !!quizData?.quiz && Array.isArray((quizData.quiz as any).questions) && (quizData.quiz as any).questions.length > 0;
+  const bestQuizScore = quizData?.bestAttempt?.score ?? 0;
+  const bestQuizTotal = quizData?.bestAttempt?.total ?? 0;
+  const passedQuiz = bestQuizTotal > 0 && (bestQuizScore / bestQuizTotal) >= 0.6;
+  const canMarkComplete = !hasQuiz || passedQuiz;
+
   const markCompleteMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/lessons/${lessonId}/complete`);
@@ -58,6 +69,8 @@ export default function LessonDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/academy/daily-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/academy/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/academy/assignments"] });
+      refreshUser();
       setCompletionResult({
         xpAwarded: data.xpAwarded,
         bonusXp: data.bonusXp,
@@ -185,7 +198,12 @@ export default function LessonDetailPage() {
           </CardContent>
         </Card>
 
-        <EnhancedQuizSection lessonId={lesson.id} />
+        <EnhancedQuizSection
+          lessonId={lesson.id}
+          onPassed={() => {
+            if (!isCompleted) markCompleteMutation.mutate();
+          }}
+        />
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex gap-2">
@@ -204,14 +222,28 @@ export default function LessonDetailPage() {
 
           <div className="flex gap-2">
             <Button
-              onClick={() => markCompleteMutation.mutate()}
+              onClick={() => {
+                if (!canMarkComplete) {
+                  toast({ title: "Pass the quiz first", description: "Score at least 60% on the quiz below to complete this lesson.", variant: "destructive" });
+                  document.querySelector("[data-testid='answer-option-0']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  return;
+                }
+                markCompleteMutation.mutate();
+              }}
               disabled={markCompleteMutation.isPending}
               className="gap-2"
-              variant={isCompleted ? "outline" : "default"}
+              variant={isCompleted ? "outline" : !canMarkComplete ? "secondary" : "default"}
               data-testid="button-mark-complete"
+              title={!canMarkComplete ? "Pass the quiz to complete this lesson" : undefined}
             >
               <CheckCircle2 className="h-4 w-4" />
-              {markCompleteMutation.isPending ? "Saving..." : isCompleted ? "Completed Again" : "Mark Complete"}
+              {markCompleteMutation.isPending
+                ? "Saving..."
+                : isCompleted
+                ? "Completed"
+                : !canMarkComplete
+                ? "Take Quiz to Complete"
+                : "Mark Complete"}
             </Button>
             {nextLesson && (
               <Button

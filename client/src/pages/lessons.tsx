@@ -41,6 +41,7 @@ import { StreakBadge } from "@/components/streak-badge";
 import { DailyChallengesCard } from "@/components/daily-challenges-card";
 import { LuckyBonusCard } from "@/components/lucky-bonus-card";
 import { LearningStatsCard } from "@/components/learning-stats-card";
+import { AssignmentsPanel } from "@/components/assignments-panel";
 
 export default function LessonsPage() {
   const { user } = useAuth();
@@ -331,6 +332,7 @@ export default function LessonsPage() {
         </div>
         <div className="space-y-4">
           <StreakBadge />
+          <AssignmentsPanel linkBase="/lessons" />
           <LuckyBonusCard />
           <DailyChallengesCard />
         </div>

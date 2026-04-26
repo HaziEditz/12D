@@ -12,6 +12,7 @@ import type { Quiz, QuizAttempt } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fireBurst } from "@/lib/confetti";
 import { playClickSound, playErrorSound, playLessonCompleteSound } from "@/lib/sounds";
+import { useAuth } from "@/lib/auth-context";
 
 const CORRECT_MESSAGES = ["Nice!", "Boom!", "Got it!", "Sweet!", "Yes!", "Easy!", "Crisp!"];
 const HYPE_AT_COMBO: Record<number, string> = {
@@ -29,6 +30,7 @@ interface Question {
 }
 
 export function EnhancedQuizSection({ lessonId, onPassed }: { lessonId: string; onPassed?: () => void }) {
+  const { refreshUser } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [feedbackIndex, setFeedbackIndex] = useState<number | null>(null);
@@ -60,6 +62,7 @@ export function EnhancedQuizSection({ lessonId, onPassed }: { lessonId: string; 
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/academy/daily-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/academy/stats"] });
+      refreshUser();
       if (result?.passed && onPassed) onPassed();
     },
   });

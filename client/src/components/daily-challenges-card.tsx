@@ -3,6 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Target, CheckCircle2, Gift } from "lucide-react";
 import { fireBurst } from "@/lib/confetti";
+import { useAuth } from "@/lib/auth-context";
 
 interface Challenge {
   id: string;
@@ -23,6 +24,7 @@ interface ChallengesData {
 
 export function DailyChallengesCard({ variant = "default" }: { variant?: "default" | "primary" }) {
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const isPrimary = variant === "primary";
 
   const { data, isLoading } = useQuery<ChallengesData>({
@@ -43,6 +45,7 @@ export function DailyChallengesCard({ variant = "default" }: { variant?: "defaul
       }
       queryClient.invalidateQueries({ queryKey: ["/api/academy/daily-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      refreshUser();
     },
   });
 

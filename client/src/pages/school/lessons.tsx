@@ -9,6 +9,7 @@ import { StreakBadge } from "@/components/streak-badge";
 import { DailyChallengesCard } from "@/components/daily-challenges-card";
 import { LuckyBonusCard } from "@/components/lucky-bonus-card";
 import { LearningStatsCard } from "@/components/learning-stats-card";
+import { AssignmentsPanel } from "@/components/assignments-panel";
 
 const difficultyColors: Record<string, string> = {
   beginner: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
@@ -112,6 +113,7 @@ export default function SchoolLessons() {
           </div>
           <div className="space-y-4">
             <StreakBadge variant={isPrimary ? "primary" : "default"} />
+            <AssignmentsPanel variant={isPrimary ? "primary" : "default"} linkBase="/school/lessons" />
             <LuckyBonusCard variant={isPrimary ? "primary" : "default"} />
             <DailyChallengesCard variant={isPrimary ? "primary" : "default"} />
           </div>

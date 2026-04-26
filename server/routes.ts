@@ -705,6 +705,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Learning stats
+  app.get("/api/academy/assignments", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const items = await storage.getStudentLessonAssignments(user.id);
+      res.json(items);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.get("/api/academy/stats", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
@@ -1398,8 +1408,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!assignment || assignment.teacherId !== user.id) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      const progress = await storage.getAssignmentProgress(req.params.id);
-      res.json(progress);
+      const explicitProgress = await storage.getAssignmentProgress(req.params.id);
+
+      // Build a "per student" view across the assignment's class so teachers see
+      // who hasn't started yet, not just who has progress rows.
+      let classStudents: any[] = [];
+      if (assignment.classId) {
+        classStudents = await storage.getStudentsByClass(assignment.classId);
+      }
+
+      // For lesson-type assignments, infer completion from lesson progress
+      const out: any[] = [];
+      const seenStudentIds = new Set<string>();
+      for (const s of classStudents) {
+        seenStudentIds.add(s.id);
+        const explicit = explicitProgress.find(p => p.studentId === s.id);
+        let completed = explicit?.completed ?? false;
+        let completedAt = explicit?.completedAt ?? null;
+        if (!completed && assignment.type === "lesson" && assignment.lessonId) {
+          const lp = await storage.getLessonProgress(s.id);
+          const match = lp.find(p => p.lessonId === assignment.lessonId && p.completed);
+          if (match) {
+            completed = true;
+            completedAt = match.completedAt ?? null;
+          }
+        }
+        out.push({
+          studentId: s.id,
+          studentName: s.displayName ?? s.email,
+          completed,
+          completedAt,
+          currentValue: explicit?.currentValue ?? 0,
+        });
+      }
+      // Include any progress rows for students no longer in the class (defensive)
+      for (const p of explicitProgress) {
+        if (!seenStudentIds.has(p.studentId)) {
+          out.push({ studentId: p.studentId, studentName: "(removed)", completed: p.completed ?? false, completedAt: p.completedAt, currentValue: p.currentValue ?? 0 });
+        }
+      }
+      res.json(out);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

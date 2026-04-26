@@ -43,10 +43,11 @@ const createClassSchema = z.object({
 const createAssignmentSchema = z.object({
   title: z.string().min(2),
   description: z.string().optional(),
-  type: z.enum(["profit_target", "lesson_completion", "portfolio_balance"]),
-  targetValue: z.coerce.number().min(1),
+  type: z.enum(["profit_target", "lesson_completion", "portfolio_balance", "lesson"]),
+  targetValue: z.coerce.number().min(0).default(0),
   dueDate: z.string().optional(),
   classId: z.string().optional(),
+  lessonId: z.string().optional(),
 });
 
 const createEventSchema = z.object({
@@ -69,6 +70,7 @@ export default function TeacherCommandCenter() {
   const { data: students = [] } = useQuery<any[]>({ queryKey: ["/api/teacher/students"] });
   const { data: assignments = [] } = useQuery<any[]>({ queryKey: ["/api/teacher/assignments"] });
   const { data: events = [] } = useQuery<any[]>({ queryKey: ["/api/classroom/events"] });
+  const { data: lessonsList = [] } = useQuery<any[]>({ queryKey: ["/api/lessons"] });
 
   const avgBalance = students.length > 0
     ? students.reduce((s: number, u: any) => s + parseFloat(u.simulatorBalance ?? "10000"), 0) / students.length
@@ -89,14 +91,30 @@ export default function TeacherCommandCenter() {
   });
 
   // Create assignment
-  const assignmentForm = useForm({ resolver: zodResolver(createAssignmentSchema), defaultValues: { title: "", description: "", type: "profit_target" as const, targetValue: 100 } });
+  const assignmentForm = useForm({ resolver: zodResolver(createAssignmentSchema), defaultValues: { title: "", description: "", type: "lesson" as const, targetValue: 0, lessonId: "", classId: "", dueDate: "" } });
   const createAssignmentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/teacher/assignments", data),
+    mutationFn: (data: any) => {
+      const payload: any = { ...data };
+      if (payload.type === "lesson") {
+        if (!payload.lessonId) throw new Error("Please select a lesson");
+        // Auto-fill title from lesson if blank
+        const lesson = lessonsList.find((l: any) => l.id === payload.lessonId);
+        if (!payload.title || payload.title.length < 2) payload.title = `Read: ${lesson?.title ?? "Lesson"}`;
+        if (!payload.description) payload.description = lesson?.description ?? `Complete the lesson and pass the quiz.`;
+        payload.targetValue = 1;
+      }
+      // strip empty strings so backend nulls them
+      Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
+      return apiRequest("POST", "/api/teacher/assignments", payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/assignments"] });
       assignmentForm.reset();
       setAssignmentDialogOpen(false);
       toast({ title: "Assignment created!" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't create assignment", description: err?.message ?? "Try again.", variant: "destructive" });
     },
   });
 
@@ -220,6 +238,7 @@ export default function TeacherCommandCenter() {
           <AssignmentsTab
             assignments={assignments}
             classes={classes}
+            lessonsList={lessonsList}
             dialogOpen={assignmentDialogOpen}
             setDialogOpen={setAssignmentDialogOpen}
             form={assignmentForm}
@@ -427,7 +446,9 @@ function StudentsTab({ students, search, setSearch }: any) {
   );
 }
 
-function AssignmentsTab({ assignments, classes, dialogOpen, setDialogOpen, form, onSubmit, isPending }: any) {
+function AssignmentsTab({ assignments, classes, lessonsList = [], dialogOpen, setDialogOpen, form, onSubmit, isPending }: any) {
+  const watchType = form.watch("type");
+  const isLessonType = watchType === "lesson";
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -442,29 +463,44 @@ function AssignmentsTab({ assignments, classes, dialogOpen, setDialogOpen, form,
             <DialogHeader><DialogTitle className="text-white">Create Assignment</DialogTitle></DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="title" render={({ field }) => (
-                  <FormItem><FormLabel className="text-slate-300">Title</FormLabel><FormControl><Input {...field} placeholder="e.g. Earn $500 profit" className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-title" /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="type" render={({ field }) => (
+                  <FormItem><FormLabel className="text-slate-300">Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-assignment-type"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent className="bg-[#0f172a] border-white/20">
+                        <SelectItem value="lesson">Lesson — students must complete a specific lesson</SelectItem>
+                        <SelectItem value="profit_target">Profit Target</SelectItem>
+                        <SelectItem value="lesson_completion">Lesson Count Goal</SelectItem>
+                        <SelectItem value="portfolio_balance">Portfolio Balance</SelectItem>
+                      </SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
                 )} />
-                <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem><FormLabel className="text-slate-300">Description (optional)</FormLabel><FormControl><Textarea {...field} placeholder="Describe the assignment..." className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-description" /></FormControl></FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="type" render={({ field }) => (
-                    <FormItem><FormLabel className="text-slate-300">Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-assignment-type"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/20">
-                          <SelectItem value="profit_target">Profit Target</SelectItem>
-                          <SelectItem value="lesson_completion">Lesson Completion</SelectItem>
-                          <SelectItem value="portfolio_balance">Portfolio Balance</SelectItem>
+                {isLessonType && (
+                  <FormField control={form.control} name="lessonId" render={({ field }) => (
+                    <FormItem><FormLabel className="text-slate-300">Lesson</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl><SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-assignment-lesson"><SelectValue placeholder="Pick a lesson…" /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/20 max-h-72">
+                          {lessonsList.map((l: any) => (
+                            <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select><FormMessage />
                     </FormItem>
                   )} />
+                )}
+                <FormField control={form.control} name="title" render={({ field }) => (
+                  <FormItem><FormLabel className="text-slate-300">{isLessonType ? "Title (auto-fills if blank)" : "Title"}</FormLabel><FormControl><Input {...field} placeholder={isLessonType ? "e.g. Read & quiz: Intro to Charts" : "e.g. Earn $500 profit"} className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-title" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description" render={({ field }) => (
+                  <FormItem><FormLabel className="text-slate-300">Instructions (optional)</FormLabel><FormControl><Textarea {...field} placeholder="What should students do?" className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-description" /></FormControl></FormItem>
+                )} />
+                {!isLessonType && (
                   <FormField control={form.control} name="targetValue" render={({ field }) => (
                     <FormItem><FormLabel className="text-slate-300">Target Value</FormLabel><FormControl><Input {...field} type="number" placeholder="100" className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-target" /></FormControl><FormMessage /></FormItem>
                   )} />
-                </div>
+                )}
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
                   <FormItem><FormLabel className="text-slate-300">Due Date (optional)</FormLabel><FormControl><Input {...field} type="date" className="bg-white/5 border-white/20 text-white" data-testid="input-assignment-due" /></FormControl></FormItem>
                 )} />
@@ -492,27 +528,7 @@ function AssignmentsTab({ assignments, classes, dialogOpen, setDialogOpen, form,
       {assignments.length > 0 ? (
         <div className="space-y-3">
           {assignments.map((a: any) => (
-            <div key={a.id} className="rounded-xl p-4 bg-white/5 border border-white/10 hover:border-teal-500/20 transition-all" data-testid={`assignment-card-${a.id}`}>
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div>
-                  <p className="font-bold text-white">{a.title}</p>
-                  {a.description && <p className="text-xs text-slate-500 mt-0.5">{a.description}</p>}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={`text-xs ${getAssignmentTypeStyle(a.type)}`}>{getAssignmentTypeLabel(a.type)}</Badge>
-                  {a.dueDate && (
-                    <span className="text-xs text-slate-600 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />{new Date(a.dueDate).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>Target: <span className="text-white font-semibold">{a.targetValue}</span></span>
-                <ChevronRight className="h-3 w-3" />
-                <span>Type: <span className="text-teal-400 font-semibold">{getAssignmentTypeLabel(a.type)}</span></span>
-              </div>
-            </div>
+            <AssignmentCard key={a.id} assignment={a} lessonsList={lessonsList} classes={classes} />
           ))}
         </div>
       ) : (
@@ -523,6 +539,54 @@ function AssignmentsTab({ assignments, classes, dialogOpen, setDialogOpen, form,
             <Plus className="h-4 w-4 mr-1.5" /> Create Assignment
           </Button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function AssignmentCard({ assignment: a, lessonsList, classes }: any) {
+  const lesson = a.lessonId ? lessonsList.find((l: any) => l.id === a.lessonId) : null;
+  const cls = a.classId ? classes.find((c: any) => c.id === a.classId) : null;
+  const { data: progressList = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/assignments", a.id, "progress"],
+  });
+  const completedCount = progressList.filter((p: any) => p.completed).length;
+  const totalStudents = progressList.length;
+  const isOverdue = a.dueDate && new Date(a.dueDate) < new Date();
+
+  return (
+    <div className="rounded-xl p-4 bg-white/5 border border-white/10 hover:border-teal-500/20 transition-all" data-testid={`assignment-card-${a.id}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <p className="font-bold text-white">{a.title}</p>
+          {lesson && <p className="text-xs text-teal-400 mt-0.5 truncate">📖 {lesson.title}</p>}
+          {a.description && <p className="text-xs text-slate-500 mt-0.5">{a.description}</p>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <Badge className={`text-xs ${getAssignmentTypeStyle(a.type)}`}>{getAssignmentTypeLabel(a.type)}</Badge>
+          {cls && <Badge variant="outline" className="text-xs border-white/20 text-slate-300">{cls.name}</Badge>}
+          {a.dueDate && (
+            <span className={`text-xs flex items-center gap-1 ${isOverdue ? "text-red-400" : "text-slate-500"}`}>
+              <Clock className="h-3 w-3" />{new Date(a.dueDate).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      </div>
+      {totalStudents > 0 && (
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all"
+              style={{ width: `${Math.round((completedCount / totalStudents) * 100)}%` }}
+            />
+          </div>
+          <span className="text-xs font-bold text-white tabular-nums" data-testid={`text-progress-${a.id}`}>
+            {completedCount}/{totalStudents} done
+          </span>
+        </div>
+      )}
+      {totalStudents === 0 && a.classId && (
+        <p className="text-xs text-slate-600 mt-2">No students in this class yet.</p>
       )}
     </div>
   );

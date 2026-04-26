@@ -280,6 +280,7 @@ export interface IStorage {
   // Academy gamification
   completeLessonAndAward(userId: string, lessonId: string, baseXp: number): Promise<{ xpAwarded: number; newXp: number; leveledUp: boolean; oldLevel: number; newLevel: number; streak: number; bestStreak: number; streakProtected: boolean; bonusXp: number; isNewCompletion: boolean }>;
   awardQuizXp(userId: string, lessonId: string, score: number, total: number, comboMultiplier: number, timeBonus: number): Promise<{ xpAwarded: number; newXp: number; leveledUp: boolean; oldLevel: number; newLevel: number; passed: boolean }>;
+  getStudentLessonAssignments(userId: string): Promise<any[]>;
   getDailyChallenges(userId: string): Promise<{ date: string; challenges: { id: string; type: string; title: string; description: string; target: number; progress: number; reward: number; claimed: boolean; emoji: string }[] }>;
   updateChallengeProgress(userId: string, type: string, increment: number): Promise<void>;
   claimChallenge(userId: string, challengeId: string): Promise<{ success: boolean; xpAwarded: number; tokensAwarded: number; message: string }>;
@@ -2357,6 +2358,32 @@ export class DatabaseStorage implements IStorage {
     const shuffled = [...challengePool].sort((a, b) => ((seed * (a.id.length + 1)) % 7) - ((seed * (b.id.length + 1)) % 7));
     const picks = shuffled.slice(0, 3);
     return picks.map(p => ({ ...p, progress: 0, claimed: false }));
+  }
+
+  async getStudentLessonAssignments(userId: string): Promise<any[]> {
+    const studentClasses = await this.getClassesByStudent(userId);
+    if (studentClasses.length === 0) return [];
+    const classIds = studentClasses.map(c => c.id);
+    const all = await db.select().from(assignments)
+      .where(and(
+        eq(assignments.type, "lesson"),
+        inArray(assignments.classId, classIds),
+      ))
+      .orderBy(desc(assignments.createdAt));
+    // Get lesson + completion status for each
+    const out: any[] = [];
+    const userProgress = await this.getLessonProgress(userId);
+    for (const a of all) {
+      let lesson: any = null;
+      if (a.lessonId) {
+        lesson = await this.getLessonById(a.lessonId);
+      }
+      const completed = a.lessonId
+        ? userProgress.some(p => p.lessonId === a.lessonId && p.completed)
+        : false;
+      out.push({ ...a, lesson, completed });
+    }
+    return out;
   }
 
   async getDailyChallenges(userId: string) {
