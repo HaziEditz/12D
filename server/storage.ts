@@ -277,6 +277,15 @@ export interface IStorage {
   claimSimulatorTokens(userId: string): Promise<{ tokensAwarded: number; totalClaimed: number }>;
   addInventoryItem(userId: string, itemId: string, itemType: string, rarity: string, quantity: number): Promise<UserInventory>;
   saveSpinHistory(data: { userId: string; spinTier: string; tokensSpent: number; rewardType: string; rewardId?: string | null; rewardAmount?: number | null; rewardName: string; rewardEmoji: string; rarity: string }): Promise<void>;
+  // Academy gamification
+  completeLessonAndAward(userId: string, lessonId: string, baseXp: number): Promise<{ xpAwarded: number; newXp: number; leveledUp: boolean; oldLevel: number; newLevel: number; streak: number; bestStreak: number; streakProtected: boolean; bonusXp: number; isNewCompletion: boolean }>;
+  awardQuizXp(userId: string, lessonId: string, score: number, total: number, comboMultiplier: number, timeBonus: number): Promise<{ xpAwarded: number; newXp: number; leveledUp: boolean; oldLevel: number; newLevel: number; passed: boolean }>;
+  getDailyChallenges(userId: string): Promise<{ date: string; challenges: { id: string; type: string; title: string; description: string; target: number; progress: number; reward: number; claimed: boolean; emoji: string }[] }>;
+  updateChallengeProgress(userId: string, type: string, increment: number): Promise<void>;
+  claimChallenge(userId: string, challengeId: string): Promise<{ success: boolean; xpAwarded: number; tokensAwarded: number; message: string }>;
+  getLearningStats(userId: string): Promise<{ totalLessons: number; completedLessons: number; totalQuizAttempts: number; avgAccuracy: number; bestStreak: number; currentStreak: number; bestCombo: number; recentAccuracy: number; improvedBy: number }>;
+  claimLuckyBonus(userId: string): Promise<{ success: boolean; xpAwarded: number; tokensAwarded: number; rewardEmoji: string; rewardName: string; message: string }>;
+  getLuckyBonusStatus(userId: string): Promise<{ available: boolean; nextAvailable: string | null }>;
   getMarketplaceListings(userId: string): Promise<any[]>;
   createMarketplaceListing(userId: string, inventoryId: string, price: number): Promise<{ success: boolean; message: string; listing?: any }>;
   buyMarketplaceListing(listingId: string, buyerId: string): Promise<{ success: boolean; message: string }>;
@@ -2192,6 +2201,283 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return { count };
+  }
+
+  // ===== ACADEMY GAMIFICATION =====
+
+  private getXpForLevel(level: number): number {
+    if (level <= 1) return 0;
+    return Math.floor(50 * Math.pow(level - 1, 1.6));
+  }
+
+  private getLevelFromXp(xp: number): number {
+    let level = 1;
+    while (level < 100 && this.getXpForLevel(level + 1) <= xp) level += 1;
+    return level;
+  }
+
+  async completeLessonAndAward(userId: string, lessonId: string, baseXp: number) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+
+    const existing = await db.select().from(lessonProgress)
+      .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)))
+      .limit(1);
+    const wasCompleted = existing.length > 0 && existing[0].completed;
+    const isNewCompletion = !wasCompleted;
+
+    if (existing.length > 0) {
+      await db.update(lessonProgress).set({ completed: true, completedAt: new Date() })
+        .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)));
+    } else {
+      await db.insert(lessonProgress).values({ userId, lessonId, completed: true, completedAt: new Date() });
+    }
+
+    const oldXp = user.xp ?? 0;
+    const oldLevel = this.getLevelFromXp(oldXp);
+
+    let xpAwarded = 0;
+    let bonusXp = 0;
+    let streak = user.lessonStreak ?? 0;
+    let bestStreak = user.lessonStreakBest ?? 0;
+    let streakProtected = false;
+    let streakFreezes = user.streakFreezes ?? 0;
+
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    if (isNewCompletion) {
+      xpAwarded = baseXp;
+      // Random surprise bonus (20% chance)
+      if (Math.random() < 0.2) {
+        bonusXp = Math.floor(Math.random() * 20) + 10;
+      }
+
+      // Streak update — only on first lesson of the day
+      if (user.lastLessonDate !== today) {
+        if (user.lastLessonDate === yesterday) {
+          streak = streak + 1;
+        } else if (user.lastLessonDate && user.lastLessonDate !== yesterday && streakFreezes > 0) {
+          // Use a streak freeze to keep streak alive after missed day(s)
+          streak = streak + 1;
+          streakFreezes = streakFreezes - 1;
+          streakProtected = true;
+        } else {
+          streak = 1;
+        }
+        if (streak > bestStreak) bestStreak = streak;
+
+        // Streak milestone bonuses
+        if ([3, 7, 14, 30, 60, 100].includes(streak)) {
+          bonusXp += streak * 5;
+          // Bonus freeze on big milestones
+          if (streak === 7 || streak === 30) streakFreezes = Math.min(3, streakFreezes + 1);
+        }
+      }
+    }
+
+    const totalAwarded = xpAwarded + bonusXp;
+    const newXp = oldXp + totalAwarded;
+    const newLevel = this.getLevelFromXp(newXp);
+    const leveledUp = newLevel > oldLevel;
+
+    const completedCount = isNewCompletion ? (user.lessonsCompleted ?? 0) + 1 : user.lessonsCompleted ?? 0;
+
+    await db.update(users).set({
+      xp: newXp,
+      lessonsCompleted: completedCount,
+      lessonStreak: streak,
+      lessonStreakBest: bestStreak,
+      lastLessonDate: today,
+      streakFreezes,
+    }).where(eq(users.id, userId));
+
+    // Update daily challenge progress
+    if (isNewCompletion) {
+      await this.updateChallengeProgress(userId, "lessons", 1);
+      await this.updateChallengeProgress(userId, "xp", totalAwarded);
+    }
+
+    return {
+      xpAwarded: totalAwarded,
+      newXp,
+      leveledUp,
+      oldLevel,
+      newLevel,
+      streak,
+      bestStreak,
+      streakProtected,
+      bonusXp,
+      isNewCompletion,
+    };
+  }
+
+  async awardQuizXp(userId: string, lessonId: string, score: number, total: number, comboMultiplier: number, timeBonus: number) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+
+    await db.insert(quizAttempts).values({ userId, lessonId, score, total });
+
+    const passed = total > 0 && score / total >= 0.6;
+    const oldXp = user.xp ?? 0;
+    const oldLevel = this.getLevelFromXp(oldXp);
+
+    // Base XP per correct answer * combo multiplier + time bonus
+    const baseXp = score * 5;
+    const multiplied = Math.round(baseXp * Math.max(1, comboMultiplier));
+    const xpAwarded = passed ? multiplied + (timeBonus || 0) : Math.floor(score * 2);
+
+    const newXp = oldXp + xpAwarded;
+    const newLevel = this.getLevelFromXp(newXp);
+    const leveledUp = newLevel > oldLevel;
+
+    await db.update(users).set({ xp: newXp }).where(eq(users.id, userId));
+
+    if (xpAwarded > 0) {
+      await this.updateChallengeProgress(userId, "xp", xpAwarded);
+    }
+    if (passed) {
+      await this.updateChallengeProgress(userId, "quizzes", 1);
+    }
+
+    return { xpAwarded, newXp, leveledUp, oldLevel, newLevel, passed };
+  }
+
+  private generateDailyChallenges(date: string) {
+    const challengePool = [
+      { id: "complete_lessons_2", type: "lessons", title: "Lesson Hunter", description: "Complete 2 lessons today", target: 2, reward: 50, emoji: "📚" },
+      { id: "complete_lessons_3", type: "lessons", title: "Knowledge Seeker", description: "Complete 3 lessons today", target: 3, reward: 80, emoji: "🎓" },
+      { id: "earn_xp_50", type: "xp", title: "XP Sprint", description: "Earn 50 XP today", target: 50, reward: 30, emoji: "⚡" },
+      { id: "earn_xp_100", type: "xp", title: "XP Marathon", description: "Earn 100 XP today", target: 100, reward: 60, emoji: "🚀" },
+      { id: "pass_quiz_2", type: "quizzes", title: "Quiz Master", description: "Pass 2 quizzes today", target: 2, reward: 40, emoji: "🧠" },
+      { id: "pass_quiz_1", type: "quizzes", title: "Quick Win", description: "Pass 1 quiz today", target: 1, reward: 20, emoji: "✅" },
+    ];
+    // Pick 3 deterministic-ish based on date
+    const seed = date.split("-").reduce((a, p) => a + parseInt(p, 10), 0);
+    const shuffled = [...challengePool].sort((a, b) => ((seed * (a.id.length + 1)) % 7) - ((seed * (b.id.length + 1)) % 7));
+    const picks = shuffled.slice(0, 3);
+    return picks.map(p => ({ ...p, progress: 0, claimed: false }));
+  }
+
+  async getDailyChallenges(userId: string) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+    const today = new Date().toISOString().split("T")[0];
+    const stored = (user.dailyChallengesData as any) || null;
+    if (!stored || stored.date !== today) {
+      const challenges = this.generateDailyChallenges(today);
+      const data = { date: today, challenges };
+      await db.update(users).set({ dailyChallengesData: data }).where(eq(users.id, userId));
+      return data;
+    }
+    return stored;
+  }
+
+  async updateChallengeProgress(userId: string, type: string, increment: number): Promise<void> {
+    const data = await this.getDailyChallenges(userId);
+    let changed = false;
+    for (const c of data.challenges) {
+      if (c.type === type && !c.claimed && c.progress < c.target) {
+        c.progress = Math.min(c.target, c.progress + increment);
+        changed = true;
+      }
+    }
+    if (changed) {
+      await db.update(users).set({ dailyChallengesData: data }).where(eq(users.id, userId));
+    }
+  }
+
+  async claimChallenge(userId: string, challengeId: string) {
+    const data = await this.getDailyChallenges(userId);
+    const challenge = data.challenges.find((c: any) => c.id === challengeId);
+    if (!challenge) return { success: false, xpAwarded: 0, tokensAwarded: 0, message: "Challenge not found" };
+    if (challenge.claimed) return { success: false, xpAwarded: 0, tokensAwarded: 0, message: "Already claimed" };
+    if (challenge.progress < challenge.target) return { success: false, xpAwarded: 0, tokensAwarded: 0, message: "Not yet completed" };
+
+    challenge.claimed = true;
+    const xpReward = challenge.reward;
+    const tokenReward = Math.floor(challenge.reward / 5);
+
+    await db.update(users).set({
+      dailyChallengesData: data,
+      xp: sql`${users.xp} + ${xpReward}`,
+      classroomTokens: sql`${users.classroomTokens} + ${tokenReward}`,
+    }).where(eq(users.id, userId));
+
+    return { success: true, xpAwarded: xpReward, tokensAwarded: tokenReward, message: `Got ${xpReward} XP!` };
+  }
+
+  async getLearningStats(userId: string) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+    const totalLessonsCount = await this.getLessonsCount();
+    const progress = await this.getLessonProgress(userId);
+    const completed = progress.filter(p => p.completed).length;
+    const attempts = await db.select().from(quizAttempts).where(eq(quizAttempts.userId, userId)).orderBy(desc(quizAttempts.completedAt));
+
+    let totalCorrect = 0;
+    let totalQ = 0;
+    for (const a of attempts) { totalCorrect += a.score; totalQ += a.total; }
+    const avgAccuracy = totalQ > 0 ? Math.round((totalCorrect / totalQ) * 100) : 0;
+
+    const recent = attempts.slice(0, 5);
+    const older = attempts.slice(5, 15);
+    const recentAcc = recent.length > 0 ? Math.round((recent.reduce((s, a) => s + a.score, 0) / recent.reduce((s, a) => s + a.total, 0)) * 100) : 0;
+    const olderAcc = older.length > 0 ? Math.round((older.reduce((s, a) => s + a.score, 0) / older.reduce((s, a) => s + a.total, 0)) * 100) : 0;
+    const improvedBy = olderAcc > 0 ? recentAcc - olderAcc : 0;
+
+    return {
+      totalLessons: totalLessonsCount,
+      completedLessons: completed,
+      totalQuizAttempts: attempts.length,
+      avgAccuracy,
+      bestStreak: user.lessonStreakBest ?? 0,
+      currentStreak: user.lessonStreak ?? 0,
+      bestCombo: user.comboBest ?? 0,
+      recentAccuracy: recentAcc,
+      improvedBy,
+    };
+  }
+
+  async getLuckyBonusStatus(userId: string) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+    const today = new Date().toISOString().split("T")[0];
+    const available = user.luckyBonusClaimedAt !== today;
+    return { available, nextAvailable: available ? null : new Date(Date.now() + 86400000).toISOString().split("T")[0] };
+  }
+
+  async claimLuckyBonus(userId: string) {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("User not found");
+    const today = new Date().toISOString().split("T")[0];
+    if (user.luckyBonusClaimedAt === today) {
+      return { success: false, xpAwarded: 0, tokensAwarded: 0, rewardEmoji: "⏰", rewardName: "Already Claimed", message: "Come back tomorrow!" };
+    }
+
+    const rewards = [
+      { weight: 40, xp: 25, tokens: 5, emoji: "✨", name: "Sparkle Bonus" },
+      { weight: 25, xp: 50, tokens: 10, emoji: "💫", name: "Star Bonus" },
+      { weight: 15, xp: 75, tokens: 15, emoji: "🌟", name: "Bright Bonus" },
+      { weight: 10, xp: 100, tokens: 25, emoji: "💎", name: "Gem Bonus" },
+      { weight: 7, xp: 150, tokens: 40, emoji: "🏆", name: "Trophy Bonus" },
+      { weight: 3, xp: 250, tokens: 75, emoji: "👑", name: "Royal Bonus" },
+    ];
+    const totalWeight = rewards.reduce((s, r) => s + r.weight, 0);
+    let r = Math.random() * totalWeight;
+    let chosen = rewards[0];
+    for (const reward of rewards) {
+      if (r < reward.weight) { chosen = reward; break; }
+      r -= reward.weight;
+    }
+
+    await db.update(users).set({
+      xp: sql`${users.xp} + ${chosen.xp}`,
+      classroomTokens: sql`${users.classroomTokens} + ${chosen.tokens}`,
+      luckyBonusClaimedAt: today,
+    }).where(eq(users.id, userId));
+
+    return { success: true, xpAwarded: chosen.xp, tokensAwarded: chosen.tokens, rewardEmoji: chosen.emoji, rewardName: chosen.name, message: `${chosen.emoji} ${chosen.name}! +${chosen.xp} XP, +${chosen.tokens} tokens` };
   }
 }
 

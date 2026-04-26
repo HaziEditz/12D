@@ -4,6 +4,11 @@ import { useLocation } from "wouter";
 import SchoolLayout from "@/layouts/school-layout";
 import { BookOpen, CheckCircle, Lock, Clock, Star, Zap, Play, ChevronRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { XpProgressHeader } from "@/components/xp-progress-header";
+import { StreakBadge } from "@/components/streak-badge";
+import { DailyChallengesCard } from "@/components/daily-challenges-card";
+import { LuckyBonusCard } from "@/components/lucky-bonus-card";
+import { LearningStatsCard } from "@/components/learning-stats-card";
 
 const difficultyColors: Record<string, string> = {
   beginner: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
@@ -96,6 +101,19 @@ export default function SchoolLessons() {
               />
             </div>
             <p className={`text-xs mt-1.5 ${subColor}`}>{progressPct}% complete</p>
+          </div>
+        </div>
+
+        {/* Gamification grid */}
+        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+          <div className="lg:col-span-2 space-y-4">
+            <XpProgressHeader variant={isPrimary ? "primary" : "default"} />
+            <LearningStatsCard variant={isPrimary ? "primary" : "default"} />
+          </div>
+          <div className="space-y-4">
+            <StreakBadge variant={isPrimary ? "primary" : "default"} />
+            <LuckyBonusCard variant={isPrimary ? "primary" : "default"} />
+            <DailyChallengesCard variant={isPrimary ? "primary" : "default"} />
           </div>
         </div>
 

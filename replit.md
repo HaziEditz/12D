@@ -193,3 +193,35 @@ Users with `membershipTier === "casual"` get distinct features:
 ### Development Tools
 - **Replit Plugins**: vite-plugin-runtime-error-modal, vite-plugin-cartographer, vite-plugin-dev-banner
 - **Google Fonts**: Inter, DM Sans, Space Grotesk, Geist Mono for typography
+
+## Academy Gamification (April 2026)
+
+The Academy (`/lessons`) and School Worlds Academy (`/school/lessons`) share a common gamification layer:
+
+### Backend
+- New user fields in `shared/schema.ts`: `lessonStreak`, `lessonStreakBest`, `lastLessonDate`, `streakFreezes` (default 2), `comboBest`, `dailyChallengesData` (jsonb), `luckyBonusClaimedAt`.
+- XP curve: `floor(50 * (level-1)^1.6)`, levels 1–100, with rank titles (Beginner → Apprentice → Trader → Expert → Master → Legend).
+- New storage methods (in `server/storage.ts`):
+  - `completeLessonAndAward` — awards base XP scaled by difficulty (15/20/30), 20% surprise bonus, streak update with freeze logic, milestone bonuses at days 3/7/14/30/60/100.
+  - `awardQuizXp` — applies combo multiplier (3×=1.5, 5×=2, 7×=2.5, 10×=3) and time bonus.
+  - `getDailyChallenges` / `claimChallenge` — 3 daily challenges (deterministic per date) from a 6-pool, awarding XP + tokens.
+  - `getLearningStats` — aggregate stats card (accuracy, recent improvement, best combo, streak).
+  - `claimLuckyBonus` / `getLuckyBonusStatus` — once-per-day weighted random reward.
+- New routes:
+  - Updated `POST /api/lessons/:id/complete` returns full reward result.
+  - Updated `POST /api/lessons/:id/quiz/attempt` accepts `comboMultiplier`, `timeBonus`, `bestCombo`.
+  - `GET/POST /api/academy/daily-challenges`, `/api/academy/lucky-bonus`, `GET /api/academy/stats`.
+
+### Frontend
+- New components in `client/src/components/`:
+  - `xp-progress-header` — level + XP progress bar with rank title.
+  - `streak-badge` — daily streak with flame, freezes count.
+  - `daily-challenges-card` — 3 daily challenges with claim buttons + confetti.
+  - `lucky-bonus-card` — daily spinning reward.
+  - `learning-stats-card` — accuracy, best combo, best streak.
+  - `lesson-completion-modal` — confetti + level up + streak celebration.
+  - `enhanced-quiz` — combo system, optional 15s timed mode, instant feedback, fun messages, time bonus, hype messages on combo milestones.
+- Confetti utility in `client/src/lib/confetti.ts` (canvas-based, no external dep).
+- `client/src/lib/levels.ts` updated with new XP curve matching backend.
+- All cards accept `variant="primary"` for kid-friendly amber styling on School Worlds (when `class.ageGroup === "primary"`).
+- Wired into `client/src/pages/lessons.tsx`, `client/src/pages/school/lessons.tsx`, and `client/src/pages/lesson-detail.tsx`.

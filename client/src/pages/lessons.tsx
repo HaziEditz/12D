@@ -36,6 +36,11 @@ import type { Lesson, LessonProgress } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation, Link } from "wouter";
 import { isTrialUser } from "@/lib/subscription";
+import { XpProgressHeader } from "@/components/xp-progress-header";
+import { StreakBadge } from "@/components/streak-badge";
+import { DailyChallengesCard } from "@/components/daily-challenges-card";
+import { LuckyBonusCard } from "@/components/lucky-bonus-card";
+import { LearningStatsCard } from "@/components/learning-stats-card";
 
 export default function LessonsPage() {
   const { user } = useAuth();
@@ -295,30 +300,41 @@ export default function LessonsPage() {
         </Card>
       )}
 
-      <Card className="mb-8">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center">
-                <BookOpen className="h-7 w-7 text-primary" />
+      {/* Gamification header */}
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <div className="lg:col-span-2 space-y-4">
+          <XpProgressHeader />
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Your Progress</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {completedCount} of {totalLessons} lessons completed
+                    </p>
+                  </div>
+                </div>
+                <div className="flex-1 max-w-sm">
+                  <Progress value={completionPercentage} className="h-3" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-primary">{Math.round(completionPercentage)}%</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">Your Progress</h3>
-                <p className="text-sm text-muted-foreground">
-                  {completedCount} of {totalLessons} lessons completed
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 max-w-md">
-              <Progress value={completionPercentage} className="h-3" />
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-primary">{Math.round(completionPercentage)}%</p>
-              <p className="text-sm text-muted-foreground">Complete</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+          <LearningStatsCard />
+        </div>
+        <div className="space-y-4">
+          <StreakBadge />
+          <LuckyBonusCard />
+          <DailyChallengesCard />
+        </div>
+      </div>
 
       {isDemoUser && (
         <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">

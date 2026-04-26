@@ -40,6 +40,13 @@ export const users = pgTable("users", {
   dailyRewardClaimedAt: text("daily_reward_claimed_at"),
   lastSeenAt: timestamp("last_seen_at"),
   simulatorTokensClaimed: integer("simulator_tokens_claimed").default(0),
+  lessonStreak: integer("lesson_streak").default(0),
+  lessonStreakBest: integer("lesson_streak_best").default(0),
+  lastLessonDate: text("last_lesson_date"),
+  streakFreezes: integer("streak_freezes").default(2),
+  comboBest: integer("combo_best").default(0),
+  dailyChallengesData: jsonb("daily_challenges_data"),
+  luckyBonusClaimedAt: text("lucky_bonus_claimed_at"),
 });
 
 export const lessons = pgTable("lessons", {

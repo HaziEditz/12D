@@ -610,10 +610,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.post("/api/lessons/:id/complete", requireAuth, async (req, res) => {
-    const user = req.user as User;
-    await storage.updateLessonProgress(user.id, req.params.id, true);
-    await checkAndAwardAchievements(user.id);
-    res.json({ success: true });
+    try {
+      const user = req.user as User;
+      const lesson = await storage.getLessonById(req.params.id);
+      if (!lesson) return res.status(404).json({ message: "Lesson not found" });
+
+      // Base XP scales with lesson difficulty
+      const diff = (lesson.difficulty || "beginner").toLowerCase();
+      const baseXp = diff === "advanced" ? 30 : diff === "intermediate" ? 20 : 15;
+
+      const result = await storage.completeLessonAndAward(user.id, req.params.id, baseXp);
+      await checkAndAwardAchievements(user.id);
+
+      // Award classroom currency in school context
+      try {
+        const studentClasses = await storage.getClassesByStudent(user.id);
+        for (const cls of studentClasses) {
+          const settings = await storage.getEconomySettings(cls.id);
+          if (settings && settings.isActive && settings.lessonReward > 0 && result.isNewCompletion) {
+            await storage.addCurrencyTransaction({ classId: cls.id, studentId: user.id, amount: settings.lessonReward, type: "lesson", description: "Completed a lesson", referenceId: req.params.id });
+          }
+        }
+      } catch {}
+
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.get("/api/lessons/:id/quiz", requireAuth, async (req, res) => {
@@ -631,11 +654,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/lessons/:id/quiz/attempt", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const { score, total } = req.body;
-      const attempt = await storage.createQuizAttempt({ userId: user.id, lessonId: req.params.id, score, total });
+      const { score, total, comboMultiplier = 1, timeBonus = 0, bestCombo = 0 } = req.body;
+
+      const result = await storage.awardQuizXp(user.id, req.params.id, score, total, comboMultiplier, timeBonus);
+
+      // Track best combo
+      if (bestCombo && bestCombo > (user.comboBest ?? 0)) {
+        await storage.updateUser(user.id, { comboBest: bestCombo });
+      }
+
       // Auto-award classroom currency for passing a quiz (>= 60%)
-      const passed = total > 0 && (score / total) >= 0.6;
-      if (passed) {
+      if (result.passed) {
         try {
           const studentClasses = await storage.getClassesByStudent(user.id);
           for (const cls of studentClasses) {
@@ -646,7 +675,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
         } catch {}
       }
-      res.json(attempt);
+
+      await checkAndAwardAchievements(user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Daily Challenges
+  app.get("/api/academy/daily-challenges", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const data = await storage.getDailyChallenges(user.id);
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/academy/daily-challenges/:id/claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.claimChallenge(user.id, req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Learning stats
+  app.get("/api/academy/stats", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const stats = await storage.getLearningStats(user.id);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Lucky bonus
+  app.get("/api/academy/lucky-bonus", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const status = await storage.getLuckyBonusStatus(user.id);
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/academy/lucky-bonus/claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.claimLuckyBonus(user.id);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
