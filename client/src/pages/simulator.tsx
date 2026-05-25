@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Paywall } from "@/components/paywall";
 import { Link } from "wouter";
 import { playTradeSound } from "@/lib/sounds";
+import { SimulatorTutorial, useSimulatorTutorialAutoStart } from "@/components/simulator-tutorial";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -164,6 +165,7 @@ async function fetchRealTimePrice(symbol: string): Promise<number | null> {
 export default function SimulatorPage() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
+  const { shouldShow, setShouldShow } = useSimulatorTutorialAutoStart();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const seriesRef = useRef<any>(null);
@@ -663,10 +665,11 @@ export default function SimulatorPage() {
     <Paywall featureName="the Trading Simulator">
       <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4">
       <div className="flex-1 flex flex-col gap-4">
-        <Card className="flex-shrink-0">
+        <Card className="flex-shrink-0" id="sim-welcome">
           <CardContent className="py-3">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
+                <div id="sim-symbol-selector">
                 <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
                   <SelectTrigger className="w-[180px]" data-testid="select-symbol">
                     <SelectValue placeholder="Select asset" />
@@ -709,12 +712,14 @@ export default function SimulatorPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+                </div>
               </div>
+              <SimulatorTutorial autoStart={shouldShow} onStartTour={() => setShouldShow(false)} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="flex-1 min-h-0">
+        <Card className="flex-1 min-h-0" id="sim-chart">
           <CardContent className="p-4 h-full">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -760,7 +765,7 @@ export default function SimulatorPage() {
       </div>
 
       <div className="w-full lg:w-80 flex flex-col gap-4">
-        <Card>
+        <Card id="sim-balance">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
@@ -814,7 +819,7 @@ export default function SimulatorPage() {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div id="sim-order-type">
               <Label className="text-sm font-medium mb-2 block">Order Type</Label>
               <Select value={orderType} onValueChange={(value) => setOrderType(value as OrderType)}>
                 <SelectTrigger data-testid="select-order-type">
@@ -836,7 +841,7 @@ export default function SimulatorPage() {
               </p>
             </div>
 
-            <div>
+            <div id="sim-quantity">
               <Label className="text-sm font-medium mb-2 block">How many units?</Label>
               <SpinnerInput
                 value={parseFloat(quantity) || 0}
@@ -957,7 +962,7 @@ export default function SimulatorPage() {
               </div>
             )}
 
-            <div>
+            <div id="sim-leverage">
               <Label className="text-sm font-medium mb-2 block">Leverage</Label>
               <Select value={leverage} onValueChange={setLeverage}>
                 <SelectTrigger data-testid="select-leverage">
@@ -984,7 +989,7 @@ export default function SimulatorPage() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3" id="sim-trade-buttons">
               <Button 
                 className="bg-success hover:bg-success/90 text-success-foreground"
                 onClick={handleBuy}
@@ -1012,7 +1017,7 @@ export default function SimulatorPage() {
           </CardContent>
         </Card>
 
-        <Card className="flex-1 min-h-0">
+        <Card className="flex-1 min-h-0" id="sim-active-trades">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Your Active Trades</CardTitle>
             <CardDescription>
