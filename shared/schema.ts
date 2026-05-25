@@ -218,6 +218,45 @@ export const chatMessages = pgTable("chat_messages", {
   receiverId: varchar("receiver_id").notNull(),
   content: text("content").notNull(),
   isRead: boolean("is_read").default(false),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
+  replyToId: varchar("reply_to_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const friendGroupChats = pgTable("friend_group_chats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  creatorId: varchar("creator_id").notNull(),
+  avatarEmoji: text("avatar_emoji").default("💬"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const friendGroupChatMembers = pgTable("friend_group_chat_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const friendGroupChatMessages = pgTable("friend_group_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  content: text("content").notNull(),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
+  replyToId: varchar("reply_to_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const cosmeticListings = pgTable("cosmetic_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sellerId: varchar("seller_id").notNull(),
+  itemId: text("item_id").notNull(),
+  itemType: text("item_type").notNull(),
+  price: real("price").notNull(),
+  status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -360,7 +399,11 @@ export const insertAchievementSchema = createInsertSchema(achievements);
 export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true });
 export const insertTradingTipSchema = createInsertSchema(tradingTips).omit({ id: true, createdAt: true });
 export const insertMarketInsightSchema = createInsertSchema(marketInsights).omit({ id: true, createdAt: true });
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true, editedAt: true, deletedAt: true });
+export const insertFriendGroupChatSchema = createInsertSchema(friendGroupChats).omit({ id: true, createdAt: true });
+export const insertFriendGroupChatMemberSchema = createInsertSchema(friendGroupChatMembers).omit({ id: true, joinedAt: true });
+export const insertFriendGroupChatMessageSchema = createInsertSchema(friendGroupChatMessages).omit({ id: true, createdAt: true, editedAt: true, deletedAt: true });
+export const insertCosmeticListingSchema = createInsertSchema(cosmeticListings).omit({ id: true, createdAt: true });
 export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).omit({ id: true, addedAt: true });
 export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, createdAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
@@ -459,6 +502,14 @@ export type InsertMarketInsight = z.infer<typeof insertMarketInsightSchema>;
 export type MarketInsight = typeof marketInsights.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertFriendGroupChat = z.infer<typeof insertFriendGroupChatSchema>;
+export type FriendGroupChat = typeof friendGroupChats.$inferSelect;
+export type InsertFriendGroupChatMember = z.infer<typeof insertFriendGroupChatMemberSchema>;
+export type FriendGroupChatMember = typeof friendGroupChatMembers.$inferSelect;
+export type InsertFriendGroupChatMessage = z.infer<typeof insertFriendGroupChatMessageSchema>;
+export type FriendGroupChatMessage = typeof friendGroupChatMessages.$inferSelect;
+export type InsertCosmeticListing = z.infer<typeof insertCosmeticListingSchema>;
+export type CosmeticListing = typeof cosmeticListings.$inferSelect;
 export type InsertWatchlistItem = z.infer<typeof insertWatchlistItemSchema>;
 export type WatchlistItem = typeof watchlistItems.$inferSelect;
 export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;

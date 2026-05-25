@@ -3435,6 +3435,214 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.put("/api/chat/:messageId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+      const msg = await storage.editChatMessage(req.params.messageId, user.id, content.trim());
+      if (!msg) return res.status(404).json({ message: "Message not found" });
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/chat/:messageId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.deleteChatMessage(req.params.messageId, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Group Chats
+  app.get("/api/group-chats", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const groups = await storage.getUserGroupChats(user.id);
+      res.json(groups);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { name, emoji = "💬", memberIds = [] } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Name required" });
+      const group = await storage.createFriendGroupChat(name.trim(), user.id, emoji, memberIds);
+      res.json(group);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/group-chats/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const msgs = await storage.getGroupChatMessages(req.params.id);
+      res.json(msgs);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content, replyToId } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+      const msg = await storage.sendGroupChatMessage(req.params.id, user.id, content.trim(), replyToId);
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/group-chats/:groupId/messages/:messageId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { content } = req.body;
+      const msg = await storage.editGroupChatMessage(req.params.messageId, user.id, content);
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/group-chats/:groupId/messages/:messageId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.deleteGroupChatMessage(req.params.messageId, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/group-chats/:id/invite", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      await storage.addGroupChatMember(req.params.id, userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/group-chats/:id/leave", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.removeGroupChatMember(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Cosmetic Marketplace
+  app.get("/api/cosmetic-market", requireAuth, async (req, res) => {
+    try {
+      const listings = await storage.getCosmeticListings();
+      res.json(listings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cosmetic-market", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { itemId, itemType, price } = req.body;
+      if (!itemId || !itemType || typeof price !== "number" || price <= 0) {
+        return res.status(400).json({ message: "Invalid listing data" });
+      }
+      const owned: string[] = (() => { try { return JSON.parse(user.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+      if (!owned.includes(itemId)) return res.status(400).json({ message: "You don't own this item" });
+      const listing = await storage.createCosmeticListing(user.id, itemId, itemType, price);
+      res.json(listing);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cosmetic-market/:id/buy", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.buyCosmeticListing(req.params.id, user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cosmetic-market/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.cancelCosmeticListing(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Shop Roulette
+  app.post("/api/global-shop/spin", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { cost } = req.body;
+      if (typeof cost !== "number" || cost <= 0) return res.status(400).json({ message: "Invalid cost" });
+      const balance = user.simulatorBalance ?? 0;
+      if (balance < cost) return res.status(400).json({ message: "Insufficient balance" });
+
+      const { ROULETTE_SLOTS } = await import("../client/src/lib/shop-catalog.js").catch(() => ({ ROULETTE_SLOTS: [] as any[] }));
+      let slots = ROULETTE_SLOTS;
+      if (!slots?.length) {
+        // Fallback if import fails
+        slots = [
+          { id: "slot-50",   reward: { type: "balance", amount: 50   }, weight: 20 },
+          { id: "slot-100",  reward: { type: "balance", amount: 100  }, weight: 15 },
+          { id: "slot-500",  reward: { type: "balance", amount: 500  }, weight: 10 },
+          { id: "slot-1000", reward: { type: "balance", amount: 1000 }, weight: 5  },
+          { id: "slot-lose", reward: { type: "balance", amount: 0    }, weight: 25 },
+        ];
+      }
+
+      const totalWeight = slots.reduce((s: number, r: any) => s + r.weight, 0);
+      let rng = Math.random() * totalWeight;
+      let chosen = slots[0];
+      for (const slot of slots) {
+        if (rng < slot.weight) { chosen = slot; break; }
+        rng -= slot.weight;
+      }
+
+      const owned: string[] = (() => { try { return JSON.parse(user.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+      let balanceChange = -cost;
+      let rewardDesc = "Nothing";
+
+      if (chosen.reward.type === "balance") {
+        balanceChange += (chosen.reward.amount ?? 0);
+        rewardDesc = chosen.reward.amount ? `$${chosen.reward.amount.toLocaleString()}` : "Nothing";
+      } else if (chosen.reward.type === "item" && chosen.reward.itemId) {
+        if (!owned.includes(chosen.reward.itemId)) owned.push(chosen.reward.itemId);
+        rewardDesc = chosen.reward.itemId;
+      }
+
+      const newBalance = Math.round((balance + balanceChange) * 100) / 100;
+      await storage.updateUser(user.id, {
+        simulatorBalance: newBalance,
+        purchasedCosmetics: JSON.stringify(owned),
+      });
+
+      res.json({ success: true, slot: chosen, rewardDesc, newBalance });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Watchlist API
   app.get("/api/watchlist", requireAuth, async (req, res) => {
     try {

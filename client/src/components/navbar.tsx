@@ -17,7 +17,7 @@ import {
   Menu, X, GraduationCap, Settings, Library, BarChart3, Lock, Crown,
   Award, Zap, BookOpenText, Newspaper, Calendar, Calculator, Star,
   Lightbulb, Users, ShieldCheck, HelpCircle, ShoppingBag, Clock,
-  ChevronLeft, ChevronRight, Coins
+  ChevronLeft, ChevronRight, Coins, MessageSquare
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -83,6 +83,7 @@ export function Navbar() {
   ];
 
   const premiumMenuItems = [
+    { href: "/messages", label: "Messages",       icon: MessageSquare },
     { href: "/friends",  label: "Friends",        icon: Users       },
     { href: "/journal",  label: "Trade Journal",  icon: BookOpenText },
     { href: "/news",     label: "News Feed",       icon: Newspaper   },

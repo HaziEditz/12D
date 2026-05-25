@@ -11,6 +11,7 @@ import {
   classroomAssets, studentAssets, userInventory, tradeOffers, studentMarketplaceListings, spinHistory,
   classGroupChats, classGroupChatMembers, classGroupChatMessages,
   classMessageReactions, classDirectMessages,
+  friendGroupChats, friendGroupChatMembers, friendGroupChatMessages, cosmeticListings,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -19,6 +20,7 @@ import {
   type TradingTip, type InsertTradingTip, type MarketInsight, type InsertMarketInsight,
   type Friendship, type InsertFriendship, type Strategy, type InsertStrategy,
   type ChatMessage, type InsertChatMessage,
+  type FriendGroupChat, type FriendGroupChatMessage, type CosmeticListing,
   type WatchlistItem, type InsertWatchlistItem, type JournalEntry, type InsertJournalEntry,
   type Notification, type InsertNotification,
   type PromoCode, type InsertPromoCode,
@@ -212,6 +214,25 @@ export interface IStorage {
   sendChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
   markMessagesAsRead(senderId: string, receiverId: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
+  editChatMessage(id: string, userId: string, content: string): Promise<ChatMessage | undefined>;
+  deleteChatMessage(id: string, userId: string): Promise<void>;
+
+  // Group Chats
+  createFriendGroupChat(name: string, creatorId: string, emoji: string, memberIds: string[]): Promise<FriendGroupChat>;
+  getUserGroupChats(userId: string): Promise<Array<FriendGroupChat & { members: string[]; lastMessage?: any }>>;
+  getGroupChatById(groupId: string): Promise<FriendGroupChat | undefined>;
+  addGroupChatMember(groupId: string, userId: string): Promise<void>;
+  removeGroupChatMember(groupId: string, userId: string): Promise<void>;
+  getGroupChatMessages(groupId: string): Promise<FriendGroupChatMessage[]>;
+  sendGroupChatMessage(groupId: string, senderId: string, content: string, replyToId?: string): Promise<FriendGroupChatMessage>;
+  editGroupChatMessage(id: string, userId: string, content: string): Promise<FriendGroupChatMessage | undefined>;
+  deleteGroupChatMessage(id: string, userId: string): Promise<void>;
+
+  // Cosmetic Marketplace
+  getCosmeticListings(): Promise<Array<CosmeticListing & { seller: { displayName: string; avatarUrl: string | null } }>>;
+  createCosmeticListing(sellerId: string, itemId: string, itemType: string, price: number): Promise<CosmeticListing>;
+  buyCosmeticListing(listingId: string, buyerId: string): Promise<{ listing: CosmeticListing; newBalance: number }>;
+  cancelCosmeticListing(listingId: string, sellerId: string): Promise<void>;
   
   // Watchlist
   getWatchlist(userId: string): Promise<WatchlistItem[]>;
@@ -1197,6 +1218,143 @@ export class DatabaseStorage implements IStorage {
       .from(chatMessages)
       .where(and(eq(chatMessages.receiverId, userId), eq(chatMessages.isRead, false)));
     return result[0]?.count ?? 0;
+  }
+
+  async editChatMessage(id: string, userId: string, content: string): Promise<ChatMessage | undefined> {
+    const [msg] = await db.update(chatMessages)
+      .set({ content, editedAt: new Date() })
+      .where(and(eq(chatMessages.id, id), eq(chatMessages.senderId, userId)))
+      .returning();
+    return msg;
+  }
+
+  async deleteChatMessage(id: string, userId: string): Promise<void> {
+    await db.update(chatMessages)
+      .set({ deletedAt: new Date(), content: "This message was deleted." })
+      .where(and(eq(chatMessages.id, id), eq(chatMessages.senderId, userId)));
+  }
+
+  async createFriendGroupChat(name: string, creatorId: string, emoji: string, memberIds: string[]): Promise<FriendGroupChat> {
+    const [group] = await db.insert(friendGroupChats).values({ name, creatorId, avatarEmoji: emoji }).returning();
+    const allMembers = [...new Set([creatorId, ...memberIds])];
+    await db.insert(friendGroupChatMembers).values(allMembers.map(uid => ({ groupId: group.id, userId: uid })));
+    return group;
+  }
+
+  async getUserGroupChats(userId: string): Promise<Array<FriendGroupChat & { members: string[]; lastMessage?: any }>> {
+    const memberships = await db.select({ groupId: friendGroupChatMembers.groupId })
+      .from(friendGroupChatMembers).where(eq(friendGroupChatMembers.userId, userId));
+    if (!memberships.length) return [];
+    const groupIds = memberships.map(m => m.groupId);
+    const groups = await db.select().from(friendGroupChats).where(inArray(friendGroupChats.id, groupIds));
+    const members = await db.select().from(friendGroupChatMembers).where(inArray(friendGroupChatMembers.groupId, groupIds));
+    return groups.map(g => ({
+      ...g,
+      members: members.filter(m => m.groupId === g.id).map(m => m.userId),
+    }));
+  }
+
+  async getGroupChatById(groupId: string): Promise<FriendGroupChat | undefined> {
+    const [g] = await db.select().from(friendGroupChats).where(eq(friendGroupChats.id, groupId));
+    return g;
+  }
+
+  async addGroupChatMember(groupId: string, userId: string): Promise<void> {
+    await db.insert(friendGroupChatMembers).values({ groupId, userId }).onConflictDoNothing();
+  }
+
+  async removeGroupChatMember(groupId: string, userId: string): Promise<void> {
+    await db.delete(friendGroupChatMembers)
+      .where(and(eq(friendGroupChatMembers.groupId, groupId), eq(friendGroupChatMembers.userId, userId)));
+  }
+
+  async getGroupChatMessages(groupId: string): Promise<FriendGroupChatMessage[]> {
+    return db.select().from(friendGroupChatMessages)
+      .where(eq(friendGroupChatMessages.groupId, groupId))
+      .orderBy(asc(friendGroupChatMessages.createdAt))
+      .limit(200);
+  }
+
+  async sendGroupChatMessage(groupId: string, senderId: string, content: string, replyToId?: string): Promise<FriendGroupChatMessage> {
+    const [msg] = await db.insert(friendGroupChatMessages)
+      .values({ groupId, senderId, content, replyToId: replyToId ?? null })
+      .returning();
+    return msg;
+  }
+
+  async editGroupChatMessage(id: string, userId: string, content: string): Promise<FriendGroupChatMessage | undefined> {
+    const [msg] = await db.update(friendGroupChatMessages)
+      .set({ content, editedAt: new Date() })
+      .where(and(eq(friendGroupChatMessages.id, id), eq(friendGroupChatMessages.senderId, userId)))
+      .returning();
+    return msg;
+  }
+
+  async deleteGroupChatMessage(id: string, userId: string): Promise<void> {
+    await db.update(friendGroupChatMessages)
+      .set({ deletedAt: new Date(), content: "This message was deleted." })
+      .where(and(eq(friendGroupChatMessages.id, id), eq(friendGroupChatMessages.senderId, userId)));
+  }
+
+  async getCosmeticListings(): Promise<Array<CosmeticListing & { seller: { displayName: string; avatarUrl: string | null } }>> {
+    const rows = await db.select({
+      listing: cosmeticListings,
+      seller: { displayName: users.displayName, avatarUrl: users.avatarUrl },
+    }).from(cosmeticListings)
+      .leftJoin(users, eq(cosmeticListings.sellerId, users.id))
+      .where(eq(cosmeticListings.status, "active"))
+      .orderBy(desc(cosmeticListings.createdAt));
+    return rows.map(r => ({ ...r.listing, seller: r.seller ?? { displayName: "Unknown", avatarUrl: null } }));
+  }
+
+  async createCosmeticListing(sellerId: string, itemId: string, itemType: string, price: number): Promise<CosmeticListing> {
+    const [listing] = await db.insert(cosmeticListings).values({ sellerId, itemId, itemType, price }).returning();
+    return listing;
+  }
+
+  async buyCosmeticListing(listingId: string, buyerId: string): Promise<{ listing: CosmeticListing; newBalance: number }> {
+    const [listing] = await db.select().from(cosmeticListings).where(eq(cosmeticListings.id, listingId));
+    if (!listing || listing.status !== "active") throw new Error("Listing not found or already sold");
+    if (listing.sellerId === buyerId) throw new Error("Cannot buy your own listing");
+    const buyer = await this.getUserById(buyerId);
+    if (!buyer) throw new Error("Buyer not found");
+    const balance = buyer.simulatorBalance ?? 0;
+    if (balance < listing.price) throw new Error("Insufficient balance");
+
+    // Transfer item from seller to buyer
+    const buyerOwned: string[] = (() => { try { return JSON.parse(buyer.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+    if (!buyerOwned.includes(listing.itemId)) buyerOwned.push(listing.itemId);
+
+    // Remove from seller
+    const seller = await this.getUserById(listing.sellerId);
+    if (seller) {
+      const sellerOwned: string[] = (() => { try { return JSON.parse(seller.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+      const newSellerOwned = sellerOwned.filter(id => id !== listing.itemId);
+      await this.updateUser(seller.id, {
+        simulatorBalance: Math.round(((seller.simulatorBalance ?? 0) + listing.price) * 100) / 100,
+        purchasedCosmetics: JSON.stringify(newSellerOwned),
+      });
+    }
+
+    // Update buyer
+    await this.updateUser(buyerId, {
+      simulatorBalance: Math.round((balance - listing.price) * 100) / 100,
+      purchasedCosmetics: JSON.stringify(buyerOwned),
+    });
+
+    // Mark sold
+    const [updated] = await db.update(cosmeticListings)
+      .set({ status: "sold" })
+      .where(eq(cosmeticListings.id, listingId))
+      .returning();
+
+    return { listing: updated, newBalance: Math.round((balance - listing.price) * 100) / 100 };
+  }
+
+  async cancelCosmeticListing(listingId: string, sellerId: string): Promise<void> {
+    await db.update(cosmeticListings)
+      .set({ status: "cancelled" })
+      .where(and(eq(cosmeticListings.id, listingId), eq(cosmeticListings.sellerId, sellerId)));
   }
 
   // Watchlist
