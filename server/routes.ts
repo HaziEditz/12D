@@ -2284,6 +2284,69 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Global Shop (uses simulatorBalance as currency) ──────────────────────
+  app.post("/api/global-shop/purchase", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { itemId, price } = req.body;
+      if (!itemId || typeof price !== "number") return res.status(400).json({ message: "Invalid request" });
+      const balance = user.simulatorBalance ?? 0;
+      if (balance < price) return res.status(400).json({ message: "Insufficient balance" });
+      const owned: string[] = (() => { try { return JSON.parse(user.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+      if (owned.includes(itemId)) return res.status(400).json({ message: "Already owned" });
+      owned.push(itemId);
+      const updated = await storage.updateUser(user.id, {
+        simulatorBalance: Math.round((balance - price) * 100) / 100,
+        purchasedCosmetics: JSON.stringify(owned),
+      });
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/global-shop/pack-open", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { packId, price } = req.body;
+      if (!packId || typeof price !== "number") return res.status(400).json({ message: "Invalid request" });
+      const balance = user.simulatorBalance ?? 0;
+      if (balance < price) return res.status(400).json({ message: "Insufficient balance" });
+
+      const packRewards: Record<string, string[]> = {
+        "pack-starter": ["frame-silver", "title-bull", "title-day-trader", "title-risk-taker"],
+        "pack-pro":     ["frame-gold", "frame-emerald", "frame-rose-gold", "title-diamond-hands", "title-the-analyst", "title-market-guru"],
+        "pack-legend":  ["frame-fire", "frame-diamond", "frame-rainbow", "frame-void", "title-wolf", "title-whale", "title-legend"],
+      };
+      const pool = packRewards[packId] ?? packRewards["pack-starter"];
+      const rewardId = pool[Math.floor(Math.random() * pool.length)];
+
+      const owned: string[] = (() => { try { return JSON.parse(user.purchasedCosmetics ?? "[]"); } catch { return []; } })();
+      if (!owned.includes(rewardId)) owned.push(rewardId);
+
+      const updated = await storage.updateUser(user.id, {
+        simulatorBalance: Math.round((balance - price) * 100) / 100,
+        purchasedCosmetics: JSON.stringify(owned),
+      });
+      res.json({ success: true, rewardId, user: updated });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/global-shop/equip", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { type, value } = req.body;
+      if (!["title", "frame"].includes(type)) return res.status(400).json({ message: "Invalid type" });
+      await storage.equipCosmetic(user.id, type, value ?? null);
+      const updated = await storage.getUserById(user.id);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/fun-zone/daily-claim", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
