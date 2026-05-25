@@ -3,173 +3,255 @@ import { Button } from "@/components/ui/button";
 import { X, ChevronLeft, ChevronRight, Sparkles, GraduationCap, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
 
 interface TutorialStep {
-  targetId: string;       // empty string = centered floating card (no spotlight)
+  targetId: string;
   title: string;
   description: string;
   position: "top" | "bottom" | "left" | "right" | "center";
   icon: string;
-  tag?: "ui" | "learn";  // "ui" = showing a feature, "learn" = trading knowledge
-  extra?: React.ReactNode;
+  tag?: "ui" | "learn";
+  bullets?: string[];
+  tip?: string;
 }
 
 const STEPS: TutorialStep[] = [
-  // ── UI Tour ───────────────────────────────────────────────────────────────
+  // ── UI: Welcome ──────────────────────────────────────────────────────────
   {
     targetId: "sim-welcome",
     title: "Welcome to the Trading Simulator!",
-    description:
-      "This is your risk-free practice arena. You get $5,000 of virtual money to trade real markets — no real cash, no real risk. Learn the ropes before you ever touch real money.",
+    description: "Think of this like a flight simulator for pilots — you get to practice with fake money before flying the real thing. Zero risk, real market prices.",
     position: "bottom",
     icon: "🚀",
     tag: "ui",
+    tip: "You start with $5,000 of virtual money. You can never lose real money here.",
   },
+
+  // ── UI: Symbol ──────────────────────────────────────────────────────────
   {
     targetId: "sim-symbol-selector",
-    title: "Pick Your Asset",
-    description:
-      "Choose what you want to trade — stocks like Apple or Tesla, crypto like Bitcoin or Ethereum, or ETFs like SPY. Each asset has its own live price and chart.",
+    title: "Pick What You Want to Trade",
+    description: "This is the asset — the thing whose price you're betting will go up or down.",
     position: "bottom",
     icon: "📊",
     tag: "ui",
+    bullets: [
+      "🍎 Stocks — companies like Apple, Tesla, Google",
+      "₿ Crypto — Bitcoin, Ethereum, Solana",
+      "📦 ETFs — baskets of stocks (e.g. SPY = top 500 US companies)",
+    ],
+    tip: "Start with something you've heard of, like AAPL or BTC.",
   },
+
+  // ── UI: Chart intro ─────────────────────────────────────────────────────
   {
     targetId: "sim-chart",
-    title: "Live Price Chart",
-    description:
-      "This candlestick chart shows price movement over time. Green candles = price went up during that period. Red candles = price went down. Each candle = one minute of activity.",
+    title: "The Price Chart",
+    description: "Each coloured bar (candle) is one minute of price action.",
     position: "left",
     icon: "🕯️",
     tag: "ui",
+    bullets: [
+      "🟢 Green candle — price went UP that minute",
+      "🔴 Red candle — price went DOWN that minute",
+      "↔️ Scroll left to see older price history",
+    ],
+    tip: "Don't panic at red candles — prices go up AND down constantly.",
   },
 
-  // ── How to Trade: Reading the Chart ───────────────────────────────────────
+  // ── LEARN: Reading the chart ────────────────────────────────────────────
   {
     targetId: "sim-chart",
-    title: "Reading the Chart: Trends",
-    description:
-      "Look at the overall direction of candles over time. A series of higher highs = uptrend (price is rising). A series of lower lows = downtrend (price is falling). Trading with the trend is usually safer than against it.",
+    title: "How to Read a Trend",
+    description: "Zoom out and look at the big picture. Are the candles generally climbing or falling?",
     position: "left",
     icon: "📈",
     tag: "learn",
+    bullets: [
+      "📈 Mostly green, going higher = Uptrend (price rising)",
+      "📉 Mostly red, going lower = Downtrend (price falling)",
+      "↔️ No clear direction = Sideways (stay out for now)",
+    ],
+    tip: "Rule of thumb: trade WITH the trend, not against it. If it's going up, buy. If going down, sell.",
   },
 
-  // ── When to BUY ────────────────────────────────────────────────────────────
+  // ── LEARN: When to BUY ──────────────────────────────────────────────────
   {
     targetId: "sim-trade-buttons",
-    title: "When to BUY (Go Long)",
-    description:
-      "Buy when you believe the price will go UP. Look for: an uptrend, a bounce off a low point, or positive news. Your profit = how much the price rises × how many units you hold.",
+    title: "When to BUY",
+    description: "Buying means you think the price will go UP from here. Imagine buying a pair of trainers cheap and reselling them later for more — same idea.",
     position: "left",
     icon: "🟢",
     tag: "learn",
+    bullets: [
+      "📈 The chart is trending upward (mostly green candles going higher)",
+      "📰 Good news just came out about the company",
+      "↩️ Price dipped low and just started bouncing back up",
+    ],
+    tip: "Your profit = (sell price − buy price) × how many units you have.",
   },
 
-  // ── When to SELL ───────────────────────────────────────────────────────────
+  // ── LEARN: When to SELL ─────────────────────────────────────────────────
   {
     targetId: "sim-trade-buttons",
     title: "When to SELL (Go Short)",
-    description:
-      "Sell when you believe the price will go DOWN. You borrow the asset, sell it, then buy it back cheaper later — pocketing the difference. Look for: downtrends, bad news, or a drop below a key price level.",
+    description: "Selling short means you think the price will go DOWN. You sell it now, then buy it back cheaper later — keeping the difference as profit.",
     position: "left",
     icon: "🔴",
     tag: "learn",
+    bullets: [
+      "📉 The chart is trending downward (mostly red candles getting lower)",
+      "📰 Bad news — company lost money, scandal, etc.",
+      "🚫 Price hit a high point and just started dropping",
+    ],
+    tip: "If price goes DOWN after you sell, that's profit. If it goes UP, that's a loss.",
   },
 
-  // ── Why Prices Move ─────────────────────────────────────────────────────
+  // ── LEARN: Why prices move ──────────────────────────────────────────────
   {
     targetId: "",
     title: "Why Do Prices Move?",
-    description:
-      "Prices change because of supply and demand. More buyers than sellers = price rises. More sellers than buyers = price falls. Key drivers: company earnings, economic data, news events, and market sentiment. Understanding why moves happen helps you predict what's next.",
+    description: "Simple: more people wanting to buy = price goes up. More people wanting to sell = price goes down.",
     position: "center",
     icon: "💡",
     tag: "learn",
+    bullets: [
+      "📰 News — earnings reports, product launches, scandals",
+      "😨 Emotion — fear causes selling, excitement causes buying",
+      "🌍 Economy — interest rates, inflation, jobs data",
+      "🐋 Big players — banks and funds moving huge amounts",
+    ],
+    tip: "You don't need to know everything. Just watching the chart and trend is enough to start.",
   },
 
-  // ── UI: Balance ────────────────────────────────────────────────────────────
-  {
-    targetId: "sim-balance",
-    title: "Track Your Performance",
-    description:
-      "Your balance shows how your virtual portfolio is doing. Watch your open trade P&L in real time. A positive number = your trades are currently profitable. Negative = you're down. You decide when to close.",
-    position: "left",
-    icon: "💰",
-    tag: "ui",
-  },
-
-  // ── UI: Order Types ────────────────────────────────────────────────────────
-  {
-    targetId: "sim-order-type",
-    title: "Order Types",
-    description:
-      "Market = execute right now at the current price. Limit = wait until price hits your target before entering. Stop Loss = automatically close your trade if it falls too far. Take Profit = automatically close when you hit your profit goal.",
-    position: "left",
-    icon: "⚙️",
-    tag: "ui",
-  },
-
-  // ── Risk Management ─────────────────────────────────────────────────────
+  // ── LEARN: Risk Management ──────────────────────────────────────────────
   {
     targetId: "",
-    title: "Risk Management 101",
-    description:
-      "The golden rule: never risk more than 1–2% of your total balance on a single trade. Use Stop Loss orders to cap your downside. Don't chase losses by going bigger — that's how small losses become big ones. Consistent small wins beat one lucky gamble.",
+    title: "The #1 Rule: Protect Your Money",
+    description: "Even the best traders lose sometimes. The trick is making sure losses stay small and wins grow.",
     position: "center",
     icon: "🛡️",
     tag: "learn",
+    bullets: [
+      "📏 Never risk more than 2% of your balance on one trade",
+      "🛑 Always set a Stop Loss — it auto-closes if price goes too far against you",
+      "🚫 Don't trade bigger to \"win back\" a loss — that always makes it worse",
+      "🏆 Small, consistent wins beat one big lucky gamble",
+    ],
+    tip: "With $5,000, risking 2% means a max loss of $100 per trade. Keep it small.",
   },
 
-  // ── UI: Quantity + Leverage ────────────────────────────────────────────────
+  // ── UI: Balance ─────────────────────────────────────────────────────────
+  {
+    targetId: "sim-balance",
+    title: "Your Balance & P&L",
+    description: "P&L means Profit & Loss — how much you're up or down on your current open trades.",
+    position: "left",
+    icon: "💰",
+    tag: "ui",
+    bullets: [
+      "✅ Green number = your trades are currently winning",
+      "❌ Red number = your trades are currently losing",
+      "💡 It changes live every second as prices move",
+    ],
+    tip: "P&L only becomes real when you close the trade. Until then it's just on paper.",
+  },
+
+  // ── UI: Order Types ─────────────────────────────────────────────────────
+  {
+    targetId: "sim-order-type",
+    title: "Order Types — How You Enter",
+    description: "This controls HOW your trade opens, not just which direction.",
+    position: "left",
+    icon: "⚙️",
+    tag: "ui",
+    bullets: [
+      "⚡ Market — opens instantly at the current price",
+      "🎯 Limit — waits until price drops to your chosen level to buy",
+      "🛑 Stop Loss — closes automatically if you're losing too much",
+      "💰 Take Profit — closes automatically once you've hit your profit goal",
+    ],
+    tip: "Beginners: just use Market. Add Stop Loss & Take Profit once you're comfortable.",
+  },
+
+  // ── UI: Quantity ────────────────────────────────────────────────────────
   {
     targetId: "sim-quantity",
-    title: "Set Your Quantity",
-    description:
-      "How many units you want to trade. Start small — 0.1 units is fine. The larger your position, the bigger your profit or loss on every price tick. Beginners: keep it small until you build confidence.",
+    title: "How Many Units?",
+    description: "This is how much of the asset you're buying or selling. The bigger the number, the bigger your profit or loss on every price move.",
     position: "left",
     icon: "🔢",
     tag: "ui",
+    bullets: [
+      "📉 0.1 BTC at $100,000 = $10,000 position",
+      "📈 If BTC goes up 1%, you make $100",
+      "📉 If BTC goes down 1%, you lose $100",
+    ],
+    tip: "Start with 0.1 or 1 unit until you get the hang of it.",
   },
+
+  // ── UI: Leverage ────────────────────────────────────────────────────────
   {
     targetId: "sim-leverage",
-    title: "Leverage — Amplify Carefully",
-    description:
-      "Leverage multiplies your exposure. 5x means a 1% price move = 5% gain or loss. It amplifies BOTH directions. Only use leverage once you understand the basics, and always pair it with a Stop Loss.",
+    title: "Leverage — Use With Caution",
+    description: "Leverage lets you control a bigger position than your balance normally allows. It multiplies both wins AND losses.",
     position: "left",
     icon: "⚡",
     tag: "ui",
+    bullets: [
+      "1x = no leverage, normal (safest for beginners)",
+      "5x = a 1% price move = 5% gain or loss for you",
+      "10x = a 1% price move = 10% gain or loss for you",
+    ],
+    tip: "Leave it at 1x until you've made at least 10 practice trades.",
   },
 
-  // ── UI: Placing a Trade ────────────────────────────────────────────────────
+  // ── UI: Buttons ─────────────────────────────────────────────────────────
   {
     targetId: "sim-trade-buttons",
-    title: "Place Your Trade",
-    description:
-      "Hit BUY if you think the price goes up, SELL if you think it goes down. Once open, your trade appears in Active Trades below with a live P&L. Close it whenever you're ready to lock in your result.",
+    title: "Place the Trade",
+    description: "Once you've picked your asset, direction, and size — hit the button!",
     position: "left",
     icon: "💹",
     tag: "ui",
+    bullets: [
+      "🟢 BUY = you think price goes UP",
+      "🔴 SELL = you think price goes DOWN",
+      "📋 Your trade appears in Active Trades below",
+    ],
+    tip: "You can close any trade at any time — you're never stuck.",
   },
 
-  // ── UI: Active Trades ──────────────────────────────────────────────────────
+  // ── UI: Active Trades ───────────────────────────────────────────────────
   {
     targetId: "sim-active-trades",
-    title: "Manage Your Positions",
-    description:
-      "Every open trade shows its current profit or loss live. You control when to exit — either to lock in profit, or to cut a loss before it grows. Good traders know when to hold and when to walk away.",
+    title: "Manage Your Open Trades",
+    description: "Once you're in a trade, watch it here. Your live P&L updates every second.",
     position: "left",
     icon: "📋",
     tag: "ui",
+    bullets: [
+      "✅ In profit? Hit Close to lock it in",
+      "❌ Going against you? Close early to limit the loss",
+      "⏳ Or hold and see — it's your call",
+    ],
+    tip: "The hardest part of trading is knowing when to exit. Practice closing both winners and losers.",
   },
 
-  // ── Closing step ──────────────────────────────────────────────────────────
+  // ── LEARN: Closing / Action plan ────────────────────────────────────────
   {
     targetId: "",
-    title: "You're Ready to Trade! 🎯",
-    description:
-      "Start simple: pick one asset, watch the chart for a trend, place a small Market order with a Stop Loss, then close it when you're in profit. Repeat, learn, improve. The simulator is 100% safe — experiment freely!",
+    title: "Your First Trade Plan 🎯",
+    description: "Here's a simple step-by-step for your very first trade:",
     position: "center",
     icon: "🏆",
     tag: "learn",
+    bullets: [
+      "1️⃣ Pick an asset you've heard of (try AAPL or BTC)",
+      "2️⃣ Look at the chart — is it going up or down right now?",
+      "3️⃣ If going up → BUY. If going down → SELL",
+      "4️⃣ Set quantity to 0.1, leverage to 1x",
+      "5️⃣ Watch the P&L — close when you're up (or down too much)",
+    ],
+    tip: "The simulator resets nothing — every trade teaches you something. Go explore! 🚀",
   },
 ];
 
@@ -178,7 +260,7 @@ const STORAGE_KEY = "simulator-tutorial-done-v3";
 interface Rect { top: number; left: number; width: number; height: number; }
 
 function computeTooltipStyle(rect: Rect, position: TutorialStep["position"]): React.CSSProperties {
-  const W = 340, margin = 18, pad = 10;
+  const W = 360, margin = 18, pad = 10;
   const vw = window.innerWidth, vh = window.innerHeight;
   let top = 0, left = 0;
 
@@ -385,7 +467,27 @@ export function SimulatorTutorial({ onStartTour, autoStart }: SimulatorTutorialP
               </div>
 
               {/* Description */}
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">{cur.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">{cur.description}</p>
+
+              {/* Bullet points */}
+              {cur.bullets && cur.bullets.length > 0 && (
+                <ul className="space-y-1.5 mb-3">
+                  {cur.bullets.map((b, i) => (
+                    <li key={i} className="text-sm text-foreground/80 leading-snug pl-1">{b}</li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Tip box */}
+              {cur.tip && (
+                <div className={`rounded-lg px-3 py-2 mb-3 text-xs leading-relaxed ${
+                  isLearnStep
+                    ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                    : "bg-primary/8 border border-primary/15 text-primary"
+                }`}>
+                  <span className="font-semibold">💡 </span>{cur.tip}
+                </div>
+              )}
 
               {/* Progress bar */}
               <div className="flex gap-1 mb-4">
