@@ -29,8 +29,9 @@ export function canAccessPremiumFeatures(user: User | null): boolean {
   if (!user) return false;
   if (user.role === "admin") return true;
   if (hasActiveSubscription(user)) return true;
-  // Students don't get a free trial — they need to be enrolled in a class by a teacher
+  // School students don't get a free trial — they access features via their class
   if (user.role === "student") return false;
+  // All other roles (casual, teacher) get a 14-day trial
   if (!isTrialExpired(user)) return true;
   return false;
 }

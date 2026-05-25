@@ -6,7 +6,7 @@ import { z } from "zod";
 export const membershipTiers = ["school", "casual", "premium"] as const;
 export type MembershipTier = typeof membershipTiers[number];
 
-export const userRoles = ["student", "teacher", "admin"] as const;
+export const userRoles = ["student", "teacher", "admin", "casual"] as const;
 export type UserRole = typeof userRoles[number];
 
 export const users = pgTable("users", {
