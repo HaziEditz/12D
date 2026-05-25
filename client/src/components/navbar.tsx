@@ -36,6 +36,15 @@ export function Navbar() {
   const onTrial = isTrialUser(user);
   const trialDays = getTrialDaysRemaining(user);
 
+  // Ping to keep lastSeenAt updated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const ping = () => fetch("/api/ping", { method: "POST", credentials: "include" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 60_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   // Scroll arrow state
   const navRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  TrendingUp, 
+  TrendingUp, TrendingDown,
   BookOpen, 
   Crown,
   GraduationCap,
@@ -23,12 +23,17 @@ import {
   ChevronUp,
   ShieldCheck,
   UserPlus,
-  UserCheck
+  UserCheck,
+  Clock,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import { getLevelInfo } from "@/lib/levels";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
 interface PublicUser {
   id: string;
@@ -40,6 +45,7 @@ interface PublicUser {
   lessonsCompleted: number | null;
   totalProfit: number | null;
   xp: number | null;
+  lastSeenAt: string | null;
 }
 
 interface UserAchievement {
@@ -52,6 +58,20 @@ interface UserAchievement {
   unlockedAt: string;
 }
 
+interface RecentTrade {
+  id: string;
+  symbol: string;
+  type: string;
+  quantity: number;
+  entryPrice: number;
+  exitPrice: number | null;
+  profit: number | null;
+  status: string;
+  openedAt: string | null;
+  closedAt: string | null;
+  leverage: number | null;
+}
+
 const categoryIcons: Record<string, any> = {
   trading: TrendingUp,
   learning: BookOpen,
@@ -60,9 +80,149 @@ const categoryIcons: Record<string, any> = {
   milestone: Calendar,
 };
 
-const getCategoryIcon = (category: string) => {
-  return categoryIcons[category] || Award;
-};
+const getCategoryIcon = (category: string) => categoryIcons[category] || Award;
+
+function getOnlineStatus(lastSeenAt: string | null): { isOnline: boolean; label: string } {
+  if (!lastSeenAt) return { isOnline: false, label: "Never active" };
+  const diff = Date.now() - new Date(lastSeenAt).getTime();
+  if (diff < 5 * 60 * 1000) return { isOnline: true, label: "Active now" };
+  return {
+    isOnline: false,
+    label: `Active ${formatDistanceToNow(new Date(lastSeenAt), { addSuffix: true })}`,
+  };
+}
+
+function OnlineBadge({ lastSeenAt }: { lastSeenAt: string | null }) {
+  const { isOnline, label } = getOnlineStatus(lastSeenAt);
+  return (
+    <div className="flex items-center gap-1.5 text-sm" data-testid="status-online">
+      <span
+        className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+          isOnline ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground/40"
+        }`}
+      />
+      <span className={isOnline ? "text-green-500 font-medium" : "text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function RecentTradesCard({ trades }: { trades: RecentTrade[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? trades : trades.slice(0, 4);
+
+  if (trades.length === 0) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            Recent Trades
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-4">No trades yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-primary" />
+          Recent Trades
+        </CardTitle>
+        <CardDescription>Last {trades.length} trades</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-border">
+          {visible.map((trade) => {
+            const isLong = trade.type === "long" || trade.type === "buy";
+            const isOpen = trade.status === "open";
+            const profitVal = trade.profit ?? 0;
+            const profitPositive = profitVal >= 0;
+            const TradeArrow = isLong ? ArrowUpRight : ArrowDownRight;
+            return (
+              <div
+                key={trade.id}
+                className="flex items-center gap-3 px-6 py-3 hover:bg-muted/40 transition-colors"
+                data-testid={`trade-row-${trade.id}`}
+              >
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isLong ? "bg-green-500/10" : "bg-red-500/10"}`}>
+                  <TradeArrow className={`h-5 w-5 ${isLong ? "text-green-500" : "text-red-500"}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{trade.symbol}</span>
+                    <Badge variant="outline" className={`text-xs py-0 px-1.5 ${isLong ? "border-green-500/40 text-green-600 dark:text-green-400" : "border-red-500/40 text-red-600 dark:text-red-400"}`}>
+                      {trade.type.toUpperCase()}
+                    </Badge>
+                    {(trade.leverage ?? 1) > 1 && (
+                      <Badge variant="secondary" className="text-xs py-0 px-1.5">{trade.leverage}x</Badge>
+                    )}
+                    <Badge
+                      variant={isOpen ? "default" : "secondary"}
+                      className={`text-xs py-0 px-1.5 ml-auto ${isOpen ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10" : ""}`}
+                    >
+                      {isOpen ? "Open" : "Closed"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <span className="text-xs text-muted-foreground">
+                      Entry: <span className="text-foreground">${trade.entryPrice.toFixed(2)}</span>
+                    </span>
+                    {trade.exitPrice && (
+                      <span className="text-xs text-muted-foreground">
+                        Exit: <span className="text-foreground">${trade.exitPrice.toFixed(2)}</span>
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      Qty: {trade.quantity}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {trade.profit !== null ? (
+                    <p className={`text-sm font-bold ${profitPositive ? "text-green-500" : "text-red-500"}`}>
+                      {profitPositive ? "+" : ""}${profitVal.toFixed(2)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">—</p>
+                  )}
+                  {trade.openedAt && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDistanceToNow(new Date(trade.openedAt), { addSuffix: true })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {trades.length > 4 && (
+          <div className="px-6 py-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full gap-1 text-muted-foreground"
+              onClick={() => setShowAll(!showAll)}
+              data-testid="button-toggle-trades"
+            >
+              {showAll ? (
+                <><ChevronUp className="h-4 w-4" /> Show Less</>
+              ) : (
+                <><ChevronDown className="h-4 w-4" /> View All {trades.length} Trades</>
+              )}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function AchievementsCard({ achievements }: { achievements: UserAchievement[] }) {
   const [showAll, setShowAll] = useState(false);
@@ -139,6 +299,11 @@ export default function PublicProfilePage() {
     enabled: !!userId,
   });
 
+  const { data: recentTrades } = useQuery<RecentTrade[]>({
+    queryKey: ["/api/users", userId, "trades"],
+    enabled: !!userId,
+  });
+
   const friendMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/friends/request", { friendId: userId });
@@ -154,14 +319,8 @@ export default function PublicProfilePage() {
     },
   });
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   const getMembershipIcon = (tier: string | null | undefined) => {
     switch (tier) {
@@ -217,13 +376,14 @@ export default function PublicProfilePage() {
   }
 
   const MembershipIcon = getMembershipIcon(profile.membershipTier);
+  const { isOnline } = getOnlineStatus(profile.lastSeenAt);
 
   const stats = [
     {
       label: "Total Profit/Loss",
       value: `${(profile.totalProfit ?? 0) >= 0 ? '+' : ''}$${(profile.totalProfit ?? 0).toLocaleString()}`,
       icon: TrendingUp,
-      color: (profile.totalProfit ?? 0) >= 0 ? "text-success" : "text-destructive"
+      color: (profile.totalProfit ?? 0) >= 0 ? "text-green-500" : "text-destructive"
     },
     {
       label: "Lessons Completed",
@@ -238,15 +398,20 @@ export default function PublicProfilePage() {
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center gap-4">
-            <Avatar className="h-24 w-24 relative">
-              <AvatarImage src={profile.avatarUrl || undefined} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                {getInitials(profile.displayName)}
-              </AvatarFallback>
+            <div className="relative">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={profile.avatarUrl || undefined} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                  {getInitials(profile.displayName)}
+                </AvatarFallback>
+              </Avatar>
               <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary flex items-center justify-center border-4 border-background text-xs font-bold text-primary-foreground">
                 {getLevelInfo(profile.xp).level}
               </div>
-            </Avatar>
+              {isOnline && (
+                <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-green-500 border-2 border-background shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]" />
+              )}
+            </div>
             
             <div>
               <div className="flex items-center justify-center gap-2 mb-1">
@@ -258,7 +423,7 @@ export default function PublicProfilePage() {
                   {getLevelInfo(profile.xp).title}
                 </Badge>
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
                 <Badge variant="secondary" className="gap-1" data-testid="badge-public-membership">
                   <MembershipIcon className="h-3 w-3" />
                   {getMembershipLabel(profile.membershipTier)}
@@ -267,6 +432,7 @@ export default function PublicProfilePage() {
                   {profile.role}
                 </Badge>
               </div>
+              <OnlineBadge lastSeenAt={profile.lastSeenAt} />
             </div>
 
             {profile.bio && (
@@ -313,6 +479,8 @@ export default function PublicProfilePage() {
           );
         })}
       </div>
+
+      <RecentTradesCard trades={recentTrades ?? []} />
 
       {achievements && achievements.length > 0 && (
         <AchievementsCard achievements={achievements} />

@@ -2811,6 +2811,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/ping", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.updateLastSeen(user.id);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.get("/api/users/:id", async (req, res) => {
     try {
       const user = await storage.getUserById(req.params.id);
@@ -2828,9 +2838,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         lessonsCompleted: user.lessonsCompleted,
         totalProfit: user.totalProfit,
         xp: user.xp,
+        lastSeenAt: user.lastSeenAt,
       };
       
       res.json(publicProfile);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:id/trades", async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const allTrades = await storage.getTradesByUser(req.params.id);
+      const recent = allTrades
+        .sort((a, b) => new Date(b.openedAt ?? 0).getTime() - new Date(a.openedAt ?? 0).getTime())
+        .slice(0, 8)
+        .map(t => ({
+          id: t.id,
+          symbol: t.symbol,
+          type: t.type,
+          quantity: t.quantity,
+          entryPrice: t.entryPrice,
+          exitPrice: t.exitPrice,
+          profit: t.profit,
+          status: t.status,
+          openedAt: t.openedAt,
+          closedAt: t.closedAt,
+          leverage: t.leverage,
+        }));
+      res.json(recent);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
