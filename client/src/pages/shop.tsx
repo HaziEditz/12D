@@ -78,8 +78,7 @@ function CardFace({ card, animate = false }: { card: PlayingCard; animate?: bool
   const isRed = card.suit === "♥" || card.suit === "♦";
   if (card.hidden) {
     return (
-      <div className={`w-16 h-24 rounded-xl border border-indigo-600/50 flex items-center justify-center shadow-lg shadow-indigo-900/40 ${animate ? "animate-[card-deal_0.3s_ease-out]" : ""}`}
-        style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)" }}>
+      <div className={`w-16 h-24 rounded-xl bg-indigo-950 border border-indigo-800/60 flex items-center justify-center ${animate ? "animate-[card-deal_0.3s_ease-out]" : ""}`}>
         <div className="text-indigo-300 text-3xl opacity-60">🂠</div>
       </div>
     );
@@ -97,9 +96,7 @@ function CardFace({ card, animate = false }: { card: PlayingCard; animate?: bool
 // ── Casino Panel Wrapper ─────────────────────────────────────────────────────
 function CasinoPanel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-amber-500/20 overflow-hidden"
-      style={{ background: "linear-gradient(160deg, #0f0f1a 0%, #111827 60%, #0a0a14 100%)", boxShadow: "0 0 40px 0 rgba(245,158,11,0.08), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
-      <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.07) 0%, transparent 70%)" }} />
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
       <div className="relative">{children}</div>
     </div>
   );
@@ -438,17 +435,17 @@ function CoinFlipGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
         <div className={`relative w-28 h-28 ${flipping ? "animate-[coin-flip_1.2s_ease-in-out]" : ""}`}
           style={{ transformStyle: "preserve-3d", perspective: "800px" }}>
           {result && !flipping ? (
-            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black shadow-2xl border-4
+            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black border-4
               ${result.result === "heads"
-                ? "bg-gradient-to-br from-yellow-300 to-amber-500 border-yellow-600 shadow-amber-500/40"
-                : "bg-gradient-to-br from-slate-400 to-slate-600 border-slate-700 shadow-slate-500/40"}`}>
+                ? "bg-amber-400 border-amber-600"
+                : "bg-slate-500 border-slate-700"}`}>
               {result.result === "heads" ? "👑" : "🔴"}
             </div>
           ) : (
-            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black shadow-2xl border-4
-              ${flipping ? "bg-gradient-to-br from-yellow-300 to-amber-500 border-yellow-600" : choice === "heads"
-                ? "bg-gradient-to-br from-yellow-300 to-amber-500 border-yellow-600 shadow-amber-500/30"
-                : "bg-gradient-to-br from-slate-400 to-slate-600 border-slate-700 shadow-slate-500/30"}`}>
+            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black border-4
+              ${flipping || choice === "heads"
+                ? "bg-amber-400 border-amber-600"
+                : "bg-slate-500 border-slate-700"}`}>
               {flipping ? "🌀" : choice === "heads" ? "👑" : "🔴"}
             </div>
           )}
@@ -946,16 +943,14 @@ export default function ShopPage() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #0a0a14 0%, #111827 50%, #0d0d1a 100%)" }}>
-      {/* Ambient glow */}
-      <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 20%, rgba(245,158,11,0.04) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.04) 0%, transparent 50%)" }} />
+    <div className="min-h-screen bg-zinc-950">
 
       <div className="relative max-w-5xl mx-auto px-4 py-8 space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight" style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24, #f59e0b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <h1 className="text-3xl font-black tracking-tight text-amber-400">
               12Digits Shop
             </h1>
             <p className="text-slate-500 text-sm mt-0.5">Cosmetics, casino games, and player market</p>
@@ -972,7 +967,7 @@ export default function ShopPage() {
             <button key={t.id} data-testid={`tab-${t.id}`} onClick={() => setMainTab(t.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all
                 ${mainTab === t.id ? "text-black shadow-lg shadow-amber-500/20" : "text-slate-500 hover:text-slate-300"}`}
-              style={mainTab === t.id ? { background: "linear-gradient(135deg, #f59e0b, #fbbf24)" } : {}}>
+              style={mainTab === t.id ? { background: "#f59e0b" } : {}}>
               <span>{t.emoji}</span>
               <span className="hidden sm:inline">{t.label}</span>
             </button>
@@ -1058,12 +1053,7 @@ export default function ShopPage() {
             <div className="grid grid-cols-5 gap-2">
               {CASINO_GAMES.map(g => (
                 <button key={g.id} onClick={() => setCasinoGame(g.id)}
-                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-center transition-all
-                    ${casinoGame === g.id
-                      ? "border-amber-500/60 shadow-lg shadow-amber-500/15"
-                      : "border-slate-800 hover:border-slate-700"}
-                    `}
-                  style={casinoGame === g.id ? { background: "linear-gradient(160deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)" } : { background: "rgba(15,15,25,0.8)" }}>
+                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-center transition-all ${casinoGame === g.id ? "border-amber-500/50 bg-zinc-800" : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"}`}>
                   <span className="text-2xl">{g.emoji}</span>
                   <span className={`text-xs font-semibold ${casinoGame === g.id ? "text-amber-400" : "text-slate-500"}`}>{g.label}</span>
                 </button>
@@ -1071,10 +1061,8 @@ export default function ShopPage() {
             </div>
 
             {/* Game panel */}
-            <div className="relative rounded-2xl border border-amber-500/20 overflow-hidden"
-              style={{ background: "linear-gradient(160deg, #0f0f1a 0%, #111827 60%, #0a0a14 100%)", boxShadow: "0 0 40px 0 rgba(245,158,11,0.07), inset 0 1px 0 rgba(255,255,255,0.04)" }}>
-              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.06) 0%, transparent 60%)" }} />
-              <div className="relative">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+              <div>
                 {casinoGame === "blackjack" && <BlackjackGame balance={balance} onRefreshUser={refreshUser} />}
                 {casinoGame === "roulette" && <RouletteGame balance={balance} onRefreshUser={refreshUser} />}
                 {casinoGame === "coinflip" && <CoinFlipGame balance={balance} onRefreshUser={refreshUser} />}
@@ -1091,8 +1079,7 @@ export default function ShopPage() {
         {mainTab === "packs" && (
           <div className="space-y-4">
             {packResult && (
-              <div className="rounded-2xl p-6 text-center border border-amber-500/30 animate-in fade-in slide-in-from-bottom-2"
-                style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.1), rgba(139,92,246,0.1))" }}>
+              <div className="rounded-2xl p-6 text-center border border-amber-500/30 bg-zinc-900 animate-in fade-in slide-in-from-bottom-2">
                 <p className="text-amber-400 font-bold text-lg mb-3">🎁 You got:</p>
                 {packResult.type === "frame"
                   ? <div className="flex justify-center"><FramePreview frameId={packResult.itemId} size={72} /></div>
