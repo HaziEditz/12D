@@ -5,7 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   FRAMES, TITLES, BADGES, PACKS, ROULETTE_SLOTS, RARITY_COLORS, RARITY_GLOW,
-  getFrameStyle, type Rarity, type RouletteSlot,
+  getFrameStyle, getItemById, type Rarity, type RouletteSlot,
 } from "@/lib/shop-catalog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -853,6 +853,9 @@ export default function ShopPage() {
   const [listItemId, setListItemId] = useState("");
   const [listItemType, setListItemType] = useState("frame");
   const [listPrice, setListPrice] = useState("");
+  const [marketFilter, setMarketFilter] = useState<"all" | "frame" | "title" | "badge">("all");
+  const [marketSort, setMarketSort] = useState<"newest" | "price-asc" | "price-desc">("newest");
+  const [marketSearch, setMarketSearch] = useState("");
 
   const owned: string[] = (() => { try { return JSON.parse(user?.purchasedCosmetics ?? "[]"); } catch { return []; } })();
   const balance = user?.simulatorBalance ?? 0;
@@ -1078,23 +1081,34 @@ export default function ShopPage() {
         {/* ── Packs ── */}
         {mainTab === "packs" && (
           <div className="space-y-4">
-            {packResult && (
-              <div className="rounded-2xl p-6 text-center border border-amber-500/30 bg-zinc-900 animate-in fade-in slide-in-from-bottom-2">
-                <p className="text-amber-400 font-bold text-lg mb-3">🎁 You got:</p>
-                {packResult.type === "frame"
-                  ? <div className="flex justify-center"><FramePreview frameId={packResult.itemId} size={72} /></div>
-                  : <p className="text-5xl my-2">{packResult.itemId}</p>}
-                <p className="text-slate-400 text-sm mt-2">{packResult.itemId}</p>
-                <Button variant="outline" size="sm" className="mt-4 border-slate-700 text-slate-300" onClick={() => setPackResult(null)}>Close</Button>
-              </div>
-            )}
+            {packResult && (() => {
+              const revealItem = getItemById(packResult.itemId);
+              const badgeItem = packResult.type === "badge" ? BADGES.find(b => b.id === packResult.itemId) : null;
+              const titleItem = packResult.type === "title" ? TITLES.find(t => t.id === packResult.itemId) : null;
+              return (
+                <div className="rounded-2xl p-8 text-center border border-amber-500/40 bg-zinc-900 animate-in fade-in slide-in-from-bottom-2">
+                  <p className="text-amber-400 font-bold text-2xl mb-1">🎁 Pack Opened!</p>
+                  <p className="text-slate-500 text-sm mb-5">Here's what you got:</p>
+                  <div className="flex flex-col items-center gap-3 mb-6">
+                    {packResult.type === "frame"
+                      ? <div className="flex justify-center"><FramePreview frameId={packResult.itemId} size={80} /></div>
+                      : <p className="text-6xl leading-none">{badgeItem?.emoji ?? titleItem?.name?.split(" ")[0] ?? "🏷️"}</p>}
+                    <div>
+                      <p className="font-bold text-white text-lg">{revealItem?.name ?? packResult.itemId}</p>
+                      {revealItem && <div className="flex justify-center mt-1.5"><RarityBadge rarity={revealItem.rarity} /></div>}
+                      <p className="text-xs text-slate-600 mt-1 capitalize">{packResult.type}</p>
+                    </div>
+                  </div>
+                  <Button className="bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold px-8" onClick={() => setPackResult(null)}>Nice!</Button>
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {PACKS.map(pack => (
                 <div key={pack.id}
-                  className={`rounded-2xl p-5 flex flex-col gap-3 border transition-all hover:scale-[1.01] hover:-translate-y-0.5
+                  className={`rounded-2xl p-5 flex flex-col gap-3 border bg-zinc-950 transition-all hover:scale-[1.01] hover:-translate-y-0.5
                     ${RARITY_GLOW[pack.rarity] ? "shadow-xl " + RARITY_GLOW[pack.rarity] : ""}
-                    border-slate-800 hover:border-slate-700`}
-                  style={{ background: "rgba(15,15,25,0.9)" }}>
+                    border-zinc-800 hover:border-zinc-700`}>
                   <div className="flex items-start gap-3">
                     <span className="text-4xl">{pack.emoji}</span>
                     <div className="flex-1">
@@ -1122,90 +1136,196 @@ export default function ShopPage() {
         )}
 
         {/* ── Market ── */}
-        {mainTab === "market" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* List Item */}
-            <div className="lg:col-span-1">
-              <div className="rounded-2xl p-5 border border-slate-800 sticky top-4" style={{ background: "rgba(15,15,25,0.9)" }}>
-                <h3 className="font-bold mb-4 flex items-center gap-2 text-slate-200"><Tag className="w-4 h-4 text-amber-400" />List an Item</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Item Type</label>
-                    <select value={listItemType} onChange={e => setListItemType(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:border-amber-500/50 outline-none">
-                      <option value="frame">Frame</option>
-                      <option value="title">Title</option>
-                      <option value="badge">Badge</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Item</label>
-                    <select value={listItemId} onChange={e => setListItemId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:border-amber-500/50 outline-none">
-                      <option value="">-- Select --</option>
-                      {(listItemType === "frame" ? FRAMES : listItemType === "title" ? TITLES : BADGES)
-                        .filter(item => owned.includes(item.id))
-                        .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Price ($)</label>
-                    <Input type="number" min="1" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="e.g. 5000"
-                      className="bg-slate-900 border-slate-700 text-slate-300 focus:border-amber-500/50" />
-                  </div>
-                  <Button className="w-full bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold"
-                    disabled={!listItemId || !listPrice || listMutation.isPending}
-                    onClick={() => listMutation.mutate({ itemId: listItemId, itemType: listItemType, price: Number(listPrice) })}>
-                    <Tag className="w-4 h-4 mr-2" />List for Sale
-                  </Button>
-                </div>
-              </div>
-            </div>
+        {mainTab === "market" && (() => {
+          const allCatalog = [...FRAMES, ...TITLES, ...BADGES] as Array<{ id: string; name: string; price: number; rarity: Rarity }>;
+          const getRetailPrice = (id: string) => allCatalog.find(i => i.id === id)?.price ?? 0;
 
-            {/* Active Listings */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-200">Active Listings</h3>
-                <Button variant="ghost" size="sm" onClick={() => refetchMarket()} className="text-slate-400 hover:text-slate-200">
-                  <RefreshCw className="w-3.5 h-3.5 mr-1" />Refresh
-                </Button>
-              </div>
-              {marketListings.length === 0 ? (
-                <div className="rounded-2xl p-12 text-center text-slate-600 border border-slate-800" style={{ background: "rgba(15,15,25,0.6)" }}>
-                  <p className="text-4xl mb-3">🏪</p>
-                  <p className="font-medium text-slate-500">No listings yet</p>
-                  <p className="text-sm text-slate-600 mt-1">Be the first to list an item!</p>
-                </div>
-              ) : (
-                marketListings.map((listing: any) => (
-                  <div key={listing.id} className="rounded-xl p-4 flex items-center gap-3 border border-slate-800 hover:border-slate-700 transition-all"
-                    style={{ background: "rgba(15,15,25,0.8)" }}>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-200">{listing.itemId}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-slate-500 capitalize">{listing.itemType}</span>
-                        <span className="text-xs text-slate-600">by</span>
-                        <span className="text-xs text-slate-400">{listing.sellerName || "Unknown"}</span>
+          const filteredListings = marketListings
+            .filter((l: any) => marketFilter === "all" || l.itemType === marketFilter)
+            .filter((l: any) => {
+              if (!marketSearch.trim()) return true;
+              const info = getItemById(l.itemId);
+              return info?.name.toLowerCase().includes(marketSearch.toLowerCase()) || l.itemId.includes(marketSearch.toLowerCase());
+            })
+            .sort((a: any, b: any) => {
+              if (marketSort === "price-asc") return a.price - b.price;
+              if (marketSort === "price-desc") return b.price - a.price;
+              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
+
+          const listPreviewItem = listItemId ? getItemById(listItemId) : null;
+          const ownedListable = (listItemType === "frame" ? FRAMES : listItemType === "title" ? TITLES : BADGES).filter(item => owned.includes(item.id));
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* List Item Panel */}
+              <div className="lg:col-span-1">
+                <div className="rounded-2xl p-5 border border-zinc-800 bg-zinc-950 sticky top-4 space-y-4">
+                  <h3 className="font-bold flex items-center gap-2 text-slate-200"><Tag className="w-4 h-4 text-amber-400" />List an Item</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">Type</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {["frame","title","badge"].map(t => (
+                          <button key={t} onClick={() => { setListItemType(t); setListItemId(""); }}
+                            className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all ${listItemType === t ? "bg-amber-500 text-black border-amber-500" : "bg-zinc-900 text-slate-400 border-zinc-800 hover:border-zinc-600"}`}>
+                            {t}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <p className="text-green-400 font-bold text-sm">${listing.price?.toLocaleString()}</p>
-                    {listing.sellerId === user?.id ? (
-                      <Button size="sm" variant="outline" className="text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
-                        onClick={() => cancelListingMutation.mutate(listing.id)} disabled={cancelListingMutation.isPending}>
-                        Cancel
-                      </Button>
-                    ) : (
-                      <Button size="sm" className="text-xs bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold"
-                        onClick={() => buyListingMutation.mutate(listing.id)} disabled={buyListingMutation.isPending || balance < listing.price}>
-                        Buy
-                      </Button>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">Item {ownedListable.length === 0 && <span className="text-red-400">(none owned)</span>}</label>
+                      <select value={listItemId} onChange={e => setListItemId(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:border-amber-500/50 outline-none">
+                        <option value="">-- Select --</option>
+                        {ownedListable.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </select>
+                    </div>
+                    {listPreviewItem && (
+                      <div className="flex items-center gap-3 rounded-xl p-3 bg-zinc-900 border border-zinc-800">
+                        {listItemType === "frame"
+                          ? <FramePreview frameId={listItemId} size={36} />
+                          : <span className="text-2xl">{BADGES.find(b => b.id === listItemId)?.emoji ?? "🏷️"}</span>}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-300 truncate">{listPreviewItem.name}</p>
+                          <RarityBadge rarity={listPreviewItem.rarity} />
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-600">Retail</p>
+                          <p className="text-xs text-slate-400">${getRetailPrice(listItemId).toLocaleString()}</p>
+                        </div>
+                      </div>
                     )}
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">Your Price ($)</label>
+                      <Input type="number" min="1" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="e.g. 5000"
+                        className="bg-zinc-900 border-zinc-700 text-slate-300 focus:border-amber-500/50" />
+                      {listPrice && listItemId && (() => {
+                        const retail = getRetailPrice(listItemId);
+                        const pct = retail > 0 ? Math.round(((retail - Number(listPrice)) / retail) * 100) : 0;
+                        if (pct > 0) return <p className="text-xs text-green-400 mt-1">{pct}% below retail — great deal for buyers</p>;
+                        if (pct < 0) return <p className="text-xs text-yellow-500 mt-1">{Math.abs(pct)}% above retail</p>;
+                        return null;
+                      })()}
+                    </div>
+                    <Button className="w-full bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold"
+                      disabled={!listItemId || !listPrice || listMutation.isPending}
+                      onClick={() => listMutation.mutate({ itemId: listItemId, itemType: listItemType, price: Number(listPrice) })}>
+                      <Tag className="w-4 h-4 mr-2" />{listMutation.isPending ? "Listing..." : "List for Sale"}
+                    </Button>
                   </div>
-                ))
-              )}
+                  <div className="rounded-xl p-3 bg-zinc-900 border border-zinc-800 text-xs text-slate-500 space-y-1">
+                    <p className="text-slate-400 font-semibold">How it works</p>
+                    <p>List any owned cosmetic for sale. Buyers pay you directly — funds land in your simulator balance. Listings stay active until sold or cancelled.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Listings Panel */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Stats bar */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Active Listings", value: marketListings.length },
+                    { label: "Frames", value: marketListings.filter((l: any) => l.itemType === "frame").length },
+                    { label: "Lowest Price", value: marketListings.length > 0 ? `$${Math.min(...marketListings.map((l: any) => l.price)).toLocaleString()}` : "—" },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-xl p-3 bg-zinc-900 border border-zinc-800 text-center">
+                      <p className="text-lg font-bold text-amber-400">{s.value}</p>
+                      <p className="text-[10px] text-slate-600 uppercase tracking-wide">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded-xl overflow-hidden border border-zinc-800">
+                    {(["all","frame","title","badge"] as const).map(f => (
+                      <button key={f} onClick={() => setMarketFilter(f)}
+                        className={`px-3 py-1.5 text-xs font-semibold capitalize transition-all ${marketFilter === f ? "bg-amber-500 text-black" : "bg-zinc-900 text-slate-400 hover:text-slate-200"}`}>
+                        {f === "all" ? "All" : f + "s"}
+                      </button>
+                    ))}
+                  </div>
+                  <select value={marketSort} onChange={e => setMarketSort(e.target.value as any)}
+                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-slate-400 outline-none">
+                    <option value="newest">Newest first</option>
+                    <option value="price-asc">Price: low to high</option>
+                    <option value="price-desc">Price: high to low</option>
+                  </select>
+                  <Input value={marketSearch} onChange={e => setMarketSearch(e.target.value)} placeholder="Search items..."
+                    className="h-8 text-xs bg-zinc-900 border-zinc-800 text-slate-300 flex-1 min-w-32 max-w-52" />
+                  <Button variant="ghost" size="sm" onClick={() => refetchMarket()} className="text-slate-500 hover:text-slate-300 h-8 px-2">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                {/* Listing cards */}
+                {filteredListings.length === 0 ? (
+                  <div className="rounded-2xl p-12 text-center border border-zinc-800 bg-zinc-900">
+                    <p className="text-4xl mb-3">🏪</p>
+                    <p className="font-medium text-slate-500">{marketListings.length === 0 ? "No listings yet" : "No matches found"}</p>
+                    <p className="text-sm text-slate-600 mt-1">{marketListings.length === 0 ? "Be the first to list an item!" : "Try a different filter or search."}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredListings.map((listing: any) => {
+                      const info = getItemById(listing.itemId);
+                      const retail = getRetailPrice(listing.itemId);
+                      const pct = retail > 0 ? Math.round(((retail - listing.price) / retail) * 100) : 0;
+                      const isOwn = listing.sellerId === user?.id;
+                      const badgeInfo = listing.itemType === "badge" ? BADGES.find(b => b.id === listing.itemId) : null;
+                      return (
+                        <div key={listing.id} className={`rounded-xl p-3.5 flex items-center gap-3 border transition-all ${isOwn ? "border-amber-500/20 bg-zinc-950" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"}`}>
+                          {/* Preview */}
+                          <div className="shrink-0 w-10 h-10 flex items-center justify-center">
+                            {listing.itemType === "frame"
+                              ? <FramePreview frameId={listing.itemId} size={36} />
+                              : <span className="text-2xl">{badgeInfo?.emoji ?? info?.name?.split(" ")[0] ?? "🏷️"}</span>}
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-semibold text-sm text-slate-200 truncate">{info?.name ?? listing.itemId}</p>
+                              {info && <RarityBadge rarity={info.rarity} />}
+                              {isOwn && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border border-amber-500/30 text-amber-500/60">yours</span>}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-slate-600 capitalize">{listing.itemType}</span>
+                              <span className="text-xs text-slate-700">·</span>
+                              <span className="text-xs text-slate-500">by {listing.seller?.displayName ?? "Unknown"}</span>
+                              {pct > 0 && <span className="text-[10px] text-green-500 font-semibold">{pct}% off retail</span>}
+                              {pct < -5 && <span className="text-[10px] text-yellow-500 font-semibold">{Math.abs(pct)}% over retail</span>}
+                            </div>
+                          </div>
+                          {/* Price + action */}
+                          <div className="shrink-0 flex items-center gap-2">
+                            <div className="text-right">
+                              <p className="text-green-400 font-bold text-sm">${listing.price?.toLocaleString()}</p>
+                              {retail > 0 && <p className="text-[10px] text-slate-700">retail ${retail.toLocaleString()}</p>}
+                            </div>
+                            {isOwn ? (
+                              <Button size="sm" variant="outline" className="text-xs h-8 border-red-500/30 text-red-400 hover:bg-red-500/10 shrink-0"
+                                onClick={() => cancelListingMutation.mutate(listing.id)} disabled={cancelListingMutation.isPending}>
+                                Cancel
+                              </Button>
+                            ) : (
+                              <Button size="sm" className="text-xs h-8 bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold shrink-0"
+                                onClick={() => buyListingMutation.mutate(listing.id)} disabled={buyListingMutation.isPending || balance < listing.price}>
+                                {buyListingMutation.isPending ? "..." : "Buy"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <style>{`

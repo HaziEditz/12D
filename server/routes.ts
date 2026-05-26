@@ -2314,9 +2314,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (balance < price) return res.status(400).json({ message: "Insufficient balance" });
 
       const packRewards: Record<string, string[]> = {
-        "pack-starter": ["frame-silver", "title-bull", "title-day-trader", "title-risk-taker"],
-        "pack-pro":     ["frame-gold", "frame-emerald", "frame-rose-gold", "title-diamond-hands", "title-the-analyst", "title-market-guru"],
-        "pack-legend":  ["frame-fire", "frame-diamond", "frame-rainbow", "frame-void", "title-wolf", "title-whale", "title-legend"],
+        "pack-starter": ["frame-silver","frame-steel","frame-mint","title-bull","title-day-trader","title-risk-taker","title-newbie","title-hodler","badge-rocket","badge-fire","badge-money"],
+        "pack-trader":  ["frame-neon-blue","frame-coral","frame-teal-wave","title-bear-slayer","title-chart-wizard","title-scalper","badge-gem","badge-lightning"],
+        "pack-pro":     ["frame-gold","frame-emerald","frame-rose-gold","frame-ocean-deep","title-diamond-hands","title-the-analyst","title-market-guru","title-quant","badge-dragon","badge-unicorn"],
+        "pack-elite":   ["frame-fire","frame-diamond","frame-midnight","frame-aurora","title-hedge-fund","title-wolf","title-market-maker","badge-galaxy","badge-nuclear"],
+        "pack-legend":  ["frame-rainbow","frame-void","frame-cosmic","title-whale","title-legend","title-oracle","badge-infinity"],
+        "pack-god":     ["frame-godmode","frame-cosmic","frame-rainbow","title-god-tier","title-sovereign","title-oracle","badge-infinity"],
       };
       const pool = packRewards[packId] ?? packRewards["pack-starter"];
       const rewardId = pool[Math.floor(Math.random() * pool.length)];
