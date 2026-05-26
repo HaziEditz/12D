@@ -437,6 +437,175 @@ function StrategyChallenge() {
   );
 }
 
+// ── Blackjack ──────────────────────────────────────────────────────────────
+const SUITS = ["♠","♥","♦","♣"];
+const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+type BJCard = { suit: string; rank: string };
+
+function cardValue(rank: string) {
+  if (["J","Q","K"].includes(rank)) return 10;
+  if (rank === "A") return 11;
+  return parseInt(rank);
+}
+function handTotal(hand: BJCard[]) {
+  let total = hand.reduce((s, c) => s + cardValue(c.rank), 0);
+  let aces = hand.filter(c => c.rank === "A").length;
+  while (total > 21 && aces > 0) { total -= 10; aces--; }
+  return total;
+}
+function newDeck(): BJCard[] {
+  const deck: BJCard[] = [];
+  for (const s of SUITS) for (const r of RANKS) deck.push({ suit: s, rank: r });
+  return deck.sort(() => Math.random() - 0.5);
+}
+function CardFace({ card, faceDown = false }: { card: BJCard; faceDown?: boolean }) {
+  const red = card.suit === "♥" || card.suit === "♦";
+  if (faceDown) return (
+    <div className="w-12 h-18 rounded-lg border-2 border-border bg-primary/20 flex items-center justify-center text-2xl" style={{ minWidth: 48, minHeight: 72 }}>🂠</div>
+  );
+  return (
+    <div className={`w-12 rounded-lg border-2 border-border bg-card flex flex-col items-center justify-center p-1 shadow-sm ${red ? "text-red-500" : "text-foreground"}`} style={{ minWidth: 48, minHeight: 72 }}>
+      <div className="text-sm font-bold leading-none">{card.rank}</div>
+      <div className="text-xl leading-none">{card.suit}</div>
+    </div>
+  );
+}
+
+function BlackjackGame() {
+  const scoreMutation = useMutation({
+    mutationFn: (data: { game: string; score: number; tokensEarned: number }) =>
+      apiRequest("POST", "/api/fun-zone/score", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+  });
+
+  const [phase, setPhase] = useState<"idle"|"betting"|"playing"|"dealer"|"result">("idle");
+  const [bet, setBet] = useState(10);
+  const [balance, setBalance] = useState(500);
+  const [deck, setDeck] = useState<BJCard[]>([]);
+  const [player, setPlayer] = useState<BJCard[]>([]);
+  const [dealer, setDealer] = useState<BJCard[]>([]);
+  const [result, setResult] = useState<"win"|"lose"|"push"|null>(null);
+
+  const startGame = () => {
+    const d = newDeck();
+    const p = [d.pop()!, d.pop()!];
+    const deal = [d.pop()!, d.pop()!];
+    setDeck(d); setPlayer(p); setDealer(deal); setResult(null); setPhase("playing");
+  };
+
+  const hit = () => {
+    const d = [...deck];
+    const p = [...player, d.pop()!];
+    setDeck(d); setPlayer(p);
+    if (handTotal(p) > 21) endRound(p, dealer, true);
+  };
+
+  const stand = () => {
+    let d = [...deck];
+    let deal = [...dealer];
+    while (handTotal(deal) < 17) deal.push(d.pop()!);
+    setDeck(d); setDealer(deal);
+    endRound(player, deal, false);
+  };
+
+  const endRound = (p: BJCard[], d: BJCard[], bust: boolean) => {
+    const pt = handTotal(p); const dt = handTotal(d);
+    let outcome: "win"|"lose"|"push";
+    if (bust) outcome = "lose";
+    else if (dt > 21 || pt > dt) outcome = "win";
+    else if (pt < dt) outcome = "lose";
+    else outcome = "push";
+    setResult(outcome);
+    setPhase("result");
+    const newBal = balance + (outcome === "win" ? bet : outcome === "lose" ? -bet : 0);
+    setBalance(Math.max(0, newBal));
+    const tokens = outcome === "win" ? Math.ceil(bet / 50) : 0;
+    if (tokens > 0) scoreMutation.mutate({ game: "blackjack", score: bet, tokensEarned: tokens });
+  };
+
+  const playerTotal = handTotal(player);
+  const dealerTotal = handTotal(dealer);
+
+  if (phase === "idle") return (
+    <div className="text-center space-y-4 py-6">
+      <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 mb-2">
+        <span className="text-4xl">🃏</span>
+      </div>
+      <h3 className="text-xl font-bold">Blackjack</h3>
+      <p className="text-muted-foreground">Beat the dealer to 21. Earn tokens when you win!</p>
+      <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto text-sm">
+        <div className="bg-muted rounded-lg p-2 text-center"><div className="font-bold text-green-500">Win</div><div className="text-xs text-muted-foreground">2× bet back</div></div>
+        <div className="bg-muted rounded-lg p-2 text-center"><div className="font-bold text-amber-500">Tokens</div><div className="text-xs text-muted-foreground">per 50 bet</div></div>
+        <div className="bg-muted rounded-lg p-2 text-center"><div className="font-bold text-primary">${balance}</div><div className="text-xs text-muted-foreground">balance</div></div>
+      </div>
+      <Button size="lg" onClick={() => setPhase("betting")} className="gap-2"><Play className="w-4 h-4" /> Play Blackjack</Button>
+    </div>
+  );
+
+  if (phase === "betting") return (
+    <div className="space-y-4 text-center">
+      <h3 className="text-lg font-bold">Place Your Bet</h3>
+      <p className="text-muted-foreground text-sm">Balance: ${balance}</p>
+      <div className="flex gap-2 justify-center flex-wrap">
+        {[10,25,50,100].filter(v => v <= balance).map(v => (
+          <button key={v} onClick={() => setBet(v)}
+            className={`px-4 py-2 rounded-lg border text-sm font-bold transition-all ${bet === v ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+            ${v}
+          </button>
+        ))}
+      </div>
+      <p className="font-semibold">Bet: <span className="text-primary">${bet}</span></p>
+      <div className="flex gap-3 justify-center">
+        <Button variant="outline" onClick={() => setPhase("idle")}>Cancel</Button>
+        <Button onClick={startGame} disabled={bet > balance}><Zap className="w-4 h-4 mr-2" />Deal!</Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Balance: <span className="font-bold text-foreground">${balance}</span></span>
+        <Badge variant="outline">Bet: ${bet}</Badge>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Dealer {phase === "result" ? `— ${dealerTotal}` : ""}</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {dealer.map((c, i) => <CardFace key={i} card={c} faceDown={phase !== "result" && i === 1} />)}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">You — {playerTotal}</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {player.map((c, i) => <CardFace key={i} card={c} />)}
+          </div>
+        </div>
+      </div>
+
+      {phase === "playing" && (
+        <div className="flex gap-3">
+          <Button className="flex-1" onClick={hit} disabled={playerTotal >= 21}>Hit</Button>
+          <Button className="flex-1" variant="outline" onClick={stand}>Stand</Button>
+        </div>
+      )}
+
+      {phase === "result" && (
+        <div className={`rounded-lg p-4 text-center space-y-2 ${result === "win" ? "bg-green-500/10 border border-green-500/30" : result === "push" ? "bg-muted border" : "bg-red-500/10 border border-red-500/30"}`}>
+          {result === "win" && <><CheckCircle2 className="w-7 h-7 text-green-500 mx-auto" /><p className="font-bold text-green-600">You Win! +${bet}</p></>}
+          {result === "push" && <><p className="text-2xl">🤝</p><p className="font-bold">Push — bet returned</p></>}
+          {result === "lose" && <><XCircle className="w-7 h-7 text-red-500 mx-auto" /><p className="font-bold text-red-600">Dealer wins. -${bet}</p></>}
+          <div className="flex gap-2 justify-center mt-2">
+            <Button size="sm" onClick={() => setPhase("betting")} disabled={balance === 0}>Play Again</Button>
+            <Button size="sm" variant="outline" onClick={() => { setBalance(500); setPhase("idle"); }}>Reset</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FunZonePage() {
   const { user } = useAuth();
   const [activeGame, setActiveGame] = useState<string | null>(null);
@@ -445,6 +614,7 @@ export default function FunZonePage() {
     { id: "market-prediction", name: "Market Prediction", description: "Predict if stocks go UP or DOWN", icon: BarChart2, color: "text-blue-500", bg: "bg-blue-500/10", component: <MarketPredictionGame /> },
     { id: "investment-quiz", name: "Investment Quiz", description: "Test your finance knowledge", icon: Brain, color: "text-purple-500", bg: "bg-purple-500/10", component: <InvestmentQuiz /> },
     { id: "strategy-challenge", name: "Strategy Challenge", description: "Allocate your portfolio & see results", icon: PieChart, color: "text-green-500", bg: "bg-green-500/10", component: <StrategyChallenge /> },
+    { id: "blackjack", name: "Blackjack", description: "Beat the dealer to 21 and earn tokens!", icon: Target, color: "text-amber-500", bg: "bg-amber-500/10", component: <BlackjackGame /> },
   ];
 
   const { data: leaderboard } = useQuery<{ userId: string; displayName: string; score: number }[]>({

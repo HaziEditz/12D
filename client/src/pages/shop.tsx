@@ -40,14 +40,14 @@ function FramePreview({ frameId, size = 44 }: { frameId: string; size?: number }
 // ── Roulette Wheel ────────────────────────────────────────────────────────────
 const SPIN_COSTS = [{ label: "$100", cost: 100 }, { label: "$500", cost: 500 }, { label: "$2,000", cost: 2000 }];
 
-function RouletteWheel({ slots, spinning, winIndex }: { slots: RouletteSlot[]; spinning: boolean; winIndex: number }) {
+function RouletteWheel({ slots, spinning, rotation }: { slots: RouletteSlot[]; spinning: boolean; rotation: number }) {
   const slotCount = slots.length;
   const segAngle = 360 / slotCount;
   const r = 110;
   const cx = 130; const cy = 130;
 
   return (
-    <svg width={260} height={260} className="mx-auto" style={{ transition: "transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)", transform: spinning ? `rotate(${360 * 5 + (360 - winIndex * segAngle)}deg)` : "rotate(0deg)" }}>
+    <svg width={260} height={260} className="mx-auto" style={{ transition: spinning ? "transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)" : "none", transform: `rotate(${rotation}deg)` }}>
       {slots.map((slot, i) => {
         const startA = (i * segAngle - 90) * (Math.PI / 180);
         const endA = ((i + 1) * segAngle - 90) * (Math.PI / 180);
@@ -78,7 +78,7 @@ export default function ShopPage() {
   const [opening, setOpening] = useState(false);
   const [spinCost, setSpinCost] = useState(100);
   const [spinning, setSpinning] = useState(false);
-  const [winIndex, setWinIndex] = useState(0);
+  const [finalRotation, setFinalRotation] = useState(0);
   const [spinResult, setSpinResult] = useState<{ slot: RouletteSlot; rewardDesc: string; newBalance: number } | null>(null);
   const [listItemId, setListItemId] = useState("");
   const [listItemType, setListItemType] = useState("frame");
@@ -102,10 +102,12 @@ export default function ShopPage() {
   });
 
   const packOpenMutation = useMutation({
-    mutationFn: (packId: string) => apiRequest("POST", "/api/global-shop/pack-open", { packId }),
+    mutationFn: ({ packId, price }: { packId: string; price: number }) =>
+      apiRequest("POST", "/api/global-shop/pack-open", { packId, price }),
     onSuccess: async (data) => {
       await refreshUser();
-      setPackResult({ itemId: data.item.id, type: data.item.type });
+      const itemType = data.rewardId?.startsWith("frame-") ? "frame" : data.rewardId?.startsWith("title-") ? "title" : "badge";
+      setPackResult({ itemId: data.rewardId, type: itemType });
       fireConfetti();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -123,7 +125,10 @@ export default function ShopPage() {
     onSuccess: async (data) => {
       await refreshUser();
       const slotIndex = ROULETTE_SLOTS.findIndex(s => s.id === data.slot.id);
-      setWinIndex(slotIndex >= 0 ? slotIndex : 0);
+      const idx = slotIndex >= 0 ? slotIndex : 0;
+      const segAngle = 360 / ROULETTE_SLOTS.length;
+      setFinalRotation(prev => prev + 360 * 5 + (360 - idx * segAngle));
+      setSpinning(true);
       setTimeout(() => {
         setSpinning(false);
         setSpinResult(data);
@@ -131,7 +136,7 @@ export default function ShopPage() {
         toast({ title: `🎰 ${data.slot.label}`, description: data.slot.reward.amount ? `+$${data.slot.reward.amount?.toLocaleString()}` : "Check your cosmetics!" });
       }, 3200);
     },
-    onError: (e: any) => { setSpinning(false); toast({ title: "Error", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => { toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const listMutation = useMutation({
@@ -172,9 +177,8 @@ export default function ShopPage() {
   }
 
   function handleSpin() {
-    if (spinning) return;
+    if (spinning || spinMutation.isPending) return;
     if (balance < spinCost) { toast({ title: "Not enough balance", variant: "destructive" }); return; }
-    setSpinning(true);
     setSpinResult(null);
     spinMutation.mutate();
   }
@@ -339,7 +343,7 @@ export default function ShopPage() {
                       🎁 <span className="font-medium text-foreground">{pack.guarantee}</span>
                     </div>
                     <Button className="w-full mt-auto" disabled={packOpenMutation.isPending || balance < pack.price}
-                      onClick={async () => { setOpening(true); await packOpenMutation.mutateAsync(pack.id); setOpening(false); }}>
+                      onClick={async () => { setOpening(true); await packOpenMutation.mutateAsync({ packId: pack.id, price: pack.price }); setOpening(false); }}>
                       {opening && packOpenMutation.isPending ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Opening...</> : <><Gift className="w-4 h-4 mr-2" />Open for ${pack.price.toLocaleString()}</>}
                     </Button>
                   </div>
@@ -357,7 +361,7 @@ export default function ShopPage() {
                 <h2 className="text-xl font-bold text-center">🎰 Spin the Wheel</h2>
                 <p className="text-sm text-muted-foreground text-center mt-1">Pay to spin. Win balance or rare items!</p>
               </div>
-              <RouletteWheel slots={ROULETTE_SLOTS} spinning={spinning} winIndex={winIndex} />
+              <RouletteWheel slots={ROULETTE_SLOTS} spinning={spinning} rotation={finalRotation} />
               {spinResult && !spinning && (
                 <div className="w-full bg-muted/50 rounded-xl p-4 text-center animate-in fade-in">
                   <p className="text-2xl font-bold">{spinResult.slot.emoji} {spinResult.slot.label}</p>
