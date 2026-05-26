@@ -34,6 +34,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { getFrameStyle } from "@/lib/shop-catalog";
 
 interface PublicUser {
   id: string;
@@ -46,6 +47,9 @@ interface PublicUser {
   totalProfit: number | null;
   xp: number | null;
   lastSeenAt: string | null;
+  equippedFrame: string | null;
+  equippedTitle: string | null;
+  purchasedCosmetics: string;
 }
 
 interface UserAchievement {
@@ -399,7 +403,7 @@ export default function PublicProfilePage() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center gap-4">
             <div className="relative">
-              <Avatar className="h-24 w-24">
+              <Avatar className="h-24 w-24" style={getFrameStyle(profile.equippedFrame) as any}>
                 <AvatarImage src={profile.avatarUrl || undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {getInitials(profile.displayName)}
@@ -423,6 +427,13 @@ export default function PublicProfilePage() {
                   {getLevelInfo(profile.xp).title}
                 </Badge>
               </div>
+              {profile.equippedTitle && (
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-sm font-semibold text-primary/80 bg-primary/10 border border-primary/20 rounded-full px-3 py-0.5" data-testid="badge-equipped-title">
+                    {profile.equippedTitle}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
                 <Badge variant="secondary" className="gap-1" data-testid="badge-public-membership">
                   <MembershipIcon className="h-3 w-3" />
@@ -433,6 +444,32 @@ export default function PublicProfilePage() {
                 </Badge>
               </div>
               <OnlineBadge lastSeenAt={profile.lastSeenAt} />
+              {/* Equipped cosmetics / stickers */}
+              {(() => {
+                const owned: string[] = (() => { try { return JSON.parse(profile.purchasedCosmetics || "[]"); } catch { return []; } })();
+                const stickers = owned.filter(id => id.startsWith("sticker-"));
+                const badges = owned.filter(id => id.startsWith("badge-"));
+                const STICKER_MAP: Record<string, string> = {
+                  "sticker-rocket": "🚀", "sticker-chart": "📈", "sticker-gem": "💎",
+                  "sticker-fire": "🔥", "sticker-crown": "👑", "sticker-brain": "🧠",
+                  "sticker-money": "💰", "sticker-star": "⭐", "sticker-dragon": "🐉", "sticker-unicorn": "🦄",
+                };
+                const BADGE_MAP: Record<string, string> = {
+                  "badge-early": "🌱", "badge-active": "📊", "badge-streak-7": "🔥",
+                  "badge-top-gamer": "🎮", "badge-scholar": "🎓", "badge-whale": "🐋",
+                };
+                if (stickers.length === 0 && badges.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2" data-testid="cosmetics-display">
+                    {stickers.map(id => STICKER_MAP[id] && (
+                      <span key={id} className="text-xl" title={id.replace("sticker-", "")}>{STICKER_MAP[id]}</span>
+                    ))}
+                    {badges.map(id => BADGE_MAP[id] && (
+                      <span key={id} className="text-xl" title={id.replace("badge-", "")}>{BADGE_MAP[id]}</span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {profile.bio && (

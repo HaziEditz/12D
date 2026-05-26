@@ -2511,6 +2511,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Blackjack Result ─────────────────────────────────────────────
+  app.post("/api/fun-zone/blackjack-result", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bet, netChange } = req.body;
+      if (typeof bet !== "number" || bet < 1) return res.status(400).json({ message: "Invalid bet" });
+      if (typeof netChange !== "number") return res.status(400).json({ message: "Invalid result" });
+      const balance = user.classroomTokens ?? 0;
+      // Validate: if losing, must have enough tokens
+      if (netChange < 0 && balance < Math.abs(netChange)) {
+        return res.status(400).json({ message: "Insufficient tokens" });
+      }
+      await storage.updateUserTokens(user.id, netChange);
+      const updatedUser = await storage.getUserById(user.id);
+      res.json({ success: true, newBalance: updatedUser?.classroomTokens ?? 0, netChange });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Daily Deals ─────────────────────────────────────────────────────
   const DAILY_DEAL_POOL = [
     { id: "title-bull", name: "Bull 🐂", type: "title", basePrice: 8, emoji: "🐂" },
@@ -2839,6 +2859,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         totalProfit: user.totalProfit,
         xp: user.xp,
         lastSeenAt: user.lastSeenAt,
+        equippedFrame: user.equippedFrame ?? null,
+        equippedTitle: user.equippedTitle ?? null,
+        purchasedCosmetics: user.purchasedCosmetics ?? "[]",
       };
       
       res.json(publicProfile);
@@ -3259,7 +3282,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(403).json({ message: "This feature requires 12Digits+ Premium or a trial subscription" });
   };
 
-  app.get("/api/friends", requireAuth, requirePremiumContent, async (req, res) => {
+  // Casual+ access: casual, premium, school tier users (and trial/admin)
+  const requireCasualOrHigher = (req: Request, res: Response, next: NextFunction) => {
+    const user = req.user as User;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    if (user.role === "admin") return next();
+    const activeTiers = ["casual", "premium", "school"];
+    if (activeTiers.includes(user.membershipTier ?? "") && user.membershipStatus === "active") return next();
+    if (user.trialStartDate) {
+      const days = Math.floor((Date.now() - new Date(user.trialStartDate).getTime()) / (1000 * 60 * 60 * 24));
+      if (days < 14) return next();
+    }
+    res.status(403).json({ message: "This feature requires a Casual or higher plan" });
+  };
+
+  app.get("/api/friends", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const friends = await storage.getFriends(user.id);
@@ -3269,7 +3306,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/friends/requests", requireAuth, requirePremiumContent, async (req, res) => {
+  app.get("/api/friends/requests", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const requests = await storage.getFriendRequests(user.id);
@@ -3279,7 +3316,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/request", requireAuth, requirePremiumContent, async (req, res) => {
+  app.post("/api/friends/request", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const { friendId } = req.body;
@@ -3314,7 +3351,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/accept/:id", requireAuth, requirePremiumContent, async (req, res) => {
+  app.post("/api/friends/accept/:id", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const friendshipId = req.params.id;
@@ -3348,7 +3385,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/friends/reject/:id", requireAuth, requirePremiumContent, async (req, res) => {
+  app.post("/api/friends/reject/:id", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const friendshipId = req.params.id;
@@ -3369,7 +3406,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete("/api/friends/:id", requireAuth, requirePremiumContent, async (req, res) => {
+  app.delete("/api/friends/:id", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       await storage.removeFriend(req.params.id, user.id);
@@ -3397,8 +3434,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Chat Messages (Premium feature)
-  app.get("/api/chat/:friendId", requireAuth, requirePremiumContent, async (req, res) => {
+  // Chat Messages (Casual+ feature)
+  app.get("/api/chat/:friendId", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const friendId = req.params.friendId;
@@ -3410,7 +3447,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/chat", requireAuth, requirePremiumContent, async (req, res) => {
+  app.post("/api/chat", requireAuth, requireCasualOrHigher, async (req, res) => {
     try {
       const user = req.user as User;
       const parsed = insertChatMessageSchema.parse({

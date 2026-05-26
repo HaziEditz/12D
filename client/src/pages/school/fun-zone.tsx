@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Coins, RotateCcw, Trophy, Star, CheckCircle2, XCircle, ChevronRight, Zap, ShoppingBag, Sparkles, Lock, Check, Package, ArrowLeftRight, Flame, Calendar, Gift, RefreshCw, AlertCircle, Timer, Shuffle, TrendingUp, Tag, Store, Plus, X, Clock } from "lucide-react";
 
-type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge" | "word-scramble" | "market-memory";
+type Game = "coin-rain" | "piggy-bank" | "smart-shopper" | "stock-guesser" | "budget-boss" | "finance-quiz" | "market-prediction" | "investment-quiz" | "strategy-challenge" | "word-scramble" | "market-memory" | "blackjack";
 type View = "games" | "shop" | "inventory" | "trade" | "spin" | "market";
 
 const RARITY_CONFIG = {
@@ -280,6 +280,313 @@ function DealCountdown() {
   return <span className="text-amber-400 font-mono font-black">{h}:{m}:{s}</span>;
 }
 
+// ── Blackjack Game ──────────────────────────────────────────────
+type Suit = "♠" | "♥" | "♦" | "♣";
+type CardValue = "2"|"3"|"4"|"5"|"6"|"7"|"8"|"9"|"10"|"J"|"Q"|"K"|"A";
+interface PlayingCard { suit: Suit; value: CardValue; hidden?: boolean }
+
+const SUITS: Suit[] = ["♠","♥","♦","♣"];
+const VALUES: CardValue[] = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+
+function buildDeck(): PlayingCard[] {
+  const deck: PlayingCard[] = [];
+  for (const suit of SUITS) for (const value of VALUES) deck.push({ suit, value });
+  return deck.sort(() => Math.random() - 0.5);
+}
+
+function cardNum(card: PlayingCard): number {
+  if (["J","Q","K"].includes(card.value)) return 10;
+  if (card.value === "A") return 11;
+  return parseInt(card.value);
+}
+
+function handValue(hand: PlayingCard[]): number {
+  let total = hand.filter(c => !c.hidden).reduce((s, c) => s + cardNum(c), 0);
+  let aces = hand.filter(c => !c.hidden && c.value === "A").length;
+  while (total > 21 && aces > 0) { total -= 10; aces--; }
+  return total;
+}
+
+function CardUI({ card, idx }: { card: PlayingCard; idx: number }) {
+  const isRed = card.suit === "♥" || card.suit === "♦";
+  if (card.hidden) {
+    return (
+      <div key={idx} className="w-14 h-20 rounded-xl bg-gradient-to-br from-indigo-800 to-indigo-900 border border-indigo-600/50 flex items-center justify-center shadow-md">
+        <div className="text-indigo-400 text-2xl">🂠</div>
+      </div>
+    );
+  }
+  return (
+    <div key={idx} className="w-14 h-20 rounded-xl bg-white border border-slate-200 flex flex-col items-start justify-start p-1.5 shadow-md select-none" style={{ minWidth: 56 }}>
+      <div className={`text-xs font-black leading-none ${isRed ? "text-red-600" : "text-slate-900"}`}>{card.value}</div>
+      <div className={`text-xs font-black leading-none ${isRed ? "text-red-600" : "text-slate-900"}`}>{card.suit}</div>
+      <div className={`text-xl flex-1 flex items-center justify-center w-full ${isRed ? "text-red-600" : "text-slate-900"}`}>{card.suit}</div>
+    </div>
+  );
+}
+
+function BlackjackGame({ onBack, tokenBalance, onTokensChange }: { onBack: () => void; tokenBalance: number; onTokensChange: () => void }) {
+  const { toast } = useToast();
+  type Phase = "bet" | "playing" | "dealer" | "result";
+  const [phase, setPhase] = useState<Phase>("bet");
+  const [bet, setBet] = useState(5);
+  const [deck, setDeck] = useState<PlayingCard[]>([]);
+  const [playerHand, setPlayerHand] = useState<PlayingCard[]>([]);
+  const [dealerHand, setDealerHand] = useState<PlayingCard[]>([]);
+  const [result, setResult] = useState<"win"|"blackjack"|"push"|"lose"|null>(null);
+  const [netChange, setNetChange] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+
+  const maxBet = Math.min(tokenBalance, 50);
+
+  const quickBets = [1, 2, 5, 10, 25].filter(b => b <= maxBet);
+
+  function startGame() {
+    const d = buildDeck();
+    const p = [d[0], d[2]];
+    const dealer = [d[1], { ...d[3], hidden: true }];
+    setDeck(d.slice(4));
+    setPlayerHand(p);
+    setDealerHand(dealer);
+    setResult(null);
+    setPhase("playing");
+  }
+
+  const pVal = handValue(playerHand);
+  const dVal = handValue(dealerHand.map(c => ({ ...c, hidden: false })));
+
+  async function finishGame(ph: PlayingCard[], dh: PlayingCard[], forcedResult?: "win"|"blackjack"|"push"|"lose") {
+    const pFinal = handValue(ph);
+    const dFinal = handValue(dh.map(c => ({ ...c, hidden: false })));
+    let res: "win"|"blackjack"|"push"|"lose";
+    if (forcedResult) {
+      res = forcedResult;
+    } else if (pFinal > 21) {
+      res = "lose";
+    } else if (dFinal > 21 || pFinal > dFinal) {
+      res = "win";
+    } else if (pFinal === dFinal) {
+      res = "push";
+    } else {
+      res = "lose";
+    }
+    const net = res === "blackjack" ? Math.floor(bet * 1.5) : res === "win" ? bet : res === "push" ? 0 : -bet;
+    setResult(res);
+    setNetChange(net);
+    setPhase("result");
+    setSubmitting(true);
+    try {
+      await apiRequest("POST", "/api/fun-zone/blackjack-result", { bet, netChange: net });
+      onTokensChange();
+    } catch (e) {
+      toast({ title: "Token update failed", variant: "destructive" });
+    }
+    setSubmitting(false);
+  }
+
+  async function hit() {
+    const [card, ...rest] = deck;
+    const newHand = [...playerHand, card];
+    setPlayerHand(newHand);
+    setDeck(rest);
+    const val = handValue(newHand);
+    if (val >= 21) {
+      const revealedDealer = dealerHand.map(c => ({ ...c, hidden: false }));
+      setDealerHand(revealedDealer);
+      await runDealer(rest, newHand, revealedDealer);
+    }
+  }
+
+  async function stand() {
+    const revDealer = dealerHand.map(c => ({ ...c, hidden: false }));
+    await runDealer(deck, playerHand, revDealer);
+  }
+
+  async function runDealer(remainingDeck: PlayingCard[], ph: PlayingCard[], dh: PlayingCard[]) {
+    setPhase("dealer");
+    let curDealer = [...dh];
+    let curDeck = [...remainingDeck];
+    while (handValue(curDealer) < 17) {
+      const [card, ...rest] = curDeck;
+      curDealer = [...curDealer, card];
+      curDeck = rest;
+    }
+    setDealerHand(curDealer);
+    setDeck(curDeck);
+    await finishGame(ph, curDealer);
+  }
+
+  async function doubleDown() {
+    if (tokenBalance < bet * 2) { toast({ title: "Not enough tokens to double" }); return; }
+    const [card, ...rest] = deck;
+    const newHand = [...playerHand, card];
+    setPlayerHand(newHand);
+    setDeck(rest);
+    const doubleBet = bet * 2;
+    setBet(doubleBet);
+    const revDealer = dealerHand.map(c => ({ ...c, hidden: false }));
+    await runDealer(rest, newHand, revDealer);
+  }
+
+  function playAgain() {
+    setPhase("bet");
+    setPlayerHand([]);
+    setDealerHand([]);
+    setResult(null);
+    setDeck([]);
+  }
+
+  const isBlackjack = playerHand.length === 2 && handValue(playerHand) === 21;
+
+  useEffect(() => {
+    if (phase === "playing" && isBlackjack) {
+      const revDealer = dealerHand.map(c => ({ ...c, hidden: false }));
+      setDealerHand(revDealer);
+      finishGame(playerHand, revDealer, "blackjack");
+    }
+  }, [playerHand]);
+
+  const resultConfig = {
+    win:       { emoji: "🎉", label: "You Win!",     color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30" },
+    blackjack: { emoji: "🃏", label: "Blackjack!",   color: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/30" },
+    push:      { emoji: "🤝", label: "Push!",         color: "text-slate-300",   bg: "bg-slate-500/10 border-slate-500/30" },
+    lose:      { emoji: "😞", label: "Dealer Wins",  color: "text-rose-400",    bg: "bg-rose-500/10 border-rose-500/30" },
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0a1628] to-[#0d1f3a] flex flex-col">
+      <div className="flex items-center gap-3 p-4 border-b border-white/10">
+        <button onClick={onBack} className="text-slate-400 hover:text-white transition-colors">← Back</button>
+        <div className="text-2xl">🃏</div>
+        <div>
+          <h2 className="text-white font-black text-lg leading-tight">Blackjack</h2>
+          <p className="text-slate-400 text-xs">Beat the dealer — bet your tokens!</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1">
+          <Coins className="h-3.5 w-3.5 text-amber-400" />
+          <span className="text-amber-400 font-black text-sm">{tokenBalance}</span>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center p-5 gap-6">
+
+        {/* BET PHASE */}
+        {phase === "bet" && (
+          <div className="w-full max-w-sm space-y-5">
+            <div className="text-center">
+              <div className="text-5xl mb-2">🃏</div>
+              <h3 className="text-white font-black text-xl">Place Your Bet</h3>
+              <p className="text-slate-400 text-sm mt-1">You have <span className="text-amber-400 font-bold">{tokenBalance}</span> tokens</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
+              <div className="flex gap-2 flex-wrap justify-center">
+                {quickBets.map(b => (
+                  <button key={b} onClick={() => setBet(b)} data-testid={`btn-bet-${b}`}
+                    className={`rounded-xl px-4 py-2 font-black text-sm transition-all ${bet === b ? "bg-amber-500 text-black" : "bg-white/10 text-white hover:bg-white/20"}`}>
+                    {b}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-wide">Custom Bet</label>
+                <input type="number" min={1} max={maxBet} value={bet}
+                  onChange={e => setBet(Math.max(1, Math.min(maxBet, parseInt(e.target.value) || 1)))}
+                  className="w-full rounded-xl px-4 py-2.5 bg-[#0d1526] border border-white/15 text-white text-center text-lg font-black focus:outline-none focus:border-amber-500/50"
+                  data-testid="input-bet-custom" />
+                <p className="text-slate-500 text-xs text-center">Min 1 · Max {maxBet}</p>
+              </div>
+              <Button onClick={startGame} disabled={tokenBalance < bet || bet < 1} data-testid="btn-deal"
+                className="w-full rounded-xl py-3 font-black text-base bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white disabled:opacity-50">
+                Deal Cards 🃏
+              </Button>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-slate-400 space-y-1 text-center">
+              <p>🃏 Blackjack pays <span className="text-amber-400 font-bold">1.5×</span> · Win pays <span className="text-emerald-400 font-bold">1×</span></p>
+              <p>Dealer hits on 16, stands on 17</p>
+            </div>
+          </div>
+        )}
+
+        {/* PLAYING / DEALER / RESULT PHASES */}
+        {(phase === "playing" || phase === "dealer" || phase === "result") && (
+          <div className="w-full max-w-sm space-y-5">
+            {/* Dealer hand */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">Dealer</span>
+                {phase !== "playing" && (
+                  <span className="ml-auto text-sm font-black text-white">{dVal}</span>
+                )}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {dealerHand.map((card, i) => <CardUI key={i} card={card} idx={i} />)}
+              </div>
+            </div>
+
+            {/* Player hand */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">You</span>
+                <span className="ml-auto text-sm font-black text-white">{pVal}</span>
+                {pVal > 21 && <span className="text-rose-400 text-xs font-bold">BUST!</span>}
+                {pVal === 21 && <span className="text-amber-400 text-xs font-bold">21!</span>}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {playerHand.map((card, i) => <CardUI key={i} card={card} idx={i} />)}
+              </div>
+            </div>
+
+            {/* Result */}
+            {phase === "result" && result && (
+              <div className={`rounded-2xl border p-4 text-center ${resultConfig[result].bg}`}>
+                <div className="text-4xl mb-2">{resultConfig[result].emoji}</div>
+                <p className={`font-black text-xl ${resultConfig[result].color}`}>{resultConfig[result].label}</p>
+                <p className={`font-bold text-sm mt-1 ${netChange > 0 ? "text-emerald-400" : netChange < 0 ? "text-rose-400" : "text-slate-400"}`}>
+                  {netChange > 0 ? `+${netChange}` : netChange} tokens
+                </p>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            {phase === "playing" && (
+              <div className="grid grid-cols-3 gap-2">
+                <Button onClick={hit} data-testid="btn-hit"
+                  className="rounded-xl font-black bg-blue-600 hover:bg-blue-500 text-white">Hit</Button>
+                <Button onClick={stand} data-testid="btn-stand"
+                  className="rounded-xl font-black bg-rose-600 hover:bg-rose-500 text-white">Stand</Button>
+                <Button onClick={doubleDown} disabled={playerHand.length !== 2 || tokenBalance < bet * 2} data-testid="btn-double"
+                  className="rounded-xl font-black bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-40">2×</Button>
+              </div>
+            )}
+
+            {phase === "dealer" && (
+              <div className="text-center text-slate-400 text-sm animate-pulse font-bold">Dealer playing...</div>
+            )}
+
+            {phase === "result" && (
+              <div className="flex gap-3">
+                {tokenBalance >= 1 && (
+                  <Button onClick={playAgain} disabled={submitting} data-testid="btn-play-again"
+                    className="flex-1 rounded-xl font-black bg-gradient-to-r from-purple-600 to-violet-700 text-white">
+                    Play Again
+                  </Button>
+                )}
+                <Button onClick={onBack} variant="outline" className="flex-1 rounded-xl font-black border-white/20 text-slate-300">
+                  Back
+                </Button>
+              </div>
+            )}
+
+            <div className="text-center text-xs text-slate-500">
+              Bet: <span className="text-amber-400 font-bold">{bet}</span> tokens
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SchoolFunZone() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
@@ -296,6 +603,7 @@ export default function SchoolFunZone() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinAngle, setSpinAngle] = useState(0);
   const [spinResult, setSpinResult] = useState<any | null>(null);
+  const spinResultRef = useRef<any>(null);
 
   // Market state
   const [listingItemId, setListingItemId] = useState<string>("");
@@ -411,18 +719,18 @@ export default function SchoolFunZone() {
     },
     onSuccess: (data: any) => {
       if (data.success) {
-        setSpinResult(data);
+        spinResultRef.current = data;
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
         refreshUser(); refetchInventory();
       } else {
+        setIsSpinning(false);
         toast({ title: "Spin failed", description: data.message, variant: "destructive" });
       }
-      setIsSpinning(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
       setIsSpinning(false);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -477,11 +785,19 @@ export default function SchoolFunZone() {
     const tier = SPIN_TIERS.find(t => t.id === spinTier)!;
     if (tokenBalance < tier.cost) { toast({ title: "Not enough tokens", variant: "destructive" }); return; }
     setIsSpinning(true);
+    spinResultRef.current = null;
     const extraRotations = 5 * 360;
     const randomStop = Math.random() * 360;
     setSpinAngle(prev => prev + extraRotations + randomStop);
-    // Hit server 2.5s in (while still spinning)
-    setTimeout(() => { spinMutation.mutate(spinTier); }, 2500);
+    // Hit server 2s in (response ready before wheel stops)
+    setTimeout(() => { spinMutation.mutate(spinTier); }, 2000);
+    // Reveal result after wheel animation completes (3.5s)
+    setTimeout(() => {
+      setIsSpinning(false);
+      if (spinResultRef.current) {
+        setSpinResult(spinResultRef.current);
+      }
+    }, 3500);
   };
 
   const handleEarnTokens = (amount: number) => {
@@ -506,19 +822,21 @@ export default function SchoolFunZone() {
     { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble financial terms to earn tokens!", color: "from-violet-400 to-purple-500", tokens: "1–10" },
   ];
 
-  const intermediateGames = [
-    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "1–10" },
-    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "2–10" },
-    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "1–10" },
-    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match finance terms to their definitions!", color: "from-rose-500 to-pink-600", tokens: "1–8" },
-  ];
-
   const hsGames = [
     { id: "market-prediction" as Game, emoji: "📈", title: "Market Prediction", desc: "Advanced market analysis challenge", color: "from-teal-600 to-cyan-700", tokens: "1–10" },
     { id: "investment-quiz" as Game, emoji: "🎓", title: "Investment Quiz", desc: "Advanced investment concepts", color: "from-purple-600 to-violet-700", tokens: "1–10" },
     { id: "strategy-challenge" as Game, emoji: "🎯", title: "Strategy Challenge", desc: "Make real-world trading decisions", color: "from-blue-600 to-indigo-700", tokens: "2–12" },
     { id: "word-scramble" as Game, emoji: "🔤", title: "Word Scramble", desc: "Unscramble advanced finance terms!", color: "from-amber-600 to-orange-700", tokens: "1–10" },
     { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match terms to definitions — beat the clock!", color: "from-rose-600 to-pink-700", tokens: "1–8" },
+    { id: "blackjack" as Game, emoji: "🃏", title: "Blackjack", desc: "Beat the dealer and win tokens! Bet up to 50 tokens.", color: "from-green-700 to-emerald-800", tokens: "Up to 50" },
+  ];
+
+  const intermediateGames = [
+    { id: "stock-guesser" as Game, emoji: "📊", title: "Stock Guesser", desc: "Predict if the stock goes up or down", color: "from-teal-500 to-cyan-600", tokens: "1–10" },
+    { id: "budget-boss" as Game, emoji: "💰", title: "Budget Boss", desc: "Allocate your monthly income wisely", color: "from-purple-500 to-violet-600", tokens: "2–10" },
+    { id: "finance-quiz" as Game, emoji: "🧠", title: "Finance Quiz", desc: "Test your financial knowledge!", color: "from-blue-500 to-indigo-600", tokens: "1–10" },
+    { id: "market-memory" as Game, emoji: "🃏", title: "Market Memory", desc: "Match finance terms to their definitions!", color: "from-rose-500 to-pink-600", tokens: "1–8" },
+    { id: "blackjack" as Game, emoji: "♠️", title: "Blackjack", desc: "Beat the dealer and win tokens!", color: "from-green-600 to-emerald-700", tokens: "Up to 50" },
   ];
 
   const games = isPrimary ? primaryGames : isIntermediate ? intermediateGames : hsGames;
@@ -533,6 +851,7 @@ export default function SchoolFunZone() {
   if (activeGame === "strategy-challenge") return <StrategyChallenge onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
   if (activeGame === "word-scramble") return <WordScrambleGame onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
   if (activeGame === "market-memory") return <MarketMemoryGame onEarn={handleEarnTokens} onBack={() => setActiveGame(null)} />;
+  if (activeGame === "blackjack") return <BlackjackGame tokenBalance={tokenBalance} onBack={() => setActiveGame(null)} onTokensChange={() => { queryClient.invalidateQueries({ queryKey: ["/api/user"] }); refreshUser(); }} />;
 
   const loginStreak = (user as any)?.loginStreak ?? 0;
   const claimedToday = (user as any)?.dailyRewardClaimedAt === new Date().toISOString().split("T")[0];
