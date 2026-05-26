@@ -3680,6 +3680,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Casino Games (Simulator Balance) ────────────────────────────────────────
+
+  app.post("/api/global-shop/blackjack-result", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bet, netChange } = req.body;
+      if (typeof bet !== "number" || bet < 1) return res.status(400).json({ message: "Invalid bet" });
+      if (typeof netChange !== "number") return res.status(400).json({ message: "Invalid result" });
+      const balance = user.simulatorBalance ?? 0;
+      if (netChange < 0 && balance < Math.abs(netChange)) return res.status(400).json({ message: "Insufficient balance" });
+      const newBalance = Math.round((balance + netChange) * 100) / 100;
+      await storage.updateUser(user.id, { simulatorBalance: newBalance });
+      res.json({ success: true, newBalance, netChange });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/global-shop/coinflip", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bet, choice } = req.body;
+      if (typeof bet !== "number" || bet < 1) return res.status(400).json({ message: "Invalid bet" });
+      if (choice !== "heads" && choice !== "tails") return res.status(400).json({ message: "Invalid choice" });
+      const balance = user.simulatorBalance ?? 0;
+      if (balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      const result = Math.random() < 0.5 ? "heads" : "tails";
+      const won = result === choice;
+      const netChange = won ? bet : -bet;
+      const newBalance = Math.round((balance + netChange) * 100) / 100;
+      await storage.updateUser(user.id, { simulatorBalance: newBalance });
+      res.json({ success: true, result, won, netChange, newBalance });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/global-shop/crash-result", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bet, netChange } = req.body;
+      if (typeof bet !== "number" || bet < 1) return res.status(400).json({ message: "Invalid bet" });
+      if (typeof netChange !== "number") return res.status(400).json({ message: "Invalid result" });
+      const balance = user.simulatorBalance ?? 0;
+      if (netChange < 0 && balance < Math.abs(netChange)) return res.status(400).json({ message: "Insufficient balance" });
+      const newBalance = Math.round((balance + netChange) * 100) / 100;
+      await storage.updateUser(user.id, { simulatorBalance: newBalance });
+      res.json({ success: true, newBalance, netChange });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/global-shop/hilo-result", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { bet, netChange } = req.body;
+      if (typeof bet !== "number" || bet < 1) return res.status(400).json({ message: "Invalid bet" });
+      if (typeof netChange !== "number") return res.status(400).json({ message: "Invalid result" });
+      const balance = user.simulatorBalance ?? 0;
+      if (netChange < 0 && balance < Math.abs(netChange)) return res.status(400).json({ message: "Insufficient balance" });
+      const newBalance = Math.round((balance + netChange) * 100) / 100;
+      await storage.updateUser(user.id, { simulatorBalance: newBalance });
+      res.json({ success: true, newBalance, netChange });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
   // Watchlist API
   app.get("/api/watchlist", requireAuth, async (req, res) => {
     try {
