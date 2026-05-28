@@ -282,6 +282,7 @@ const navItems = [
   { id: "strategies", label: "Strategies", icon: Target },
   { id: "promo-codes", label: "Promo Codes", icon: Tag },
   { id: "financial", label: "Financials", icon: DollarSign },
+  { id: "balances", label: "Balances", icon: Shield },
 ];
 
 export default function AdminPage() {
@@ -1123,6 +1124,7 @@ export default function AdminPage() {
 
           {activeTab === "promo-codes" && <PromoCodesTab />}
           {activeTab === "financial" && <FinancialTab financialStats={financialStats} financialLoading={financialLoading} />}
+          {activeTab === "balances" && <BalancesTab />}
         </main>
       </div>
     </div>
@@ -1550,6 +1552,162 @@ function FinancialTab({ financialStats, financialLoading }: {
               </div>
             </CardContent>
           </Card>
+        )}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function BalancesTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [resetAllAmount, setResetAllAmount] = useState("10000");
+  const [customBalances, setCustomBalances] = useState<Record<string, string>>({});
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
+
+  const { data: userList = [], refetch, isLoading } = useQuery<Array<{
+    id: string; email: string; displayName: string; role: string;
+    membershipTier: string; simulatorBalance: number; totalProfit: number; createdAt: string;
+  }>>({ queryKey: ["/api/admin/users-list"] });
+
+  const resetOneMutation = useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      apiRequest("POST", `/api/admin/users/${id}/reset-balance`, { amount }),
+    onSuccess: () => { toast({ title: "Balance reset" }); refetch(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const setOneMutation = useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      apiRequest("POST", `/api/admin/users/${id}/set-balance`, { amount }),
+    onSuccess: () => { toast({ title: "Balance updated" }); refetch(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const resetAllMutation = useMutation({
+    mutationFn: (amount: number) => apiRequest("POST", "/api/admin/reset-all-balances", { amount }),
+    onSuccess: () => { toast({ title: "All balances reset" }); refetch(); setConfirmResetAll(false); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const closeTradesMutation = useMutation({
+    mutationFn: (userId?: string) => apiRequest("POST", "/api/admin/close-open-trades", userId ? { userId } : {}),
+    onSuccess: (d: any) => { toast({ title: `Closed ${d.closedCount ?? 0} open trades` }); refetch(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const filtered = userList.filter(u =>
+    u.displayName?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const suspiciousThreshold = 500000;
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-6 space-y-6 max-w-5xl">
+        <div>
+          <h2 className="text-lg font-semibold">Balance Manager</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Reset, inspect, and correct simulator balances. Use this to clean up glitched or exploited accounts.</p>
+        </div>
+
+        {/* Bulk actions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2"><Shield className="h-4 w-4 text-destructive" />Bulk Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Reset amount ($)</label>
+                <Input value={resetAllAmount} onChange={e => setResetAllAmount(e.target.value)}
+                  className="w-32 h-9 text-sm" type="number" min="0" />
+              </div>
+              {confirmResetAll ? (
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm text-destructive font-medium">Are you sure? This resets ALL non-admin users.</span>
+                  <Button size="sm" variant="destructive" disabled={resetAllMutation.isPending}
+                    onClick={() => resetAllMutation.mutate(Number(resetAllAmount))}>
+                    {resetAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, reset all"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmResetAll(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="destructive" onClick={() => setConfirmResetAll(true)}>
+                  <XCircle className="h-4 w-4 mr-1.5" />Reset All Balances
+                </Button>
+              )}
+              <Button size="sm" variant="outline" disabled={closeTradesMutation.isPending}
+                onClick={() => closeTradesMutation.mutate(undefined)}>
+                {closeTradesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1.5" />}
+                Force-Close All Open Trades
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Force-closing trades sets their profit to $0 and does not adjust balances. Use "Reset Balance" to fix balances after.</p>
+          </CardContent>
+        </Card>
+
+        {/* Search */}
+        <div className="flex items-center gap-3">
+          <Input placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm h-9 text-sm" />
+          <Button size="sm" variant="outline" onClick={() => refetch()}>Refresh</Button>
+          <span className="text-xs text-muted-foreground">{filtered.length} users</span>
+        </div>
+
+        {/* Users table */}
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+        ) : (
+          <div className="border rounded-lg divide-y">
+            {filtered.map(u => {
+              const isSuspicious = (u.simulatorBalance ?? 0) > suspiciousThreshold;
+              const customVal = customBalances[u.id] ?? "";
+              return (
+                <div key={u.id} className={`flex items-center gap-3 px-4 py-3 ${isSuspicious ? "bg-destructive/5" : ""}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{u.displayName || "—"}</span>
+                      <Badge variant="outline" className="text-[10px] py-0 shrink-0">{u.role}</Badge>
+                      {isSuspicious && <Badge variant="destructive" className="text-[10px] py-0 shrink-0">Suspicious</Badge>}
+                    </div>
+                    <span className="text-xs text-muted-foreground truncate">{u.email}</span>
+                  </div>
+                  <div className="text-right shrink-0 w-28">
+                    <p className={`text-sm font-bold ${isSuspicious ? "text-destructive" : "text-foreground"}`}>
+                      ${(u.simulatorBalance ?? 0).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      P&L: {(u.totalProfit ?? 0) >= 0 ? "+" : ""}${(u.totalProfit ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Input
+                      type="number" min="0" placeholder="Amount"
+                      value={customVal}
+                      onChange={e => setCustomBalances(prev => ({ ...prev, [u.id]: e.target.value }))}
+                      className="w-24 h-8 text-xs"
+                    />
+                    <Button size="sm" variant="outline" className="h-8 text-xs"
+                      disabled={!customVal || setOneMutation.isPending}
+                      onClick={() => { setOneMutation.mutate({ id: u.id, amount: Number(customVal) }); setCustomBalances(prev => ({ ...prev, [u.id]: "" })); }}>
+                      Set
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                      disabled={resetOneMutation.isPending}
+                      onClick={() => resetOneMutation.mutate({ id: u.id, amount: 10000 })}>
+                      Reset
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground"
+                      disabled={closeTradesMutation.isPending}
+                      onClick={() => closeTradesMutation.mutate(u.id)}
+                      title="Close all open trades for this user">
+                      Close Trades
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </ScrollArea>

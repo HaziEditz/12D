@@ -966,12 +966,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Per-user rate limit for check-triggers (prevents refresh exploit)
+  const checkTriggersLastCall = new Map<string, number>();
+
   // Price monitoring endpoint - checks and executes pending orders based on current prices
   app.post("/api/trades/check-triggers", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const { prices } = req.body as { prices: Record<string, number> };
-      
+      const { prices: clientPrices } = req.body as { prices: Record<string, number> };
+
+      // Rate limit: ignore calls within 5 seconds of the last one for this user
+      const now = Date.now();
+      const lastCall = checkTriggersLastCall.get(user.id) ?? 0;
+      if (now - lastCall < 5000) {
+        return res.json({ executed: 0, closed: 0, executedTrades: [], closedTrades: [], rateLimited: true });
+      }
+      checkTriggersLastCall.set(user.id, now);
+
+      // Always use server-authoritative prices for trigger evaluation.
+      // Client prices are only used as a fallback for symbols the server doesn't track.
+      const serverPrices = await storage.getSimulatedPrices();
+      const prices: Record<string, number> = { ...clientPrices };
+      for (const [symbol, serverPrice] of Object.entries(serverPrices)) {
+        prices[symbol] = serverPrice; // server price always wins
+      }
+
       if (!prices || typeof prices !== 'object') {
         return res.status(400).json({ message: "Prices object is required" });
       }
@@ -1359,6 +1378,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       storage.getTotalTradesCount(),
     ]);
     res.json({ users: usersCount, lessons: lessonsCount, trades: tradesCount });
+  });
+
+  // ── Admin Balance Management ────────────────────────────────────────────────
+  app.get("/api/admin/users-list", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/users/:id/reset-balance", requireAdmin, async (req, res) => {
+    try {
+      const amount = typeof req.body.amount === "number" ? req.body.amount : 10000;
+      await storage.resetUserBalance(req.params.id, amount);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/users/:id/set-balance", requireAdmin, async (req, res) => {
+    try {
+      const { amount } = req.body;
+      if (typeof amount !== "number" || amount < 0) return res.status(400).json({ message: "Invalid amount" });
+      await storage.updateUser(req.params.id, { simulatorBalance: amount });
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/reset-all-balances", requireAdmin, async (req, res) => {
+    try {
+      const amount = typeof req.body.amount === "number" ? req.body.amount : 10000;
+      await storage.resetAllBalances(amount);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/close-open-trades", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const count = userId
+        ? await storage.closeAllOpenTradesForUser(userId)
+        : await storage.closeAllOpenTrades();
+      res.json({ success: true, closedCount: count });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
   // Teacher routes

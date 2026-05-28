@@ -101,6 +101,11 @@ export interface IStorage {
   // Admin stats
   getUsersCount(): Promise<number>;
   getLessonsCount(): Promise<number>;
+  getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "simulatorBalance" | "totalProfit" | "createdAt">>>;
+  resetUserBalance(userId: string, amount: number): Promise<void>;
+  resetAllBalances(amount: number): Promise<void>;
+  closeAllOpenTradesForUser(userId: string): Promise<number>;
+  closeAllOpenTrades(): Promise<number>;
   
   // Schools
   createSchool(data: InsertSchool): Promise<School>;
@@ -480,6 +485,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async closeTrade(id: string, exitPrice: number): Promise<Trade | undefined> {
+    // First fetch the trade to get entryPrice, quantity, leverage, userId
     const [trade] = await db.select().from(trades).where(eq(trades.id, id)).limit(1);
     if (!trade) return undefined;
 
@@ -489,6 +495,8 @@ export class DatabaseStorage implements IStorage {
       : (trade.entryPrice - exitPrice) * trade.quantity;
     const profit = baseProfit * leverage;
 
+    // Atomic update: only succeeds if trade is still open.
+    // If two requests race, only ONE will update (0 rows = already closed).
     const [updatedTrade] = await db.update(trades)
       .set({ 
         status: "closed", 
@@ -496,18 +504,22 @@ export class DatabaseStorage implements IStorage {
         closedAt: new Date(),
         profit,
       })
-      .where(eq(trades.id, id))
+      .where(and(eq(trades.id, id), eq(trades.status, "open")))
       .returning();
 
-    // Update user balance and total profit
-    if (updatedTrade) {
-      const user = await this.getUserById(trade.userId);
-      if (user) {
-        await this.updateUser(user.id, {
-          simulatorBalance: user.simulatorBalance + profit,
-          totalProfit: (user.totalProfit ?? 0) + profit,
-        });
-      }
+    if (!updatedTrade) {
+      // Another concurrent request already closed this trade — return it without crediting balance again
+      const [existing] = await db.select().from(trades).where(eq(trades.id, id)).limit(1);
+      return existing;
+    }
+
+    // Update user balance and total profit (only runs once per trade)
+    const user = await this.getUserById(trade.userId);
+    if (user) {
+      await this.updateUser(user.id, {
+        simulatorBalance: Math.round(((user.simulatorBalance ?? 0) + profit) * 100) / 100,
+        totalProfit: Math.round(((user.totalProfit ?? 0) + profit) * 100) / 100,
+      });
     }
 
     return updatedTrade;
@@ -594,6 +606,76 @@ export class DatabaseStorage implements IStorage {
   async getLessonsCount(): Promise<number> {
     const result = await db.select().from(lessons);
     return result.length;
+  }
+
+  async getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "simulatorBalance" | "totalProfit" | "createdAt">>> {
+    const rows = await db.select({
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      role: users.role,
+      membershipTier: users.membershipTier,
+      simulatorBalance: users.simulatorBalance,
+      totalProfit: users.totalProfit,
+      createdAt: users.createdAt,
+    }).from(users).orderBy(desc(users.simulatorBalance));
+    return rows;
+  }
+
+  async resetUserBalance(userId: string, amount: number): Promise<void> {
+    // Close all open trades first (they would otherwise continue to credit balance)
+    await db.update(trades)
+      .set({ status: "closed", closedAt: new Date(), exitPrice: 0, profit: 0 })
+      .where(and(eq(trades.userId, userId), eq(trades.status, "open")));
+    await db.update(trades)
+      .set({ status: "cancelled" })
+      .where(and(eq(trades.userId, userId), eq(trades.status, "pending")));
+    // Reset balance
+    await this.updateUser(userId, { simulatorBalance: amount, totalProfit: 0 });
+  }
+
+  async resetAllBalances(amount: number): Promise<void> {
+    // Close all open/pending trades for non-admin users
+    const nonAdminUsers = await db.select({ id: users.id }).from(users).where(ne(users.role, "admin"));
+    for (const u of nonAdminUsers) {
+      await db.update(trades)
+        .set({ status: "closed", closedAt: new Date(), exitPrice: 0, profit: 0 })
+        .where(and(eq(trades.userId, u.id), eq(trades.status, "open")));
+      await db.update(trades)
+        .set({ status: "cancelled" })
+        .where(and(eq(trades.userId, u.id), eq(trades.status, "pending")));
+    }
+    // Reset all non-admin balances
+    await db.update(users)
+      .set({ simulatorBalance: amount, totalProfit: 0 })
+      .where(ne(users.role, "admin"));
+  }
+
+  async closeAllOpenTradesForUser(userId: string): Promise<number> {
+    const openTrades = await db.select().from(trades)
+      .where(and(eq(trades.userId, userId), eq(trades.status, "open")));
+    for (const trade of openTrades) {
+      await db.update(trades)
+        .set({ status: "closed", closedAt: new Date(), exitPrice: trade.entryPrice, profit: 0 })
+        .where(and(eq(trades.id, trade.id), eq(trades.status, "open")));
+    }
+    await db.update(trades)
+      .set({ status: "cancelled" })
+      .where(and(eq(trades.userId, userId), eq(trades.status, "pending")));
+    return openTrades.length;
+  }
+
+  async closeAllOpenTrades(): Promise<number> {
+    const openTrades = await db.select().from(trades).where(eq(trades.status, "open"));
+    for (const trade of openTrades) {
+      await db.update(trades)
+        .set({ status: "closed", closedAt: new Date(), exitPrice: trade.entryPrice, profit: 0 })
+        .where(and(eq(trades.id, trade.id), eq(trades.status, "open")));
+    }
+    await db.update(trades)
+      .set({ status: "cancelled" })
+      .where(eq(trades.status, "pending"));
+    return openTrades.length;
   }
 
   // Schools
