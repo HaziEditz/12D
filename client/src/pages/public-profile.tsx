@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   TrendingUp, TrendingDown,
   BookOpen, 
@@ -24,6 +31,9 @@ import {
   ShieldCheck,
   UserPlus,
   UserCheck,
+  UserMinus,
+  MessageSquare,
+  MoreVertical,
   Clock,
   Activity,
   ArrowUpRight,
@@ -291,6 +301,7 @@ export default function PublicProfilePage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [friendRequestSent, setFriendRequestSent] = useState(false);
 
   const { data: profile, isLoading, error } = useQuery<PublicUser>({
@@ -308,10 +319,17 @@ export default function PublicProfilePage() {
     enabled: !!userId,
   });
 
+  // Fetch current user's friends to determine friendship state
+  const { data: myFriendsRaw = [] } = useQuery<{friendship: any; friend: {id: string}}[]>({
+    queryKey: ["/api/friends"],
+    enabled: !!currentUser && currentUser.id !== userId,
+  });
+  const existingFriendship = myFriendsRaw.find(f => f.friend.id === userId);
+  const isFriend = !!existingFriendship;
+
   const friendMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/friends/request", { friendId: userId });
-      return res.json();
+      return apiRequest("POST", "/api/friends/request", { friendId: userId });
     },
     onSuccess: () => {
       setFriendRequestSent(true);
@@ -320,6 +338,19 @@ export default function PublicProfilePage() {
     },
     onError: (error: Error) => {
       toast({ title: "Could not send request", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const unfriendMutation = useMutation({
+    mutationFn: async (friendshipId: string) => {
+      return apiRequest("DELETE", `/api/friends/${friendshipId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Friend removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/friends"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -479,20 +510,61 @@ export default function PublicProfilePage() {
             )}
 
             {currentUser && currentUser.id !== profile.id && (
-              <Button
-                variant={friendRequestSent ? "secondary" : "default"}
-                size="sm"
-                className="gap-2"
-                disabled={friendRequestSent || friendMutation.isPending}
-                onClick={() => friendMutation.mutate()}
-                data-testid="button-add-friend-profile"
-              >
-                {friendRequestSent ? (
-                  <><UserCheck className="h-4 w-4" /> Request Sent</>
+              <div className="flex items-center gap-2" data-testid="profile-actions">
+                {isFriend ? (
+                  <>
+                    <Button
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => navigate(`/messages?dm=${profile.id}`)}
+                      data-testid="button-message-friend"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Message
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="px-2" data-testid="button-friend-menu">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          disabled={unfriendMutation.isPending}
+                          onClick={() => unfriendMutation.mutate(existingFriendship!.friendship.id)}
+                          data-testid="button-unfriend"
+                        >
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Unfriend
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => toast({ title: "Blocked", description: `${profile.displayName} has been blocked.` })}
+                          data-testid="button-block"
+                        >
+                          Block
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
                 ) : (
-                  <><UserPlus className="h-4 w-4" /> Add Friend</>
+                  <Button
+                    variant={friendRequestSent ? "secondary" : "default"}
+                    size="sm"
+                    className="gap-2"
+                    disabled={friendRequestSent || friendMutation.isPending}
+                    onClick={() => friendMutation.mutate()}
+                    data-testid="button-add-friend-profile"
+                  >
+                    {friendRequestSent ? (
+                      <><UserCheck className="h-4 w-4" /> Request Sent</>
+                    ) : (
+                      <><UserPlus className="h-4 w-4" /> Add Friend</>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </div>
             )}
           </div>
         </CardContent>

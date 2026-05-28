@@ -1596,10 +1596,12 @@ function BalancesTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const filtered = userList.filter(u =>
-    u.displayName?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = search.trim()
+    ? userList.filter(u =>
+        (u.displayName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (u.email ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : userList;
 
   const suspiciousThreshold = 500000;
 

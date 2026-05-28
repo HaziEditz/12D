@@ -124,7 +124,19 @@ export default function MessagesPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { data: friends = [] } = useQuery<User[]>({ queryKey: ["/api/friends"] });
+  // /api/friends returns { friendship, friend }[] — unwrap to User[]
+  const { data: friendsRaw = [] } = useQuery<{friendship: any; friend: User}[]>({ queryKey: ["/api/friends"] });
+  const friends: User[] = friendsRaw.map(f => f.friend);
+
+  // Support opening a specific DM via ?dm=userId in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dmId = params.get("dm");
+    if (dmId) {
+      setActiveFriendId(dmId);
+      setSidebarTab("dms");
+    }
+  }, []);
   const { data: groupChats = [], refetch: refetchGroups } = useQuery<any[]>({
     queryKey: ["/api/group-chats"],
     enabled: sidebarTab === "groups" || !!activeGroupId,

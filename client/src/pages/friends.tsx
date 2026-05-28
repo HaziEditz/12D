@@ -10,9 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Users, UserPlus, Search, Check, X, UserMinus, Loader2, MessageCircle } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { User, Friendship } from "@shared/schema";
-import { FriendChat } from "@/components/friend-chat";
 
 interface FriendResult {
   friendship: Friendship;
@@ -33,16 +32,9 @@ interface SearchUser {
 export default function FriendsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [selectedFriend, setSelectedFriend] = useState<User | null>(null);
 
-  const openChat = (friend: User) => {
-    setSelectedFriend(friend);
-    setChatOpen(true);
-  };
-
-  // Check access: admin, active subscription, or within trial period
   const isInTrial = () => {
     if (!user?.trialStartDate) return false;
     const TRIAL_DAYS = 14;
@@ -304,7 +296,8 @@ export default function FriendsPage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => openChat(f.friend)}
+                          onClick={() => navigate(`/messages?dm=${f.friend.id}`)}
+                          title="Open chat"
                           data-testid={`button-chat-${f.friendship.id}`}
                         >
                           <MessageCircle className="h-4 w-4" />
@@ -326,12 +319,6 @@ export default function FriendsPage() {
             </CardContent>
           </Card>
         </div>
-
-        <FriendChat
-          friend={selectedFriend}
-          open={chatOpen}
-          onOpenChange={setChatOpen}
-        />
       </div>
     </Paywall>
   );
