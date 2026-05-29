@@ -170,9 +170,12 @@ export default function SimulatorPage() {
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const seriesRef = useRef<any>(null);
   
-  const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+    return localStorage.getItem("sim-selected-symbol") || "BTC/USD";
+  });
   const [quantity, setQuantity] = useState("1");
   const [currentPrice, setCurrentPrice] = useState(0);
+  const pricesLoadedRef = useRef(false);
   const timeframe = "1m";
   const [candleData, setCandleData] = useState<CandlestickData[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("market");
@@ -249,10 +252,16 @@ export default function SimulatorPage() {
   // Store prices for all symbols for trigger checking
   const pricesRef = useRef<Record<string, number>>({});
   
+  // Persist selected symbol across refreshes
+  useEffect(() => {
+    localStorage.setItem("sim-selected-symbol", selectedSymbol);
+  }, [selectedSymbol]);
+
   // Update price ref whenever currentPrice changes
   useEffect(() => {
     if (currentPrice > 0) {
       pricesRef.current[selectedSymbol] = currentPrice;
+      pricesLoadedRef.current = true;
     }
   }, [currentPrice, selectedSymbol]);
 
@@ -1033,10 +1042,12 @@ export default function SimulatorPage() {
             ) : (
               openTrades.map((trade) => {
                 const isPending = trade.status === "pending";
-                // Use the stored price for this trade's symbol, fall back to currentPrice if viewing that symbol
-                const tradePrice = trade.symbol === selectedSymbol 
-                  ? currentPrice 
-                  : (pricesRef.current[trade.symbol] || trade.entryPrice);
+                // Safe price: never use 0. Fall back to entryPrice so P&L shows 0 rather than garbage.
+                const rawPrice = trade.symbol === selectedSymbol
+                  ? currentPrice
+                  : (pricesRef.current[trade.symbol] || 0);
+                const tradePrice = rawPrice > 0 ? rawPrice : trade.entryPrice;
+                const isPriceReady = trade.symbol === selectedSymbol ? currentPrice > 0 : pricesRef.current[trade.symbol] != null;
                 const tradeLeverage = trade.leverage ?? 1;
                 const pnl = trade.type === "buy"
                   ? (tradePrice - trade.entryPrice) * trade.quantity * tradeLeverage
@@ -1119,10 +1130,12 @@ export default function SimulatorPage() {
                             size="sm"
                             className="h-7 px-3 text-xs"
                             onClick={() => closeTradeMutation.mutate({ id: trade.id, exitPrice: tradePrice })}
+                            disabled={closeTradeMutation.isPending || !isPriceReady}
+                            title={!isPriceReady ? "Loading price…" : undefined}
                             data-testid={`button-close-${trade.id}`}
                           >
                             <X className="h-3 w-3 mr-1" />
-                            Close
+                            {!isPriceReady ? "Loading…" : "Close"}
                           </Button>
                         </div>
                       )}
