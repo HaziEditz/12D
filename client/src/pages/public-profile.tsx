@@ -57,6 +57,7 @@ interface PublicUser {
   totalProfit: number | null;
   xp: number | null;
   lastSeenAt: string | null;
+  presenceStatus: string | null;
   equippedFrame: string | null;
   equippedTitle: string | null;
   purchasedCosmetics: string;
@@ -96,28 +97,30 @@ const categoryIcons: Record<string, any> = {
 
 const getCategoryIcon = (category: string) => categoryIcons[category] || Award;
 
-function getOnlineStatus(lastSeenAt: string | null): { isOnline: boolean; label: string } {
-  if (!lastSeenAt) return { isOnline: false, label: "Never active" };
+function getPresenceInfo(lastSeenAt: string | null, presenceStatus?: string | null): {
+  status: "online" | "idle" | "offline"; label: string;
+} {
+  if (!lastSeenAt) return { status: "offline", label: "Never active" };
   const diff = Date.now() - new Date(lastSeenAt).getTime();
-  if (diff < 5 * 60 * 1000) return { isOnline: true, label: "Active now" };
-  return {
-    isOnline: false,
-    label: `Active ${formatDistanceToNow(new Date(lastSeenAt), { addSuffix: true })}`,
-  };
+  if (diff > 3 * 60 * 1000) {
+    return { status: "offline", label: `Active ${formatDistanceToNow(new Date(lastSeenAt), { addSuffix: true })}` };
+  }
+  if (presenceStatus === "idle") return { status: "idle", label: "Idle" };
+  return { status: "online", label: "Active now" };
 }
 
-function OnlineBadge({ lastSeenAt }: { lastSeenAt: string | null }) {
-  const { isOnline, label } = getOnlineStatus(lastSeenAt);
+function OnlineBadge({ lastSeenAt, presenceStatus }: { lastSeenAt: string | null; presenceStatus?: string | null }) {
+  const { status, label } = getPresenceInfo(lastSeenAt, presenceStatus);
+  const dotColor = status === "online"
+    ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]"
+    : status === "idle"
+    ? "bg-yellow-400 shadow-[0_0_6px_2px_rgba(250,204,21,0.5)]"
+    : "bg-muted-foreground/40";
+  const textColor = status === "online" ? "text-green-500" : status === "idle" ? "text-yellow-400" : "text-muted-foreground";
   return (
     <div className="flex items-center gap-1.5 text-sm" data-testid="status-online">
-      <span
-        className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${
-          isOnline ? "bg-green-500 shadow-[0_0_6px_2px_rgba(34,197,94,0.5)]" : "bg-muted-foreground/40"
-        }`}
-      />
-      <span className={isOnline ? "text-green-500 font-medium" : "text-muted-foreground"}>
-        {label}
-      </span>
+      <span className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${dotColor}`} />
+      <span className={`font-medium ${textColor}`}>{label}</span>
     </div>
   );
 }
@@ -474,7 +477,7 @@ export default function PublicProfilePage() {
                   {profile.role}
                 </Badge>
               </div>
-              <OnlineBadge lastSeenAt={profile.lastSeenAt} />
+              <OnlineBadge lastSeenAt={profile.lastSeenAt} presenceStatus={profile.presenceStatus} />
               {/* Equipped cosmetics / stickers */}
               {(() => {
                 const owned: string[] = (() => { try { return JSON.parse(profile.purchasedCosmetics || "[]"); } catch { return []; } })();

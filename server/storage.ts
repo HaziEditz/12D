@@ -160,8 +160,9 @@ export interface IStorage {
   markDMsRead(userId: string, partnerId: string, classId: string): Promise<void>;
   getDMUnreadCount(userId: string, classId: string): Promise<number>;
   // Online presence
-  updateLastSeen(userId: string): Promise<void>;
+  updateLastSeen(userId: string, status?: string): Promise<void>;
   getOnlineUsers(userIds: string[]): Promise<Record<string, boolean>>;
+  getUserPresence(userIds: string[]): Promise<Record<string, "online" | "idle" | "offline">>;
   
   // Achievements
   createAchievement(data: InsertAchievement): Promise<Achievement>;
@@ -955,17 +956,33 @@ export class DatabaseStorage implements IStorage {
     return msgs.length;
   }
 
-  async updateLastSeen(userId: string): Promise<void> {
-    await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, userId));
+  async updateLastSeen(userId: string, status: string = "online"): Promise<void> {
+    const validStatus = ["online", "idle"].includes(status) ? status : "online";
+    await db.update(users).set({ lastSeenAt: new Date(), presenceStatus: validStatus }).where(eq(users.id, userId));
   }
 
   async getOnlineUsers(userIds: string[]): Promise<Record<string, boolean>> {
     if (!userIds.length) return {};
-    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
-    const onlineUsers = await db.select({ id: users.id, lastSeenAt: users.lastSeenAt }).from(users).where(inArray(users.id, userIds));
+    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+    const rows = await db.select({ id: users.id, lastSeenAt: users.lastSeenAt }).from(users).where(inArray(users.id, userIds));
     const result: Record<string, boolean> = {};
-    for (const u of onlineUsers) {
+    for (const u of rows) {
       result[u.id] = u.lastSeenAt ? u.lastSeenAt > cutoff : false;
+    }
+    return result;
+  }
+
+  async getUserPresence(userIds: string[]): Promise<Record<string, "online" | "idle" | "offline">> {
+    if (!userIds.length) return {};
+    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+    const rows = await db.select({ id: users.id, lastSeenAt: users.lastSeenAt, presenceStatus: users.presenceStatus }).from(users).where(inArray(users.id, userIds));
+    const result: Record<string, "online" | "idle" | "offline"> = {};
+    for (const u of rows) {
+      if (!u.lastSeenAt || u.lastSeenAt <= cutoff) {
+        result[u.id] = "offline";
+      } else {
+        result[u.id] = (u.presenceStatus === "idle" ? "idle" : "online") as "online" | "idle";
+      }
     }
     return result;
   }

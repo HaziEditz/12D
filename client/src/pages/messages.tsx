@@ -13,6 +13,7 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { getFrameStyle } from "@/lib/shop-catalog";
+import { AvatarStatusDot, type PresenceStatus } from "@/components/status-dot";
 import type { User } from "@shared/schema";
 
 type SidebarTab = "dms" | "groups";
@@ -30,11 +31,7 @@ function TypingDots({ name }: { name: string }) {
   );
 }
 
-function OnlineDot({ online }: { online?: boolean }) {
-  return <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${online ? "bg-green-500" : "bg-slate-500"}`} />;
-}
-
-function UserAvatar({ u, size = 36, online }: { u: User; size?: number; online?: boolean }) {
+function UserAvatar({ u, size = 36, status }: { u: User; size?: number; status?: PresenceStatus }) {
   const frame = u.equippedFrame;
   const frameStyle = getFrameStyle(frame);
   return (
@@ -43,7 +40,7 @@ function UserAvatar({ u, size = 36, online }: { u: User; size?: number; online?:
         <AvatarImage src={u.avatarUrl ?? ""} />
         <AvatarFallback className="text-xs">{u.displayName?.[0]?.toUpperCase()}</AvatarFallback>
       </Avatar>
-      <OnlineDot online={online} />
+      {status && <AvatarStatusDot status={status} />}
     </div>
   );
 }
@@ -156,6 +153,16 @@ export default function MessagesPage() {
 
   const activeFriend = friends.find((f: User) => f.id === activeFriendId);
   const activeGroup = groupChats.find((g: any) => g.id === activeGroupId);
+
+  const friendIds = friends.map((f: User) => f.id);
+  const { data: presence = {} } = useQuery<Record<string, PresenceStatus>>({
+    queryKey: ["/api/users/presence", friendIds.join(",")],
+    queryFn: () => friendIds.length
+      ? fetch(`/api/users/presence?ids=${friendIds.join(",")}`, { credentials: "include" }).then(r => r.json())
+      : Promise.resolve({}),
+    enabled: friendIds.length > 0,
+    refetchInterval: 30_000,
+  });
 
   const allDmMessages = [
     ...dmMessages,
@@ -295,18 +302,21 @@ export default function MessagesPage() {
                 <p>No friends yet.</p>
                 <p className="mt-1">Go to Friends to connect.</p>
               </div>
-            ) : filteredFriends.map((f: User) => (
-              <button key={f.id} onClick={() => { setActiveFriendId(f.id); setActiveGroupId(null); setSidebarTab("dms"); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition-colors text-left ${activeFriendId === f.id ? "bg-muted/80" : ""}`}>
-                <div className="relative shrink-0">
-                  <Avatar className="w-9 h-9"><AvatarImage src={f.avatarUrl ?? ""} /><AvatarFallback className="text-xs">{f.displayName?.[0]}</AvatarFallback></Avatar>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{f.displayName}</p>
-                  {f.equippedTitle && <p className="text-[10px] text-muted-foreground truncate">{f.equippedTitle}</p>}
-                </div>
-              </button>
-            ))}
+            ) : filteredFriends.map((f: User) => {
+              const fStatus: PresenceStatus = presence[f.id] ?? "offline";
+              return (
+                <button key={f.id} onClick={() => { setActiveFriendId(f.id); setActiveGroupId(null); setSidebarTab("dms"); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition-colors text-left ${activeFriendId === f.id ? "bg-muted/80" : ""}`}>
+                  <UserAvatar u={f} size={36} status={fStatus} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{f.displayName}</p>
+                    <p className={`text-[10px] truncate ${fStatus === "online" ? "text-green-500" : fStatus === "idle" ? "text-yellow-400" : "text-muted-foreground"}`}>
+                      {fStatus === "online" ? "Online" : fStatus === "idle" ? "Idle" : (f.equippedTitle || "Offline")}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </ScrollArea>
         )}
 

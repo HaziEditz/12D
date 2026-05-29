@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   lastLoginDate: text("last_login_date"),
   dailyRewardClaimedAt: text("daily_reward_claimed_at"),
   lastSeenAt: timestamp("last_seen_at"),
+  presenceStatus: text("presence_status").default("offline"),
   simulatorTokensClaimed: integer("simulator_tokens_claimed").default(0),
   lessonStreak: integer("lesson_streak").default(0),
   lessonStreakBest: integer("lesson_streak_best").default(0),

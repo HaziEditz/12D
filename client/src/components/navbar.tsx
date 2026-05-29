@@ -36,13 +36,51 @@ export function Navbar() {
   const onTrial = isTrialUser(user);
   const trialDays = getTrialDaysRemaining(user);
 
-  // Ping to keep lastSeenAt updated
+  // Ping with idle detection (Page Visibility + activity tracking)
   useEffect(() => {
     if (!isAuthenticated) return;
-    const ping = () => fetch("/api/ping", { method: "POST", credentials: "include" }).catch(() => {});
-    ping();
-    const interval = setInterval(ping, 60_000);
-    return () => clearInterval(interval);
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let currentStatus: "online" | "idle" = "online";
+
+    const sendPing = (status: "online" | "idle") => {
+      currentStatus = status;
+      fetch("/api/ping", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      }).catch(() => {});
+    };
+
+    const resetIdleTimer = () => {
+      if (currentStatus === "idle") sendPing("online");
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => sendPing("idle"), 60_000);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        sendPing("idle");
+      } else {
+        resetIdleTimer();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("mousemove", resetIdleTimer, { passive: true });
+    document.addEventListener("keydown", resetIdleTimer, { passive: true });
+
+    sendPing("online");
+    resetIdleTimer();
+    const interval = setInterval(() => sendPing(document.visibilityState === "hidden" ? "idle" : currentStatus), 30_000);
+
+    return () => {
+      clearInterval(interval);
+      if (idleTimer) clearTimeout(idleTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("mousemove", resetIdleTimer);
+      document.removeEventListener("keydown", resetIdleTimer);
+    };
   }, [isAuthenticated]);
 
   // Scroll arrow state

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Users, UserPlus, Search, Check, X, UserMinus, Loader2, MessageCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { AvatarStatusDot, type PresenceStatus } from "@/components/status-dot";
 import type { User, Friendship } from "@shared/schema";
 
 interface FriendResult {
@@ -48,6 +49,16 @@ export default function FriendsPage() {
   const { data: friends = [], isLoading: friendsLoading } = useQuery<FriendResult[]>({
     queryKey: ["/api/friends"],
     enabled: !!hasPaidAccess,
+  });
+
+  const friendIds = friends.map(f => f.friend.id);
+  const { data: presence = {} } = useQuery<Record<string, PresenceStatus>>({
+    queryKey: ["/api/users/presence", friendIds.join(",")],
+    queryFn: () => friendIds.length
+      ? fetch(`/api/users/presence?ids=${friendIds.join(",")}`, { credentials: "include" }).then(r => r.json())
+      : Promise.resolve({}),
+    enabled: friendIds.length > 0,
+    refetchInterval: 30_000,
   });
 
   const { data: requests = [], isLoading: requestsLoading } = useQuery<RequestResult[]>({
@@ -274,22 +285,27 @@ export default function FriendsPage() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {friends.map((f) => (
+                  {friends.map((f) => {
+                    const fStatus: PresenceStatus = presence[f.friend.id] ?? "offline";
+                    return (
                     <div key={f.friendship.id} className="flex items-center justify-between p-3 rounded-lg border">
                       <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={f.friend.avatarUrl || undefined} />
-                          <AvatarFallback>{f.friend.displayName.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
+                        <div className="relative shrink-0">
+                          <Avatar>
+                            <AvatarImage src={f.friend.avatarUrl || undefined} />
+                            <AvatarFallback>{f.friend.displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <AvatarStatusDot status={fStatus} />
+                        </div>
                         <div>
                           <Link href={`/users/${f.friend.id}`}>
                             <span className="font-medium hover:underline cursor-pointer" data-testid={`text-friend-${f.friendship.id}`}>
                               {f.friend.displayName}
                             </span>
                           </Link>
-                          {f.friend.bio && (
-                            <p className="text-sm text-muted-foreground line-clamp-1">{f.friend.bio}</p>
-                          )}
+                          <p className={`text-xs ${fStatus === "online" ? "text-green-500" : fStatus === "idle" ? "text-yellow-400" : "text-muted-foreground"}`}>
+                            {fStatus === "online" ? "Online" : fStatus === "idle" ? "Idle" : f.friend.bio ? f.friend.bio.slice(0, 40) : "Offline"}
+                          </p>
                         </div>
                       </div>
                       <div className="flex gap-1">
@@ -313,7 +329,8 @@ export default function FriendsPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </CardContent>

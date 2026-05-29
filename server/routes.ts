@@ -2899,8 +2899,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/ping", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      await storage.updateLastSeen(user.id);
+      const status = req.body?.status === "idle" ? "idle" : "online";
+      await storage.updateLastSeen(user.id, status);
       res.json({ ok: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/presence", requireAuth, async (req, res) => {
+    try {
+      const ids = String(req.query.ids || "").split(",").map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return res.json({});
+      const presence = await storage.getUserPresence(ids);
+      res.json(presence);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -2924,6 +2936,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         totalProfit: user.totalProfit,
         xp: user.xp,
         lastSeenAt: user.lastSeenAt,
+        presenceStatus: user.presenceStatus ?? "offline",
         equippedFrame: user.equippedFrame ?? null,
         equippedTitle: user.equippedTitle ?? null,
         purchasedCosmetics: user.purchasedCosmetics ?? "[]",
