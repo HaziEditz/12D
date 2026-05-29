@@ -2682,6 +2682,89 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/marketplace/history", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(await storage.getMarketplaceHistory(user.id));
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // ── Auctions ─────────────────────────────────────────────────────────────
+  app.get("/api/marketplace/auctions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(await storage.getAuctions(user.id));
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/marketplace/auctions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { inventoryId, startPrice, durationMinutes } = req.body;
+      if (!inventoryId || typeof startPrice !== "number" || startPrice < 1) return res.status(400).json({ message: "inventoryId and startPrice (≥1) required" });
+      const dur = Math.min(Math.max(Number(durationMinutes) || 60, 30), 1440);
+      res.json(await storage.createAuction(user.id, inventoryId, startPrice, dur));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/marketplace/auctions/:id/bid", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { amount } = req.body;
+      if (typeof amount !== "number" || amount < 1) return res.status(400).json({ message: "amount required" });
+      res.json(await storage.placeBid(req.params.id, user.id, amount));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/marketplace/auctions/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(await storage.cancelAuction(req.params.id, user.id));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // ── Bets ─────────────────────────────────────────────────────────────────
+  app.get("/api/marketplace/bets", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(await storage.getBets(user.id));
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/marketplace/bets", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { question, optionA, optionB, expiresInMinutes } = req.body;
+      if (!question?.trim()) return res.status(400).json({ message: "question required" });
+      res.json(await storage.createBet(user.id, question.trim(), optionA?.trim() || "Yes", optionB?.trim() || "No", Number(expiresInMinutes) || 60));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/marketplace/bets/:id/enter", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { option, amount } = req.body;
+      if (!["A","B"].includes(option) || typeof amount !== "number" || amount < 1) return res.status(400).json({ message: "option (A/B) and amount (≥1) required" });
+      res.json(await storage.enterBet(req.params.id, user.id, option, amount));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/marketplace/bets/:id/resolve", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { result } = req.body;
+      if (!["A","B","cancel"].includes(result)) return res.status(400).json({ message: "result must be A, B, or cancel" });
+      res.json(await storage.resolveBet(req.params.id, user.id, result));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/marketplace/bets/my-entries", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(await storage.getMyBetEntries(user.id));
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // PayPal routes with error handling
   app.get("/setup", async (req, res) => {
     try {

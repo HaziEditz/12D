@@ -9,6 +9,7 @@ import {
   classroomJobs, classroomJobAssignments, classroomAuctions, classroomAuctionBids,
   classroomStoreItems, classroomStorePurchases, classroomChallenges, economyLoans,
   classroomAssets, studentAssets, userInventory, tradeOffers, studentMarketplaceListings, spinHistory,
+  marketplaceAuctions, auctionBids, marketplaceBets, betEntries,
   classGroupChats, classGroupChatMembers, classGroupChatMessages,
   classMessageReactions, classDirectMessages,
   friendGroupChats, friendGroupChatMembers, friendGroupChatMessages, cosmeticListings,
@@ -318,6 +319,20 @@ export interface IStorage {
   createMarketplaceListing(userId: string, inventoryId: string, price: number): Promise<{ success: boolean; message: string; listing?: any }>;
   buyMarketplaceListing(listingId: string, buyerId: string): Promise<{ success: boolean; message: string }>;
   cancelMarketplaceListing(listingId: string, userId: string): Promise<{ success: boolean; message: string }>;
+  getMarketplaceHistory(userId: string): Promise<any[]>;
+  // Auctions
+  getAuctions(userId: string): Promise<any[]>;
+  createAuction(userId: string, inventoryId: string, startPrice: number, durationMinutes: number): Promise<{ success: boolean; message: string; auction?: any }>;
+  placeBid(auctionId: string, bidderId: string, amount: number): Promise<{ success: boolean; message: string }>;
+  cancelAuction(auctionId: string, userId: string): Promise<{ success: boolean; message: string }>;
+  settleExpiredAuctions(classId: string): Promise<void>;
+  // Bets
+  getBets(userId: string): Promise<any[]>;
+  createBet(userId: string, question: string, optionA: string, optionB: string, expiresInMinutes: number): Promise<{ success: boolean; message: string; bet?: any }>;
+  enterBet(betId: string, userId: string, option: string, amount: number): Promise<{ success: boolean; message: string }>;
+  resolveBet(betId: string, userId: string, result: string): Promise<{ success: boolean; message: string; payouts?: any[] }>;
+  cancelBet(betId: string, userId: string): Promise<{ success: boolean; message: string }>;
+  getMyBetEntries(userId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1935,6 +1950,194 @@ export class DatabaseStorage implements IStorage {
     await db.update(userInventory).set({ tradable: true }).where(eq(userInventory.id, listing.inventoryId));
     await db.update(studentMarketplaceListings).set({ status: "cancelled" }).where(eq(studentMarketplaceListings.id, listingId));
     return { success: true, message: "Listing cancelled" };
+  }
+
+  async getMarketplaceHistory(userId: string): Promise<any[]> {
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return [];
+    return await db.select().from(studentMarketplaceListings)
+      .where(and(eq(studentMarketplaceListings.classId, classId), eq(studentMarketplaceListings.status, "sold")))
+      .orderBy(desc(studentMarketplaceListings.createdAt))
+      .limit(20);
+  }
+
+  // ── Auctions ────────────────────────────────────────────────────────────────
+  private COLLECTIBLE_INFO: Record<string, { emoji: string; name: string }> = {
+    "col-coin": { emoji: "🪙", name: "Gold Coin" }, "col-chart-up": { emoji: "📈", name: "Bull Chart" },
+    "col-piggy": { emoji: "🐷", name: "Piggy Bank" }, "col-notepad": { emoji: "📔", name: "Trade Journal" },
+    "col-lock": { emoji: "🔒", name: "Safety Lock" }, "col-receipt": { emoji: "🧾", name: "Trade Receipt" },
+    "col-rocket": { emoji: "🚀", name: "Moon Rocket" }, "col-crown": { emoji: "👑", name: "Gold Crown" },
+    "col-gem": { emoji: "💚", name: "Emerald Gem" }, "col-trophy": { emoji: "🏆", name: "Bronze Trophy" },
+    "col-lightning": { emoji: "⚡", name: "Lightning Bolt" }, "col-diamond": { emoji: "💎", name: "Diamond" },
+    "col-fire": { emoji: "🔥", name: "Fire Badge" }, "col-dragon": { emoji: "🐉", name: "Dragon" },
+    "col-crystal-ball": { emoji: "🔮", name: "Crystal Ball" }, "col-unicorn": { emoji: "🦄", name: "Unicorn" },
+    "col-rainbow-star": { emoji: "🌟", name: "Rainbow Star" }, "col-golden-bull": { emoji: "🐂", name: "Golden Bull" },
+    "pu-double-tokens": { emoji: "🎯", name: "2× Token Boost" }, "pu-shield": { emoji: "🛡️", name: "Loss Shield" },
+    "pu-xp-boost": { emoji: "⚡", name: "XP Boost" },
+  };
+
+  async getAuctions(userId: string): Promise<any[]> {
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return [];
+    await this.settleExpiredAuctions(classId);
+    return await db.select().from(marketplaceAuctions)
+      .where(and(eq(marketplaceAuctions.classId, classId), eq(marketplaceAuctions.status, "active")))
+      .orderBy(asc(marketplaceAuctions.endTime));
+  }
+
+  async createAuction(userId: string, inventoryId: string, startPrice: number, durationMinutes: number): Promise<{ success: boolean; message: string; auction?: any }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    const [invItem] = await db.select().from(userInventory).where(and(eq(userInventory.id, inventoryId), eq(userInventory.userId, userId)));
+    if (!invItem) return { success: false, message: "Item not found in your inventory" };
+    if (!invItem.tradable) return { success: false, message: "This item is already listed elsewhere" };
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return { success: false, message: "You must be in a class to auction items" };
+    const info = this.COLLECTIBLE_INFO[invItem.itemId] ?? { emoji: "🎁", name: invItem.itemId };
+    const endTime = new Date(Date.now() + durationMinutes * 60 * 1000);
+    const [auction] = await db.insert(marketplaceAuctions).values({
+      classId, sellerId: userId, sellerName: user.displayName,
+      inventoryId, itemId: invItem.itemId, itemName: info.name, itemEmoji: info.emoji,
+      rarity: invItem.rarity, startPrice, currentBid: 0, endTime, status: "active",
+    }).returning();
+    await db.update(userInventory).set({ tradable: false }).where(eq(userInventory.id, inventoryId));
+    return { success: true, message: "Auction started!", auction };
+  }
+
+  async placeBid(auctionId: string, bidderId: string, amount: number): Promise<{ success: boolean; message: string }> {
+    const [auction] = await db.select().from(marketplaceAuctions).where(eq(marketplaceAuctions.id, auctionId));
+    if (!auction || auction.status !== "active") return { success: false, message: "Auction not found or ended" };
+    if (new Date() > auction.endTime) return { success: false, message: "Auction has ended" };
+    if (auction.sellerId === bidderId) return { success: false, message: "Cannot bid on your own auction" };
+    const minBid = Math.max(auction.startPrice, auction.currentBid + 1);
+    if (amount < minBid) return { success: false, message: `Minimum bid is ${minBid} tokens` };
+    const bidder = await this.getUserById(bidderId);
+    if (!bidder) return { success: false, message: "Bidder not found" };
+    if ((bidder.classroomTokens ?? 0) < amount) return { success: false, message: "Not enough tokens" };
+    // Refund previous bidder
+    if (auction.currentBidderId) {
+      await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${auction.currentBid}` }).where(eq(users.id, auction.currentBidderId));
+    }
+    // Deduct tokens from new bidder
+    await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} - ${amount}` }).where(eq(users.id, bidderId));
+    // Record bid
+    await db.insert(auctionBids).values({ auctionId, bidderId, bidderName: bidder.displayName, amount });
+    await db.update(marketplaceAuctions).set({ currentBid: amount, currentBidderId: bidderId, currentBidderName: bidder.displayName }).where(eq(marketplaceAuctions.id, auctionId));
+    return { success: true, message: `Bid of ${amount} tokens placed!` };
+  }
+
+  async cancelAuction(auctionId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    const [auction] = await db.select().from(marketplaceAuctions).where(eq(marketplaceAuctions.id, auctionId));
+    if (!auction || auction.status !== "active") return { success: false, message: "Auction not found" };
+    if (auction.sellerId !== userId) return { success: false, message: "Not your auction" };
+    if (auction.currentBid > 0 && auction.currentBidderId) {
+      await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${auction.currentBid}` }).where(eq(users.id, auction.currentBidderId));
+    }
+    await db.update(userInventory).set({ tradable: true }).where(eq(userInventory.id, auction.inventoryId));
+    await db.update(marketplaceAuctions).set({ status: "cancelled" }).where(eq(marketplaceAuctions.id, auctionId));
+    return { success: true, message: "Auction cancelled and item returned" };
+  }
+
+  async settleExpiredAuctions(classId: string): Promise<void> {
+    const expired = await db.select().from(marketplaceAuctions)
+      .where(and(eq(marketplaceAuctions.classId, classId), eq(marketplaceAuctions.status, "active")));
+    const now = new Date();
+    for (const auction of expired) {
+      if (auction.endTime > now) continue;
+      if (auction.currentBid > 0 && auction.currentBidderId) {
+        // Transfer item to winner; tokens already deducted at bid time, pay seller
+        await db.update(userInventory).set({ userId: auction.currentBidderId, tradable: true }).where(eq(userInventory.id, auction.inventoryId));
+        await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${auction.currentBid}` }).where(eq(users.id, auction.sellerId));
+        await db.update(marketplaceAuctions).set({ status: "ended" }).where(eq(marketplaceAuctions.id, auction.id));
+      } else {
+        // No bids — return item to seller
+        await db.update(userInventory).set({ tradable: true }).where(eq(userInventory.id, auction.inventoryId));
+        await db.update(marketplaceAuctions).set({ status: "ended" }).where(eq(marketplaceAuctions.id, auction.id));
+      }
+    }
+  }
+
+  // ── Bets ────────────────────────────────────────────────────────────────────
+  async getBets(userId: string): Promise<any[]> {
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return [];
+    const bets = await db.select().from(marketplaceBets)
+      .where(and(eq(marketplaceBets.classId, classId), or(eq(marketplaceBets.status, "open"), eq(marketplaceBets.status, "locked"))))
+      .orderBy(desc(marketplaceBets.createdAt));
+    const entries = await db.select().from(betEntries).where(eq(betEntries.userId, userId));
+    return bets.map(b => ({
+      ...b,
+      myEntry: entries.find(e => e.betId === b.id) ?? null,
+    }));
+  }
+
+  async createBet(userId: string, question: string, optionA: string, optionB: string, expiresInMinutes: number): Promise<{ success: boolean; message: string; bet?: any }> {
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    const classId = await this.getUserClassId(userId);
+    if (!classId) return { success: false, message: "You must be in a class" };
+    const expiresAt = expiresInMinutes > 0 ? new Date(Date.now() + expiresInMinutes * 60 * 1000) : null;
+    const [bet] = await db.insert(marketplaceBets).values({
+      classId, creatorId: userId, creatorName: user.displayName,
+      question, optionA, optionB, expiresAt,
+    }).returning();
+    return { success: true, message: "Bet created!", bet };
+  }
+
+  async enterBet(betId: string, userId: string, option: string, amount: number): Promise<{ success: boolean; message: string }> {
+    if (!["A", "B"].includes(option)) return { success: false, message: "Invalid option" };
+    const [bet] = await db.select().from(marketplaceBets).where(eq(marketplaceBets.id, betId));
+    if (!bet || bet.status !== "open") return { success: false, message: "Bet is not open" };
+    if (bet.expiresAt && new Date() > bet.expiresAt) return { success: false, message: "Bet has expired" };
+    const existing = await db.select().from(betEntries).where(and(eq(betEntries.betId, betId), eq(betEntries.userId, userId)));
+    if (existing.length > 0) return { success: false, message: "You already entered this bet" };
+    const user = await this.getUserById(userId);
+    if (!user) return { success: false, message: "User not found" };
+    if ((user.classroomTokens ?? 0) < amount) return { success: false, message: "Not enough tokens" };
+    await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} - ${amount}` }).where(eq(users.id, userId));
+    await db.insert(betEntries).values({ betId, userId, userName: user.displayName, option, amount });
+    if (option === "A") {
+      await db.update(marketplaceBets).set({ totalPoolA: sql`${marketplaceBets.totalPoolA} + ${amount}` }).where(eq(marketplaceBets.id, betId));
+    } else {
+      await db.update(marketplaceBets).set({ totalPoolB: sql`${marketplaceBets.totalPoolB} + ${amount}` }).where(eq(marketplaceBets.id, betId));
+    }
+    return { success: true, message: `Bet placed: ${amount} tokens on ${option === "A" ? bet.optionA : bet.optionB}` };
+  }
+
+  async resolveBet(betId: string, userId: string, result: string): Promise<{ success: boolean; message: string; payouts?: any[] }> {
+    if (!["A", "B", "cancel"].includes(result)) return { success: false, message: "Invalid result" };
+    const [bet] = await db.select().from(marketplaceBets).where(eq(marketplaceBets.id, betId));
+    if (!bet) return { success: false, message: "Bet not found" };
+    if (bet.creatorId !== userId) return { success: false, message: "Only the bet creator can resolve it" };
+    if (bet.status === "resolved" || bet.status === "cancelled") return { success: false, message: "Bet already resolved" };
+    if (result === "cancel") {
+      const allEntries = await db.select().from(betEntries).where(eq(betEntries.betId, betId));
+      for (const entry of allEntries) {
+        await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${entry.amount}` }).where(eq(users.id, entry.userId));
+      }
+      await db.update(marketplaceBets).set({ status: "cancelled", resolvedAt: new Date() }).where(eq(marketplaceBets.id, betId));
+      return { success: true, message: "Bet cancelled, all tokens refunded" };
+    }
+    const winningEntries = await db.select().from(betEntries).where(and(eq(betEntries.betId, betId), eq(betEntries.option, result)));
+    const totalPool = (bet.totalPoolA ?? 0) + (bet.totalPoolB ?? 0);
+    const winningPool = result === "A" ? (bet.totalPoolA ?? 0) : (bet.totalPoolB ?? 0);
+    const payouts: any[] = [];
+    for (const entry of winningEntries) {
+      const share = winningPool > 0 ? Math.floor((entry.amount / winningPool) * totalPool) : 0;
+      await db.update(users).set({ classroomTokens: sql`${users.classroomTokens} + ${share}` }).where(eq(users.id, entry.userId));
+      await db.update(betEntries).set({ payout: share }).where(eq(betEntries.id, entry.id));
+      payouts.push({ userName: entry.userName, payout: share });
+    }
+    await db.update(marketplaceBets).set({ status: "resolved", result, resolvedAt: new Date() }).where(eq(marketplaceBets.id, betId));
+    return { success: true, message: `Bet resolved! ${result === "A" ? bet.optionA : bet.optionB} wins`, payouts };
+  }
+
+  async cancelBet(betId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    return this.resolveBet(betId, userId, "cancel");
+  }
+
+  async getMyBetEntries(userId: string): Promise<any[]> {
+    return await db.select().from(betEntries).where(eq(betEntries.userId, userId)).orderBy(desc(betEntries.createdAt)).limit(20);
   }
 
   async checkAndAwardAchievements(userId: string): Promise<void> {

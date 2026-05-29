@@ -587,6 +587,26 @@ function BlackjackGame({ onBack, tokenBalance, onTokensChange }: { onBack: () =>
   );
 }
 
+function AuctionCountdown({ endTime }: { endTime: string }) {
+  const [remaining, setRemaining] = useState("");
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(endTime).getTime() - Date.now();
+      if (diff <= 0) { setRemaining("Ended"); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setRemaining(h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [endTime]);
+  const diff = new Date(endTime).getTime() - Date.now();
+  const urgent = diff < 5 * 60 * 1000;
+  return <span className={`font-mono font-bold text-xs ${urgent ? "text-rose-400 animate-pulse" : "text-slate-300"}`}>{remaining}</span>;
+}
+
 export default function SchoolFunZone() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
@@ -609,6 +629,18 @@ export default function SchoolFunZone() {
   const [listingItemId, setListingItemId] = useState<string>("");
   const [listingPrice, setListingPrice] = useState<string>("10");
   const [showListForm, setShowListForm] = useState(false);
+  const [marketTab, setMarketTab] = useState<"listings" | "auctions" | "bets" | "history">("listings");
+  const [auctionItemId, setAuctionItemId] = useState<string>("");
+  const [auctionStartPrice, setAuctionStartPrice] = useState<string>("10");
+  const [auctionDuration, setAuctionDuration] = useState<string>("60");
+  const [showAuctionForm, setShowAuctionForm] = useState(false);
+  const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
+  const [showBetForm, setShowBetForm] = useState(false);
+  const [betQuestion, setBetQuestion] = useState<string>("");
+  const [betOptionA, setBetOptionA] = useState<string>("Yes");
+  const [betOptionB, setBetOptionB] = useState<string>("No");
+  const [betDuration, setBetDuration] = useState<string>("60");
+  const [betAmounts, setBetAmounts] = useState<Record<string, { option: string; amount: string }>>({});
 
   const { data: inventory = [], refetch: refetchInventory } = useQuery<any[]>({ queryKey: ["/api/inventory"] });
   const { data: tradeOffersList = [], refetch: refetchTrades } = useQuery<any[]>({ queryKey: ["/api/trades"] });
@@ -617,6 +649,20 @@ export default function SchoolFunZone() {
     queryKey: ["/api/marketplace"],
     refetchInterval: 10000,
     enabled: view === "market",
+  });
+  const { data: auctions = [], refetch: refetchAuctions } = useQuery<any[]>({
+    queryKey: ["/api/marketplace/auctions"],
+    refetchInterval: 10000,
+    enabled: view === "market",
+  });
+  const { data: bets = [], refetch: refetchBets } = useQuery<any[]>({
+    queryKey: ["/api/marketplace/bets"],
+    refetchInterval: 10000,
+    enabled: view === "market",
+  });
+  const { data: marketHistory = [] } = useQuery<any[]>({
+    queryKey: ["/api/marketplace/history"],
+    enabled: view === "market" && marketTab === "history",
   });
 
   const awardTokensMutation = useMutation({
@@ -777,6 +823,79 @@ export default function SchoolFunZone() {
       } else {
         toast({ title: "Failed", description: data.message, variant: "destructive" });
       }
+    },
+  });
+
+  const createAuctionMutation = useMutation({
+    mutationFn: async ({ inventoryId, startPrice, durationMinutes }: { inventoryId: string; startPrice: number; durationMinutes: number }) => {
+      const r = await apiRequest("POST", "/api/marketplace/auctions", { inventoryId, startPrice, durationMinutes }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Auction started!", description: data.message });
+        setShowAuctionForm(false); setAuctionItemId(""); setAuctionStartPrice("10");
+        refetchInventory(); refetchAuctions();
+      } else toast({ title: "Could not start auction", description: data.message, variant: "destructive" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const placeBidMutation = useMutation({
+    mutationFn: async ({ id, amount }: { id: string; amount: number }) => {
+      const r = await apiRequest("POST", `/api/marketplace/auctions/${id}/bid`, { amount }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Bid placed!", description: data.message });
+        refetchAuctions(); refreshUser(); queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      } else toast({ title: "Bid failed", description: data.message, variant: "destructive" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const cancelAuctionMutation = useMutation({
+    mutationFn: async (id: string) => { const r = await apiRequest("DELETE", `/api/marketplace/auctions/${id}`, {}); return r.json(); },
+    onSuccess: (data: any) => {
+      if (data.success) { toast({ title: "Auction cancelled" }); refetchInventory(); refetchAuctions(); refreshUser(); }
+      else toast({ title: "Failed", description: data.message, variant: "destructive" });
+    },
+  });
+
+  const createBetMutation = useMutation({
+    mutationFn: async ({ question, optionA, optionB, expiresInMinutes }: { question: string; optionA: string; optionB: string; expiresInMinutes: number }) => {
+      const r = await apiRequest("POST", "/api/marketplace/bets", { question, optionA, optionB, expiresInMinutes }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Bet created!", description: "Others can now place their bets" });
+        setShowBetForm(false); setBetQuestion(""); setBetOptionA("Yes"); setBetOptionB("No");
+        refetchBets();
+      } else toast({ title: "Could not create bet", description: data.message, variant: "destructive" });
+    },
+  });
+
+  const enterBetMutation = useMutation({
+    mutationFn: async ({ betId, option, amount }: { betId: string; option: string; amount: number }) => {
+      const r = await apiRequest("POST", `/api/marketplace/bets/${betId}/enter`, { option, amount }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Bet entered!", description: data.message });
+        refetchBets(); refreshUser(); queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      } else toast({ title: "Failed", description: data.message, variant: "destructive" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const resolveBetMutation = useMutation({
+    mutationFn: async ({ betId, result }: { betId: string; result: string }) => {
+      const r = await apiRequest("POST", `/api/marketplace/bets/${betId}/resolve`, { result }); return r.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Bet resolved!", description: data.message });
+        refetchBets(); refreshUser(); queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      } else toast({ title: "Failed", description: data.message, variant: "destructive" });
     },
   });
 
@@ -1048,98 +1167,395 @@ export default function SchoolFunZone() {
 
         {/* ── MARKETPLACE VIEW ── */}
         {view === "market" && (
-          <div className="space-y-5">
-            {/* Header + list button */}
+          <div className="space-y-4">
+            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-black text-white text-lg flex items-center gap-2"><Store className="h-5 w-5 text-teal-400" />Student Marketplace</h2>
-                <p className="text-slate-400 text-xs mt-0.5">Buy and sell collectibles with your classmates. Token transfers are instant and secure.</p>
+                <h2 className="font-black text-white text-lg flex items-center gap-2">
+                  <Store className="h-5 w-5 text-teal-400" />Trading Hub
+                </h2>
+                <p className="text-slate-400 text-xs mt-0.5">Buy, sell, auction, and bet with your classmates</p>
               </div>
-              <Button onClick={() => setShowListForm(!showListForm)} size="sm" className="rounded-xl font-bold bg-teal-600 hover:bg-teal-500 text-white gap-1.5" data-testid="btn-toggle-list-form">
-                <Plus className="h-3.5 w-3.5" />List Item
-              </Button>
+              <div className="flex items-center gap-1.5 bg-[#0d1526] rounded-xl px-3 py-1.5 border border-white/10">
+                <Coins className="h-3.5 w-3.5 text-amber-400" />
+                <span className="text-amber-400 font-black text-sm">{tokenBalance}</span>
+              </div>
             </div>
 
-            {/* Create listing form */}
-            {showListForm && (
-              <div className="rounded-2xl p-5 bg-white/5 border border-white/10 space-y-4">
-                <h3 className="font-black text-white">List an Item for Sale</h3>
-                {tradableItems.length === 0 ? (
-                  <p className="text-slate-400 text-sm">No tradable items in your collection. Open some mystery bags first!</p>
+            {/* Sub-tabs */}
+            <div className="flex gap-1 bg-[#0d1526] p-1 rounded-2xl border border-white/10">
+              {([
+                { id: "listings", label: "Shop", icon: "🏪" },
+                { id: "auctions", label: "Auctions", icon: "⏳" },
+                { id: "bets",     label: "Bets",     icon: "🎲" },
+                { id: "history",  label: "History",  icon: "📜" },
+              ] as const).map(tab => (
+                <button key={tab.id} onClick={() => setMarketTab(tab.id)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${marketTab === tab.id ? "bg-teal-600 text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+                  data-testid={`tab-market-${tab.id}`}>
+                  <span>{tab.icon}</span>{tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── LISTINGS TAB ── */}
+            {marketTab === "listings" && (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Button onClick={() => { setShowListForm(!showListForm); setShowAuctionForm(false); }} size="sm"
+                    className="rounded-xl font-bold bg-teal-600 hover:bg-teal-500 text-white gap-1.5" data-testid="btn-toggle-list-form">
+                    <Plus className="h-3.5 w-3.5" />Fixed Price
+                  </Button>
+                  <Button onClick={() => { setShowAuctionForm(!showAuctionForm); setShowListForm(false); }} size="sm"
+                    className="rounded-xl font-bold bg-violet-600 hover:bg-violet-500 text-white gap-1.5" data-testid="btn-toggle-auction-form">
+                    <Timer className="h-3.5 w-3.5" />Start Auction
+                  </Button>
+                </div>
+
+                {/* Fixed-price form */}
+                {showListForm && (
+                  <div className="rounded-2xl p-5 bg-white/5 border border-white/10 space-y-4">
+                    <h3 className="font-black text-white flex items-center gap-2"><Tag className="h-4 w-4 text-teal-400" />List for Fixed Price</h3>
+                    {tradableItems.length === 0 ? (
+                      <p className="text-slate-400 text-sm">No tradable items. Open mystery bags first!</p>
+                    ) : (
+                      <>
+                        <select value={listingItemId} onChange={e => setListingItemId(e.target.value)} data-testid="select-listing-item"
+                          className="w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white">
+                          <option value="">— Choose item —</option>
+                          {tradableItems.map((item: any) => {
+                            const info = COLLECTIBLE_CATALOG[item.itemId];
+                            return <option key={item.id} value={item.id}>{info?.emoji} {info?.name ?? item.itemId} ({item.rarity})</option>;
+                          })}
+                        </select>
+                        <input type="number" min="1" max="200" value={listingPrice} onChange={e => setListingPrice(e.target.value)}
+                          placeholder="Price (1–200 tokens)" data-testid="input-listing-price"
+                          className="w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white" />
+                        <div className="flex gap-2">
+                          <Button onClick={() => createListingMutation.mutate({ inventoryId: listingItemId, price: parseInt(listingPrice) })}
+                            disabled={!listingItemId || !listingPrice || createListingMutation.isPending}
+                            className="flex-1 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold" data-testid="btn-create-listing">
+                            {createListingMutation.isPending ? "Listing..." : "List for Sale"}
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowListForm(false)} className="rounded-xl border-white/20 text-slate-400">Cancel</Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Auction form (in listings tab) */}
+                {showAuctionForm && (
+                  <div className="rounded-2xl p-5 bg-white/5 border border-violet-500/20 space-y-4">
+                    <h3 className="font-black text-white flex items-center gap-2"><Timer className="h-4 w-4 text-violet-400" />Start an Auction</h3>
+                    {tradableItems.length === 0 ? (
+                      <p className="text-slate-400 text-sm">No tradable items. Open mystery bags first!</p>
+                    ) : (
+                      <>
+                        <select value={auctionItemId} onChange={e => setAuctionItemId(e.target.value)} data-testid="select-auction-item"
+                          className="w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white">
+                          <option value="">— Choose item —</option>
+                          {tradableItems.map((item: any) => {
+                            const info = COLLECTIBLE_CATALOG[item.itemId];
+                            return <option key={item.id} value={item.id}>{info?.emoji} {info?.name ?? item.itemId} ({item.rarity})</option>;
+                          })}
+                        </select>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Start Price</label>
+                            <input type="number" min="1" max="500" value={auctionStartPrice} onChange={e => setAuctionStartPrice(e.target.value)}
+                              className="mt-1 w-full rounded-xl px-3 py-2 text-sm bg-[#0d1526] border border-white/15 text-white" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Duration</label>
+                            <select value={auctionDuration} onChange={e => setAuctionDuration(e.target.value)}
+                              className="mt-1 w-full rounded-xl px-3 py-2 text-sm bg-[#0d1526] border border-white/15 text-white">
+                              <option value="30">30 minutes</option>
+                              <option value="60">1 hour</option>
+                              <option value="240">4 hours</option>
+                              <option value="1440">24 hours</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={() => createAuctionMutation.mutate({ inventoryId: auctionItemId, startPrice: parseInt(auctionStartPrice), durationMinutes: parseInt(auctionDuration) })}
+                            disabled={!auctionItemId || createAuctionMutation.isPending}
+                            className="flex-1 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold">
+                            {createAuctionMutation.isPending ? "Starting..." : "Start Auction"}
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowAuctionForm(false)} className="rounded-xl border-white/20 text-slate-400">Cancel</Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {(marketListings as any[]).length === 0 ? (
+                  <div className="rounded-2xl p-10 bg-white/5 border border-white/10 text-center">
+                    <Store className="h-10 w-10 text-slate-600 mx-auto mb-3" />
+                    <p className="text-white font-bold">No listings yet</p>
+                    <p className="text-slate-400 text-sm mt-1">Be the first to list an item!</p>
+                  </div>
                 ) : (
-                  <>
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Select Item</label>
-                      <select value={listingItemId} onChange={e => setListingItemId(e.target.value)} data-testid="select-listing-item"
-                        className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white focus:outline-none focus:border-teal-500/50">
-                        <option value="">— Choose an item —</option>
-                        {tradableItems.map((item: any) => {
-                          const info = COLLECTIBLE_CATALOG[item.itemId];
-                          return <option key={item.id} value={item.id}>{info?.emoji} {info?.name ?? item.itemId} ({item.rarity})</option>;
-                        })}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Price (tokens)</label>
-                      <input type="number" min="1" max="200" value={listingPrice} onChange={e => setListingPrice(e.target.value)}
-                        data-testid="input-listing-price"
-                        className="mt-1.5 w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white focus:outline-none focus:border-teal-500/50" />
-                      <p className="text-slate-500 text-xs mt-1">Min: 1 token · Max: 200 tokens</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={() => createListingMutation.mutate({ inventoryId: listingItemId, price: parseInt(listingPrice) })}
-                        disabled={!listingItemId || !listingPrice || createListingMutation.isPending}
-                        className="flex-1 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold" data-testid="btn-create-listing">
-                        {createListingMutation.isPending ? "Listing..." : "List for Sale"}
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowListForm(false)} className="rounded-xl border-white/20 text-slate-400" data-testid="btn-cancel-list">Cancel</Button>
-                    </div>
-                  </>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {(marketListings as any[]).map((listing: any) => {
+                      const rarityConf = RARITY_CONFIG[listing.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+                      const isOwn = listing.sellerId === user?.id;
+                      return (
+                        <div key={listing.id} className={`rounded-2xl p-4 border transition-all ${rarityConf.bg} ${rarityConf.glow}`} data-testid={`listing-${listing.id}`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="text-3xl">{listing.itemEmoji}</div>
+                            <Badge className={`text-xs ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>
+                          </div>
+                          <p className="font-black text-white text-sm">{listing.itemName}</p>
+                          <p className="text-slate-400 text-xs">{listing.sellerName}</p>
+                          <div className="flex items-center justify-between mt-3">
+                            <span className="text-amber-400 font-black flex items-center gap-1"><Coins className="h-3.5 w-3.5" />{listing.price}</span>
+                            {isOwn ? (
+                              <Button size="sm" variant="outline" className="rounded-lg text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                                onClick={() => cancelListingMutation.mutate(listing.id)} disabled={cancelListingMutation.isPending}>Remove</Button>
+                            ) : (
+                              <Button size="sm" className="rounded-lg text-xs bg-teal-600 hover:bg-teal-500 text-white font-bold"
+                                onClick={() => buyListingMutation.mutate(listing.id)}
+                                disabled={buyListingMutation.isPending || tokenBalance < listing.price}
+                                data-testid={`btn-buy-listing-${listing.id}`}>
+                                {tokenBalance < listing.price ? <Lock className="h-3 w-3" /> : "Buy"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Active listings */}
-            {(marketListings as any[]).length === 0 ? (
-              <div className="rounded-2xl p-12 bg-white/5 border border-white/10 text-center">
-                <Store className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-white font-bold text-lg">No listings yet!</p>
-                <p className="text-slate-400 text-sm mt-1">Be the first to list an item from your collection.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(marketListings as any[]).map((listing: any) => {
-                  const rarityConf = RARITY_CONFIG[listing.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
-                  const isOwn = listing.sellerId === user?.id;
-                  return (
-                    <div key={listing.id} className={`rounded-2xl p-4 border transition-all ${rarityConf.bg} ${rarityConf.glow}`} data-testid={`listing-${listing.id}`}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="text-4xl">{listing.itemEmoji}</div>
-                        <Badge className={`text-xs ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>
-                      </div>
-                      <h3 className="font-black text-white text-sm">{listing.itemName}</h3>
-                      <p className="text-slate-400 text-xs mt-0.5">Seller: {listing.sellerName}</p>
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center gap-1.5">
-                          <Coins className="h-4 w-4 text-amber-400" />
-                          <span className="text-amber-400 font-black text-base">{listing.price}</span>
+            {/* ── AUCTIONS TAB ── */}
+            {marketTab === "auctions" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-slate-400 text-xs">Highest bidder wins when time runs out. Outbid = instant refund.</p>
+                  <Button size="sm" onClick={() => setMarketTab("listings")} className="rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold gap-1">
+                    <Plus className="h-3 w-3" />New Auction
+                  </Button>
+                </div>
+
+                {(auctions as any[]).length === 0 ? (
+                  <div className="rounded-2xl p-10 bg-white/5 border border-white/10 text-center">
+                    <span className="text-4xl mb-3 block">⏳</span>
+                    <p className="text-white font-bold">No active auctions</p>
+                    <p className="text-slate-400 text-sm mt-1">Go to Shop tab and start one!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(auctions as any[]).map((auction: any) => {
+                      const rarityConf = RARITY_CONFIG[auction.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+                      const isOwn = auction.sellerId === user?.id;
+                      const iLeading = auction.currentBidderId === user?.id;
+                      const minBid = Math.max(auction.startPrice, (auction.currentBid || 0) + 1);
+                      const myBid = bidAmounts[auction.id] ?? String(minBid);
+                      return (
+                        <div key={auction.id} className={`rounded-2xl p-4 border ${rarityConf.bg} ${rarityConf.glow}`} data-testid={`auction-${auction.id}`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="text-3xl">{auction.itemEmoji}</div>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge className={`text-xs ${rarityConf.bg} ${rarityConf.color} border-0`}>{rarityConf.label}</Badge>
+                              <div className="flex items-center gap-1 bg-black/30 rounded-lg px-2 py-0.5">
+                                <Clock className="h-3 w-3 text-slate-400" />
+                                <AuctionCountdown endTime={auction.endTime} />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="font-black text-white text-sm">{auction.itemName}</p>
+                          <p className="text-slate-400 text-xs">by {auction.sellerName}</p>
+                          <div className="mt-2 p-2 rounded-xl bg-black/20 border border-white/5">
+                            {auction.currentBid > 0 ? (
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-400 text-xs">Current bid</span>
+                                <span className="text-amber-400 font-black flex items-center gap-1"><Coins className="h-3 w-3" />{auction.currentBid}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-400 text-xs">Start price</span>
+                                <span className="text-slate-300 font-bold flex items-center gap-1"><Coins className="h-3 w-3 text-amber-400" />{auction.startPrice}</span>
+                              </div>
+                            )}
+                            {auction.currentBidderName && (
+                              <p className={`text-xs mt-0.5 ${iLeading ? "text-teal-400 font-bold" : "text-slate-500"}`}>
+                                {iLeading ? "🏆 You're leading!" : `Leading: ${auction.currentBidderName}`}
+                              </p>
+                            )}
+                          </div>
+                          {isOwn ? (
+                            <Button size="sm" variant="outline" className="w-full mt-2 rounded-lg text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                              onClick={() => cancelAuctionMutation.mutate(auction.id)} disabled={cancelAuctionMutation.isPending}>Cancel Auction</Button>
+                          ) : (
+                            <div className="flex gap-1.5 mt-2">
+                              <input type="number" min={minBid} value={myBid}
+                                onChange={e => setBidAmounts(prev => ({ ...prev, [auction.id]: e.target.value }))}
+                                className="flex-1 rounded-xl px-3 py-1.5 text-xs bg-[#0d1526] border border-white/15 text-white"
+                                placeholder={`Min ${minBid}`} data-testid={`input-bid-${auction.id}`} />
+                              <Button size="sm" className="rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs px-3"
+                                onClick={() => placeBidMutation.mutate({ id: auction.id, amount: parseInt(myBid) })}
+                                disabled={placeBidMutation.isPending || !myBid || parseInt(myBid) < minBid || tokenBalance < parseInt(myBid)}
+                                data-testid={`btn-bid-${auction.id}`}>Bid</Button>
+                            </div>
+                          )}
                         </div>
-                        {isOwn ? (
-                          <Button size="sm" variant="outline" className="rounded-lg text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
-                            onClick={() => cancelListingMutation.mutate(listing.id)} disabled={cancelListingMutation.isPending}
-                            data-testid={`btn-cancel-listing-${listing.id}`}>Remove</Button>
-                        ) : (
-                          <Button size="sm" className="rounded-lg text-xs bg-teal-600 hover:bg-teal-500 text-white font-bold"
-                            onClick={() => buyListingMutation.mutate(listing.id)}
-                            disabled={buyListingMutation.isPending || tokenBalance < listing.price}
-                            data-testid={`btn-buy-listing-${listing.id}`}>
-                            {tokenBalance < listing.price ? <Lock className="h-3 w-3" /> : "Buy"}
-                          </Button>
-                        )}
-                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── BETS TAB ── */}
+            {marketTab === "bets" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-slate-400 text-xs">Create predictions — winners split the whole pool.</p>
+                  <Button size="sm" onClick={() => setShowBetForm(!showBetForm)}
+                    className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold gap-1">
+                    <Plus className="h-3 w-3" />New Bet
+                  </Button>
+                </div>
+
+                {showBetForm && (
+                  <div className="rounded-2xl p-5 bg-white/5 border border-amber-500/20 space-y-3">
+                    <h3 className="font-black text-white flex items-center gap-2">🎲 Create a Bet</h3>
+                    <input value={betQuestion} onChange={e => setBetQuestion(e.target.value)} placeholder="Question (e.g. Will AAPL go up today?)"
+                      className="w-full rounded-xl px-3 py-2.5 text-sm bg-[#0d1526] border border-white/15 text-white" data-testid="input-bet-question" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={betOptionA} onChange={e => setBetOptionA(e.target.value)} placeholder="Option A (e.g. Yes)"
+                        className="rounded-xl px-3 py-2 text-sm bg-[#0d1526] border border-teal-500/30 text-white" />
+                      <input value={betOptionB} onChange={e => setBetOptionB(e.target.value)} placeholder="Option B (e.g. No)"
+                        className="rounded-xl px-3 py-2 text-sm bg-[#0d1526] border border-rose-500/30 text-white" />
                     </div>
-                  );
-                })}
+                    <select value={betDuration} onChange={e => setBetDuration(e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-sm bg-[#0d1526] border border-white/15 text-white">
+                      <option value="30">Closes in 30 min</option>
+                      <option value="60">Closes in 1 hour</option>
+                      <option value="240">Closes in 4 hours</option>
+                      <option value="1440">Closes in 24 hours</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <Button onClick={() => createBetMutation.mutate({ question: betQuestion, optionA: betOptionA, optionB: betOptionB, expiresInMinutes: parseInt(betDuration) })}
+                        disabled={!betQuestion.trim() || createBetMutation.isPending}
+                        className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold" data-testid="btn-create-bet">
+                        {createBetMutation.isPending ? "Creating..." : "Post Bet"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowBetForm(false)} className="rounded-xl border-white/20 text-slate-400">Cancel</Button>
+                    </div>
+                  </div>
+                )}
+
+                {(bets as any[]).length === 0 ? (
+                  <div className="rounded-2xl p-10 bg-white/5 border border-white/10 text-center">
+                    <span className="text-4xl mb-3 block">🎲</span>
+                    <p className="text-white font-bold">No active bets</p>
+                    <p className="text-slate-400 text-sm mt-1">Create one and let the class decide!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(bets as any[]).map((bet: any) => {
+                      const totalPool = (bet.totalPoolA ?? 0) + (bet.totalPoolB ?? 0);
+                      const pctA = totalPool > 0 ? Math.round((bet.totalPoolA / totalPool) * 100) : 50;
+                      const pctB = 100 - pctA;
+                      const isCreator = bet.creatorId === user?.id;
+                      const myEntry = bet.myEntry;
+                      const myBetData = betAmounts[bet.id] ?? { option: "A", amount: "5" };
+                      return (
+                        <div key={bet.id} className="rounded-2xl p-4 bg-white/5 border border-white/10" data-testid={`bet-${bet.id}`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="font-bold text-white text-sm leading-snug flex-1">{bet.question}</p>
+                            <span className="text-xs text-slate-400 ml-2 shrink-0">by {bet.creatorName}</span>
+                          </div>
+
+                          {/* Pool bar */}
+                          <div className="flex rounded-lg overflow-hidden h-2 mb-1.5">
+                            <div style={{ width: `${pctA}%` }} className="bg-teal-500 transition-all" />
+                            <div style={{ width: `${pctB}%` }} className="bg-rose-500 transition-all" />
+                          </div>
+                          <div className="flex justify-between text-xs text-slate-400 mb-3">
+                            <span className="text-teal-400 font-bold">{bet.optionA} ({bet.totalPoolA}t · {pctA}%)</span>
+                            <span className="text-slate-500 text-xs">{totalPool} total</span>
+                            <span className="text-rose-400 font-bold">{pctB}% · {bet.totalPoolB}t · {bet.optionB}</span>
+                          </div>
+
+                          {myEntry ? (
+                            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs">
+                              <span className="text-amber-400 font-bold">Your bet:</span>
+                              <span className="text-white ml-1">{myEntry.amount}t on {myEntry.option === "A" ? bet.optionA : bet.optionB}</span>
+                              {myEntry.payout != null && <span className="text-teal-400 ml-2">→ Payout: {myEntry.payout}t</span>}
+                            </div>
+                          ) : (
+                            <div className="flex gap-1.5 items-center">
+                              <select value={myBetData.option} onChange={e => setBetAmounts(prev => ({ ...prev, [bet.id]: { ...myBetData, option: e.target.value } }))}
+                                className="rounded-xl px-2 py-1.5 text-xs bg-[#0d1526] border border-white/15 text-white">
+                                <option value="A">{bet.optionA}</option>
+                                <option value="B">{bet.optionB}</option>
+                              </select>
+                              <input type="number" min="1" max="100" value={myBetData.amount}
+                                onChange={e => setBetAmounts(prev => ({ ...prev, [bet.id]: { ...myBetData, amount: e.target.value } }))}
+                                className="w-20 rounded-xl px-2 py-1.5 text-xs bg-[#0d1526] border border-white/15 text-white"
+                                placeholder="tokens" data-testid={`input-bet-amount-${bet.id}`} />
+                              <Button size="sm" className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold"
+                                onClick={() => enterBetMutation.mutate({ betId: bet.id, option: myBetData.option, amount: parseInt(myBetData.amount) })}
+                                disabled={enterBetMutation.isPending || !myBetData.amount || tokenBalance < parseInt(myBetData.amount)}
+                                data-testid={`btn-enter-bet-${bet.id}`}>Place Bet</Button>
+                            </div>
+                          )}
+
+                          {isCreator && bet.status === "open" && (
+                            <div className="flex gap-1.5 mt-2 border-t border-white/5 pt-2">
+                              <p className="text-xs text-slate-500 flex-1">Resolve:</p>
+                              <Button size="sm" className="rounded-lg text-xs bg-teal-700 hover:bg-teal-600 text-white h-6 px-2"
+                                onClick={() => resolveBetMutation.mutate({ betId: bet.id, result: "A" })}
+                                disabled={resolveBetMutation.isPending}>{bet.optionA} wins</Button>
+                              <Button size="sm" className="rounded-lg text-xs bg-rose-700 hover:bg-rose-600 text-white h-6 px-2"
+                                onClick={() => resolveBetMutation.mutate({ betId: bet.id, result: "B" })}
+                                disabled={resolveBetMutation.isPending}>{bet.optionB} wins</Button>
+                              <Button size="sm" variant="outline" className="rounded-lg text-xs border-white/15 text-slate-400 h-6 px-2"
+                                onClick={() => resolveBetMutation.mutate({ betId: bet.id, result: "cancel" })}
+                                disabled={resolveBetMutation.isPending}>Refund</Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── HISTORY TAB ── */}
+            {marketTab === "history" && (
+              <div className="space-y-2">
+                <p className="text-slate-400 text-xs">Recent completed sales in your class</p>
+                {(marketHistory as any[]).length === 0 ? (
+                  <div className="rounded-2xl p-10 bg-white/5 border border-white/10 text-center">
+                    <span className="text-4xl mb-3 block">📜</span>
+                    <p className="text-white font-bold">No sales yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(marketHistory as any[]).map((sale: any) => {
+                      const rarityConf = RARITY_CONFIG[sale.rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.common;
+                      return (
+                        <div key={sale.id} className="flex items-center gap-3 rounded-xl p-3 bg-white/5 border border-white/8">
+                          <span className="text-2xl">{sale.itemEmoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-bold text-xs">{sale.itemName}</p>
+                            <p className="text-slate-500 text-xs">{sale.sellerName}</p>
+                          </div>
+                          <Badge className={`text-xs ${rarityConf.color} bg-transparent border-0 shrink-0`}>{rarityConf.label}</Badge>
+                          <span className="text-amber-400 font-black text-sm shrink-0">{sale.price}t</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>

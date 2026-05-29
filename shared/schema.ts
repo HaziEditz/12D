@@ -804,6 +804,62 @@ export const spinHistory = pgTable("spin_history", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const marketplaceAuctions = pgTable("marketplace_auctions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  sellerId: varchar("seller_id").notNull(),
+  sellerName: varchar("seller_name", { length: 100 }).notNull(),
+  inventoryId: varchar("inventory_id").notNull(),
+  itemId: varchar("item_id", { length: 100 }).notNull(),
+  itemName: varchar("item_name", { length: 100 }).notNull(),
+  itemEmoji: varchar("item_emoji", { length: 20 }).notNull(),
+  rarity: varchar("rarity", { length: 20 }),
+  startPrice: integer("start_price").notNull(),
+  currentBid: integer("current_bid").notNull().default(0),
+  currentBidderId: varchar("current_bidder_id"),
+  currentBidderName: varchar("current_bidder_name", { length: 100 }),
+  endTime: timestamp("end_time").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const auctionBids = pgTable("auction_bids", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  auctionId: varchar("auction_id").notNull(),
+  bidderId: varchar("bidder_id").notNull(),
+  bidderName: varchar("bidder_name", { length: 100 }).notNull(),
+  amount: integer("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const marketplaceBets = pgTable("marketplace_bets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  creatorId: varchar("creator_id").notNull(),
+  creatorName: varchar("creator_name", { length: 100 }).notNull(),
+  question: text("question").notNull(),
+  optionA: varchar("option_a", { length: 100 }).notNull().default("Yes"),
+  optionB: varchar("option_b", { length: 100 }).notNull().default("No"),
+  totalPoolA: integer("total_pool_a").notNull().default(0),
+  totalPoolB: integer("total_pool_b").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("open"),
+  result: varchar("result", { length: 1 }),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const betEntries = pgTable("bet_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  betId: varchar("bet_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  userName: varchar("user_name", { length: 100 }).notNull(),
+  option: varchar("option", { length: 1 }).notNull(),
+  amount: integer("amount").notNull(),
+  payout: integer("payout"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserInventorySchema = createInsertSchema(userInventory).omit({ id: true, createdAt: true });
 export const insertTradeOfferSchema = createInsertSchema(tradeOffers).omit({ id: true, createdAt: true, respondedAt: true });
 export const insertMarketplaceListingSchema = createInsertSchema(studentMarketplaceListings).omit({ id: true, createdAt: true });
@@ -813,6 +869,10 @@ export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type InsertTradeOffer = z.infer<typeof insertTradeOfferSchema>;
 export type MarketplaceListing = typeof studentMarketplaceListings.$inferSelect;
 export type SpinHistory = typeof spinHistory.$inferSelect;
+export type MarketplaceAuction = typeof marketplaceAuctions.$inferSelect;
+export type AuctionBid = typeof auctionBids.$inferSelect;
+export type MarketplaceBet = typeof marketplaceBets.$inferSelect;
+export type BetEntry = typeof betEntries.$inferSelect;
 
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Email or username is required"),
