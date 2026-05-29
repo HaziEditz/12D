@@ -104,14 +104,42 @@ function Router() {
 }
 
 
+function PageLoadingScreen() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+            <div
+              className="absolute inset-0 rounded-full border-2 border-primary animate-spin"
+              style={{ borderTopColor: "transparent" }}
+            />
+            <svg className="w-7 h-7 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+              <polyline points="16 7 22 7 22 13" />
+            </svg>
+          </div>
+          <div className="absolute inset-0 rounded-full border border-primary/30 animate-ping" />
+        </div>
+        <p className="text-foreground font-semibold text-lg">Entering your world…</p>
+        <p className="text-muted-foreground text-sm">Preparing your dashboard</p>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const isAdminPage = location.startsWith("/admin");
   const isSchoolPage = location.startsWith("/school");
   const isSchoolPlanPage = location === "/school-plan";
   const isCasualPage = location.startsWith("/casual");
   const isCasualUser = user?.membershipTier === "casual";
+
+  if (isLoading) {
+    return <PageLoadingScreen />;
+  }
 
   if (isAdminPage) {
     return (

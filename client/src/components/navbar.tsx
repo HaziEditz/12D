@@ -129,8 +129,9 @@ export function Navbar() {
                 const Icon = item.icon;
                 const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href) && item.href.length > 1);
                 const showLock = item.premium && !hasPremium;
+                const navId = `onboarding-nav-${item.href.replace(/\//g, "").replace(/-/g, "") || "home"}`;
                 return (
-                  <Link key={item.href} href={item.href} className="flex-shrink-0">
+                  <Link key={item.href} href={item.href} className="flex-shrink-0" id={navId}>
                     <Button
                       variant={isActive ? "secondary" : "ghost"}
                       size="sm"
