@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import {
   Crown, Sparkles, Star, Package, Shuffle, TrendingUp, Tag, RefreshCw,
   Gift, Check, Zap, ChevronUp, ChevronDown, Minus, Plus, TrendingDown,
-  Coins, DollarSign, Spade, Diamond, Heart, Club,
+  Coins, DollarSign, Spade, Diamond, Heart, Club, Flame, Gem, Dice6,
 } from "lucide-react";
 import { fireConfetti } from "@/lib/confetti";
 
@@ -93,10 +93,37 @@ function CardFace({ card, animate = false }: { card: PlayingCard; animate?: bool
   );
 }
 
+// ── Chip Bet Selector ────────────────────────────────────────────────────────
+const CHIPS = [
+  { value: 1,      label: "$1",    bg: "bg-white border-gray-300 text-gray-900", shadow: "shadow-white/20" },
+  { value: 10,     label: "$10",   bg: "bg-blue-600 border-blue-400 text-white", shadow: "shadow-blue-500/30" },
+  { value: 100,    label: "$100",  bg: "bg-zinc-900 border-amber-400 text-amber-400", shadow: "shadow-amber-500/20" },
+  { value: 500,    label: "$500",  bg: "bg-purple-700 border-purple-400 text-white", shadow: "shadow-purple-500/30" },
+  { value: 1000,   label: "$1K",   bg: "bg-red-700 border-red-400 text-white", shadow: "shadow-red-500/30" },
+  { value: 5000,   label: "$5K",   bg: "bg-yellow-500 border-yellow-300 text-black", shadow: "shadow-yellow-400/30" },
+  { value: 25000,  label: "$25K",  bg: "bg-orange-500 border-orange-300 text-white", shadow: "shadow-orange-400/30" },
+  { value: 100000, label: "$100K", bg: "bg-gradient-to-br from-yellow-400 via-amber-400 to-yellow-600 border-yellow-200 text-black", shadow: "shadow-yellow-400/40" },
+];
+
+function ChipBets({ bet, setBet, maxBet }: { bet: number; setBet: (n: number) => void; maxBet: number }) {
+  const chips = CHIPS.filter(c => c.value <= maxBet);
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2 justify-center">
+      {chips.map(c => (
+        <button key={c.value} onClick={() => setBet(c.value)}
+          className={`w-14 h-14 rounded-full border-2 font-black text-xs transition-all hover:scale-110 active:scale-95 shadow-lg ${c.bg} ${c.shadow} ${bet === c.value ? "scale-110 ring-2 ring-white/40" : "opacity-80 hover:opacity-100"}`}>
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Casino Panel Wrapper ─────────────────────────────────────────────────────
 function CasinoPanel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+    <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(160deg,#0a0a14 0%,#0e0a06 100%)", border: "1px solid rgba(212,175,55,0.25)" }}>
       <div className="relative">{children}</div>
     </div>
   );
@@ -117,7 +144,6 @@ function BlackjackGame({ balance, onRefreshUser }: { balance: number; onRefreshU
   const [dealAnim, setDealAnim] = useState(false);
 
   const maxBet = balance;
-  const quickBets = [50, 100, 250, 500, 1000].filter(b => b <= maxBet);
   const pVal = handValue(playerHand);
 
   async function startGame() {
@@ -203,41 +229,44 @@ function BlackjackGame({ balance, onRefreshUser }: { balance: number; onRefreshU
     await finishGame(newHand, finalDealer);
   }
 
-  const resultColors = { win: "text-green-400", blackjack: "text-yellow-400", push: "text-blue-400", lose: "text-red-400" };
-  const resultLabel = { win: "You Win! 🎉", blackjack: "Blackjack! 🃏✨", push: "Push — Tie", lose: "Dealer Wins 💀" };
+  const resultColors = { win: "text-emerald-400", blackjack: "text-yellow-300", push: "text-blue-400", lose: "text-red-400" };
+  const resultLabel = { win: "You Win! 🎉", blackjack: "BLACKJACK! 🃏", push: "Push — Tie", lose: "Dealer Wins" };
+  const resultBg = { win: "from-emerald-950/80 to-emerald-900/30 border-emerald-500/40", blackjack: "from-yellow-950/80 to-amber-900/30 border-yellow-500/40", push: "from-blue-950/80 to-blue-900/30 border-blue-500/30", lose: "from-red-950/80 to-red-900/30 border-red-500/30" };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-amber-400 tracking-tight">🃏 Blackjack</h2>
-        <p className="text-sm text-slate-400 mt-0.5">Beat the dealer to 21. Blackjack pays 3:2.</p>
+    <div className="p-6 space-y-5">
+      {/* Header */}
+      <div className="text-center pb-2 border-b border-amber-500/10">
+        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">♠ Blackjack</h2>
+        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Beat the dealer · Blackjack pays 3:2</p>
       </div>
 
-      {/* Dealer */}
+      {/* Felt area */}
       {phase !== "bet" && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Dealer {phase === "result" ? `(${handValue(dealerHand.map(c => ({ ...c, hidden: false })))})` : ""}</p>
-          <div className="flex gap-2 flex-wrap">
-            {dealerHand.map((card, i) => <CardFace key={i} card={card} animate={dealAnim && i < 2} />)}
+        <div className="rounded-xl p-4 space-y-4" style={{ background: "radial-gradient(ellipse at center, #0d2a1a 0%, #071510 100%)", border: "1px solid rgba(16,185,129,0.2)" }}>
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-emerald-600/70 uppercase tracking-[0.2em] font-bold">
+              DEALER {phase === "result" ? `· ${handValue(dealerHand.map(c => ({ ...c, hidden: false })))}` : ""}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {dealerHand.map((card, i) => <CardFace key={i} card={card} animate={dealAnim && i < 2} />)}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Player */}
-      {phase !== "bet" && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">You ({pVal})</p>
-          <div className="flex gap-2 flex-wrap">
-            {playerHand.map((card, i) => <CardFace key={i} card={card} animate={dealAnim && i < 2} />)}
+          <div className="border-t border-emerald-900/60" />
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-emerald-600/70 uppercase tracking-[0.2em] font-bold">YOU · {pVal}</p>
+            <div className="flex gap-2 flex-wrap">
+              {playerHand.map((card, i) => <CardFace key={i} card={card} animate={dealAnim && i < 2} />)}
+            </div>
           </div>
         </div>
       )}
 
       {/* Result Banner */}
       {phase === "result" && result && (
-        <div className={`rounded-xl p-4 text-center border animate-in fade-in slide-in-from-bottom-2 duration-300 ${result === "win" || result === "blackjack" ? "bg-green-500/10 border-green-500/30" : result === "lose" ? "bg-red-500/10 border-red-500/30" : "bg-blue-500/10 border-blue-500/30"}`}>
-          <p className={`text-2xl font-bold ${resultColors[result]}`}>{resultLabel[result]}</p>
-          <p className={`text-lg font-semibold mt-1 ${netChange >= 0 ? "text-green-400" : "text-red-400"}`}>
+        <div className={`rounded-xl p-4 text-center border bg-gradient-to-b animate-in fade-in slide-in-from-bottom-2 duration-300 ${resultBg[result]}`}>
+          <p className={`text-2xl font-black tracking-wide ${resultColors[result]}`}>{resultLabel[result]}</p>
+          <p className={`text-lg font-bold mt-1 ${netChange >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {netChange > 0 ? `+$${netChange.toLocaleString()}` : netChange < 0 ? `-$${Math.abs(netChange).toLocaleString()}` : "No change"}
           </p>
         </div>
@@ -245,52 +274,48 @@ function BlackjackGame({ balance, onRefreshUser }: { balance: number; onRefreshU
 
       {/* Bet Phase */}
       {phase === "bet" && (
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs text-slate-400 mb-2 font-medium">Quick Bet</p>
-            <div className="flex gap-2 flex-wrap">
-              {quickBets.map(q => (
-                <button key={q} onClick={() => setBet(q)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${bet === q ? "bg-amber-500 border-amber-500 text-black" : "border-slate-700 text-slate-300 hover:border-amber-500/50 hover:text-amber-400"}`}>
-                  ${q.toLocaleString()}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="space-y-5">
+          <ChipBets bet={bet} setBet={setBet} maxBet={maxBet} />
           <div className="flex items-center gap-3">
-            <button onClick={() => setBet(b => Math.max(1, b - 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center hover:border-amber-500/50 transition-colors">
-              <Minus className="w-4 h-4 text-slate-300" />
+            <button onClick={() => setBet(b => Math.max(1, b - (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Minus className="w-4 h-4 text-zinc-400" />
             </button>
             <div className="flex-1 text-center">
-              <p className="text-3xl font-bold text-amber-400">${bet.toLocaleString()}</p>
-              <p className="text-xs text-slate-500">bet amount</p>
+              <p className="text-3xl font-black text-amber-400">${bet.toLocaleString()}</p>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-wider">bet amount</p>
             </div>
-            <button onClick={() => setBet(b => Math.min(maxBet, b + 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center hover:border-amber-500/50 transition-colors">
-              <Plus className="w-4 h-4 text-slate-300" />
+            <button onClick={() => setBet(b => Math.min(maxBet, b + (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Plus className="w-4 h-4 text-zinc-400" />
             </button>
           </div>
-          <Button className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-400 text-black border-0" onClick={startGame} disabled={bet < 1 || balance < bet}>
-            Deal Cards
-          </Button>
+          <button onClick={startGame} disabled={bet < 1 || balance < bet}
+            className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95 disabled:opacity-40"
+            style={{ background: "linear-gradient(135deg,#d4af37 0%,#f5cc5a 50%,#d4af37 100%)" }}>
+            ♠ Deal Cards ♠
+          </button>
         </div>
       )}
 
       {/* Playing Phase */}
       {phase === "playing" && (
         <div className="grid grid-cols-3 gap-2">
-          <Button onClick={hit} className="h-11 font-bold bg-green-600 hover:bg-green-500 border-0">Hit</Button>
-          <Button onClick={stand} className="h-11 font-bold bg-red-600 hover:bg-red-500 border-0">Stand</Button>
-          <Button onClick={doubleDown} disabled={playerHand.length !== 2 || balance < bet * 2}
-            className="h-11 font-bold bg-blue-600 hover:bg-blue-500 border-0">2×</Button>
+          <button onClick={hit} className="h-12 rounded-xl font-black text-sm uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95" style={{ background: "linear-gradient(135deg,#059669,#10b981)" }}>Hit</button>
+          <button onClick={stand} className="h-12 rounded-xl font-black text-sm uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95" style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)" }}>Stand</button>
+          <button onClick={doubleDown} disabled={playerHand.length !== 2 || balance < bet * 2}
+            className="h-12 rounded-xl font-black text-sm uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40" style={{ background: "linear-gradient(135deg,#2563eb,#3b82f6)" }}>2×</button>
         </div>
       )}
 
       {/* Result Phase */}
       {phase === "result" && (
-        <Button className="w-full h-11 font-bold bg-amber-500 hover:bg-amber-400 text-black border-0" onClick={() => { setPhase("bet"); setPlayerHand([]); setDealerHand([]); }}
+        <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95 disabled:opacity-40"
+          style={{ background: "linear-gradient(135deg,#d4af37 0%,#f5cc5a 50%,#d4af37 100%)" }}
+          onClick={() => { setPhase("bet"); setPlayerHand([]); setDealerHand([]); }}
           disabled={submitting}>
-          {submitting ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Saving...</> : "Play Again"}
-        </Button>
+          {submitting ? "Saving..." : "Play Again"}
+        </button>
       )}
     </div>
   );
@@ -304,97 +329,141 @@ function RouletteGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
   const [finalRotation, setFinalRotation] = useState(0);
   const [spinResult, setSpinResult] = useState<{ slot: RouletteSlot; rewardDesc: string; newBalance: number } | null>(null);
 
-  const SPIN_COSTS = [{ label: "$100", cost: 100 }, { label: "$500", cost: 500 }, { label: "$2,000", cost: 2000 }];
+  const SPIN_COSTS = [
+    { label: "$10", cost: 10 }, { label: "$100", cost: 100 }, { label: "$500", cost: 500 },
+    { label: "$2K", cost: 2000 }, { label: "$10K", cost: 10000 },
+  ];
 
   const spinMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/global-shop/spin", { cost: spinCost }),
-    onSuccess: async (data) => {
+    onSuccess: async (res) => {
+      const data = await res.json();
       onRefreshUser();
-      const slotIndex = ROULETTE_SLOTS.findIndex(s => s.id === data.slot.id);
+      const slotIndex = ROULETTE_SLOTS.findIndex((s: RouletteSlot) => s.id === data.slot.id);
       const idx = slotIndex >= 0 ? slotIndex : 0;
       const segAngle = 360 / ROULETTE_SLOTS.length;
-      setFinalRotation(prev => prev + 360 * 6 + (360 - idx * segAngle));
+      // FIX: land the CENTER of the slot at the pointer (top).
+      const target = ((360 - (idx + 0.5) * segAngle) % 360 + 360) % 360;
+      setFinalRotation(prev => {
+        const currentAngle = ((prev % 360) + 360) % 360;
+        const diff = ((target - currentAngle) + 360) % 360;
+        return prev + 360 * 8 + diff;
+      });
       setSpinning(true);
       setTimeout(() => {
         setSpinning(false);
         setSpinResult(data);
         if (data.slot.id === "slot-jackpot") fireConfetti();
-      }, 3200);
+        else if (data.slot.reward?.amount && data.slot.reward.amount > 0) fireConfetti();
+      }, 4000);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const slotCount = ROULETTE_SLOTS.length;
   const segAngle = 360 / slotCount;
-  const r = 110; const cx = 130; const cy = 130;
+  const r = 118; const cx = 136; const cy = 136;
 
   return (
     <div className="p-6 space-y-5">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-amber-400">🎰 Spin the Wheel</h2>
-        <p className="text-sm text-slate-400 mt-0.5">Spin for a chance to win balance or rare items!</p>
+      <div className="text-center pb-2 border-b border-amber-500/10">
+        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">◎ Roulette</h2>
+        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Spin the wheel · Win cash or rare items</p>
       </div>
 
-      <div className="relative flex justify-center">
+      {/* Wheel */}
+      <div className="relative flex justify-center items-center">
+        {/* Glow ring behind wheel */}
+        <div className="absolute w-72 h-72 rounded-full opacity-20 animate-pulse"
+          style={{ background: "radial-gradient(circle, #d4af37 0%, transparent 70%)" }} />
         <div className="relative">
-          <svg width={260} height={260}
-            style={{ transition: spinning ? "transform 3.2s cubic-bezier(0.17,0.67,0.12,0.99)" : "none", transform: `rotate(${finalRotation}deg)` }}>
+          {/* Pointer */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20" style={{ marginTop: -2 }}>
+            <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[22px] border-l-transparent border-r-transparent border-t-amber-400 filter drop-shadow-[0_0_6px_rgba(212,175,55,0.8)]" />
+          </div>
+          {/* Outer decorative ring */}
+          <div className="absolute inset-0 rounded-full pointer-events-none z-10" style={{ border: "3px solid rgba(212,175,55,0.6)", boxShadow: "0 0 20px rgba(212,175,55,0.3), inset 0 0 20px rgba(0,0,0,0.5)" }} />
+          <svg width={272} height={272}
+            style={{
+              transition: spinning ? "transform 4s cubic-bezier(0.15,0.65,0.1,1)" : "none",
+              transform: `rotate(${finalRotation}deg)`,
+              display: "block",
+            }}>
             {ROULETTE_SLOTS.map((slot, i) => {
               const startA = (i * segAngle - 90) * (Math.PI / 180);
               const endA = ((i + 1) * segAngle - 90) * (Math.PI / 180);
               const x1 = cx + r * Math.cos(startA); const y1 = cy + r * Math.sin(startA);
               const x2 = cx + r * Math.cos(endA); const y2 = cy + r * Math.sin(endA);
               const midA = ((i + 0.5) * segAngle - 90) * (Math.PI / 180);
-              const tx = cx + (r * 0.65) * Math.cos(midA);
-              const ty = cy + (r * 0.65) * Math.sin(midA);
+              const tx = cx + (r * 0.68) * Math.cos(midA);
+              const ty = cy + (r * 0.68) * Math.sin(midA);
+              const large = segAngle > 180 ? 1 : 0;
               return (
                 <g key={slot.id}>
-                  <path d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`} fill={slot.color} stroke="#1f2937" strokeWidth={1.5} />
-                  <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="white" style={{ pointerEvents: "none" }}>{slot.emoji}</text>
+                  <path d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
+                    fill={slot.color} stroke="#000" strokeWidth={1.5} />
+                  <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize={13}
+                    fill="white" fontWeight="bold" style={{ pointerEvents: "none", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}>
+                    {slot.emoji}
+                  </text>
                 </g>
               );
             })}
-            <circle cx={cx} cy={cy} r={18} fill="#111827" stroke="#374151" strokeWidth={2} />
+            {/* Hub */}
+            <circle cx={cx} cy={cy} r={22} fill="#0a0a14" stroke="#d4af37" strokeWidth={2.5} />
+            <circle cx={cx} cy={cy} r={12} fill="#d4af37" opacity={0.9} />
           </svg>
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10">
-            <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[16px] border-l-transparent border-r-transparent border-t-amber-400 filter drop-shadow-lg" />
-          </div>
         </div>
       </div>
 
+      {/* Result */}
       {spinResult && !spinning && (
-        <div className="rounded-xl p-4 text-center border border-amber-500/30 bg-amber-500/10 animate-in fade-in slide-in-from-bottom-2">
-          <p className="text-2xl font-bold text-amber-300">{spinResult.slot.emoji} {spinResult.slot.label}</p>
-          {spinResult.slot.reward.amount ? (
-            <p className="text-green-400 font-semibold mt-1">+${spinResult.slot.reward.amount.toLocaleString()}</p>
+        <div className="rounded-xl p-4 text-center border border-amber-500/30 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          style={{ background: "linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(10,10,20,0.9) 100%)" }}>
+          <p className="text-3xl font-black text-amber-300 tracking-wide">{spinResult.slot.emoji} {spinResult.slot.label}</p>
+          {spinResult.slot.reward?.amount && spinResult.slot.reward.amount > 0 ? (
+            <p className="text-emerald-400 font-bold text-lg mt-1">+${spinResult.slot.reward.amount.toLocaleString()}</p>
+          ) : spinResult.slot.reward?.type === "item" ? (
+            <p className="text-purple-400 font-bold mt-1">✨ Item added to your collection!</p>
           ) : (
-            <p className="text-purple-400 font-semibold mt-1">Item added to collection!</p>
+            <p className="text-zinc-500 mt-1">Better luck next spin!</p>
           )}
         </div>
       )}
 
-      <div className="flex gap-2">
-        {SPIN_COSTS.map(opt => (
+      {/* Spin cost selector */}
+      <div className="flex gap-1.5 flex-wrap justify-center">
+        {SPIN_COSTS.filter(o => o.cost <= balance || o.cost === 10).map(opt => (
           <button key={opt.cost} onClick={() => setSpinCost(opt.cost)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${spinCost === opt.cost ? "bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/20" : "border-slate-700 text-slate-400 hover:border-amber-500/50 hover:text-amber-400 bg-slate-900/50"}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-black border transition-all ${spinCost === opt.cost ? "text-black border-amber-400 shadow-lg shadow-amber-500/20" : "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-400"}`}
+            style={spinCost === opt.cost ? { background: "linear-gradient(135deg,#d4af37,#f5cc5a)" } : { background: "rgba(10,10,20,0.8)" }}>
             {opt.label}
           </button>
         ))}
       </div>
-      <Button className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-400 text-black border-0 shadow-lg shadow-amber-500/20"
-        onClick={() => spinMutation.mutate()} disabled={spinning || balance < spinCost || spinMutation.isPending}>
-        {spinning ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Spinning...</> : <><Shuffle className="w-4 h-4 mr-2" />Spin for ${spinCost.toLocaleString()}</>}
-      </Button>
 
-      <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
-        {ROULETTE_SLOTS.map(slot => (
-          <div key={slot.id} className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <span>{slot.emoji}</span>
-            <span className="text-slate-400 truncate flex-1">{slot.label}</span>
-            <RarityBadge rarity={slot.rarity} />
-          </div>
-        ))}
-      </div>
+      <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+        style={spinning || spinMutation.isPending ? { background: "#1a1a2e", border: "1px solid rgba(212,175,55,0.3)", color: "#d4af37" } : { background: "linear-gradient(135deg,#d4af37 0%,#f5cc5a 50%,#d4af37 100%)", color: "#000" }}
+        onClick={() => { setSpinResult(null); spinMutation.mutate(); }}
+        disabled={spinning || balance < spinCost || spinMutation.isPending}>
+        {spinning ? <><RefreshCw className="w-4 h-4 animate-spin" /> Spinning...</> : <><Shuffle className="w-4 h-4" /> Spin for ${spinCost.toLocaleString()}</>}
+      </button>
+
+      {/* Prize table */}
+      <details className="group">
+        <summary className="text-xs text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors select-none text-center">
+          View prize table ▾
+        </summary>
+        <div className="grid grid-cols-2 gap-1 mt-2 max-h-40 overflow-y-auto pr-1">
+          {ROULETTE_SLOTS.map(slot => (
+            <div key={slot.id} className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg border border-zinc-800/80" style={{ background: "rgba(10,10,20,0.6)" }}>
+              <span>{slot.emoji}</span>
+              <span className="text-zinc-500 truncate flex-1">{slot.label}</span>
+              <RarityBadge rarity={slot.rarity} />
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
@@ -407,58 +476,64 @@ function CoinFlipGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
   const [flipping, setFlipping] = useState(false);
   const [result, setResult] = useState<{ won: boolean; result: "heads" | "tails"; netChange: number } | null>(null);
 
-  const quickBets = [50, 100, 250, 500, 1000].filter(b => b <= balance);
-
   const flipMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/global-shop/coinflip", { bet, choice }),
-    onSuccess: (data) => {
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setResult(null);
       setFlipping(true);
       setTimeout(() => {
         setFlipping(false);
         setResult(data);
         onRefreshUser();
         if (data.won) fireConfetti();
-      }, 1200);
+      }, 1400);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-amber-400">🪙 Coin Flip</h2>
-        <p className="text-sm text-slate-400 mt-0.5">50/50 — pick your side and double or nothing!</p>
+    <div className="p-6 space-y-5">
+      <div className="text-center pb-2 border-b border-amber-500/10">
+        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">◉ Coin Flip</h2>
+        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">50/50 · Double or nothing</p>
       </div>
 
-      {/* Coin */}
-      <div className="flex justify-center items-center py-4">
-        <div className={`relative w-28 h-28 ${flipping ? "animate-[coin-flip_1.2s_ease-in-out]" : ""}`}
-          style={{ transformStyle: "preserve-3d", perspective: "800px" }}>
-          {result && !flipping ? (
-            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black border-4
-              ${result.result === "heads"
-                ? "bg-amber-400 border-amber-600"
-                : "bg-slate-500 border-slate-700"}`}>
-              {result.result === "heads" ? "👑" : "🔴"}
+      {/* Coin — FIXED: perspective on PARENT, transform on CHILD */}
+      <div className="flex justify-center items-center py-6">
+        <div style={{ perspective: "700px" }}>
+          <div className={flipping ? "animate-[casino-coin-flip_1.4s_ease-in-out]" : ""}
+            style={{ transformStyle: "preserve-3d", width: 120, height: 120, position: "relative" }}>
+            {/* Heads face */}
+            <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0, borderRadius: "9999px",
+              background: "radial-gradient(circle at 35% 35%, #f5cc5a, #d4af37, #8a6914)",
+              border: "4px solid #a07820", boxShadow: "0 0 24px rgba(212,175,55,0.4), inset 0 2px 4px rgba(255,255,255,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48 }}>
+              👑
             </div>
-          ) : (
-            <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl font-black border-4
-              ${flipping || choice === "heads"
-                ? "bg-amber-400 border-amber-600"
-                : "bg-slate-500 border-slate-700"}`}>
-              {flipping ? "🌀" : choice === "heads" ? "👑" : "🔴"}
+            {/* Tails face */}
+            <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0, borderRadius: "9999px",
+              background: "radial-gradient(circle at 35% 35%, #9ca3af, #6b7280, #374151)",
+              border: "4px solid #4b5563", boxShadow: "0 0 16px rgba(107,114,128,0.3), inset 0 2px 4px rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48,
+              transform: "rotateY(180deg)" }}>
+              🌍
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       {/* Result */}
       {result && !flipping && (
-        <div className={`rounded-xl p-4 text-center border animate-in fade-in duration-300 ${result.won ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
-          <p className={`text-2xl font-bold ${result.won ? "text-green-400" : "text-red-400"}`}>
-            {result.won ? "You Win! 🎉" : "You Lose 😔"} — {result.result}
+        <div className={`rounded-xl p-4 text-center border animate-in fade-in slide-in-from-bottom-2 duration-300 ${result.won ? "border-emerald-500/40" : "border-red-500/30"}`}
+          style={{ background: result.won ? "linear-gradient(135deg,rgba(16,185,129,0.1),rgba(10,10,20,0.9))" : "linear-gradient(135deg,rgba(220,38,38,0.1),rgba(10,10,20,0.9))" }}>
+          <p className="text-xl font-black tracking-wide mb-1" style={{ color: result.result === "heads" ? "#d4af37" : "#9ca3af" }}>
+            {result.result === "heads" ? "👑 Heads" : "🌍 Tails"}
           </p>
-          <p className={`text-lg font-semibold mt-1 ${result.netChange > 0 ? "text-green-400" : "text-red-400"}`}>
+          <p className={`text-2xl font-black ${result.won ? "text-emerald-400" : "text-red-400"}`}>
+            {result.won ? "YOU WIN!" : "You Lose"}
+          </p>
+          <p className={`text-lg font-bold mt-1 ${result.netChange > 0 ? "text-emerald-400" : "text-red-400"}`}>
             {result.netChange > 0 ? `+$${result.netChange.toLocaleString()}` : `-$${Math.abs(result.netChange).toLocaleString()}`}
           </p>
         </div>
@@ -466,44 +541,47 @@ function CoinFlipGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
 
       {/* Side picker */}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => setChoice("heads")}
-          className={`py-3 rounded-xl font-bold text-sm border transition-all ${choice === "heads" ? "bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/20" : "border-slate-700 text-slate-400 hover:border-amber-500/50 bg-slate-900/50"}`}>
+        <button onClick={() => { if (!flipping) setChoice("heads"); }}
+          className="py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-95"
+          style={choice === "heads" ? {
+            background: "linear-gradient(135deg,#d4af37,#f5cc5a)", color: "#000",
+            boxShadow: "0 4px 20px rgba(212,175,55,0.35)"
+          } : { background: "rgba(10,10,20,0.8)", border: "1px solid rgba(212,175,55,0.25)", color: "#a09060" }}>
           👑 Heads
         </button>
-        <button onClick={() => setChoice("tails")}
-          className={`py-3 rounded-xl font-bold text-sm border transition-all ${choice === "tails" ? "bg-slate-400 border-slate-400 text-black shadow-lg" : "border-slate-700 text-slate-400 hover:border-slate-500/70 bg-slate-900/50"}`}>
-          🔴 Tails
+        <button onClick={() => { if (!flipping) setChoice("tails"); }}
+          className="py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-95"
+          style={choice === "tails" ? {
+            background: "linear-gradient(135deg,#6b7280,#9ca3af)", color: "#000",
+            boxShadow: "0 4px 20px rgba(107,114,128,0.35)"
+          } : { background: "rgba(10,10,20,0.8)", border: "1px solid rgba(107,114,128,0.25)", color: "#6b7280" }}>
+          🌍 Tails
         </button>
       </div>
 
-      {/* Bet */}
-      <div className="space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          {quickBets.map(q => (
-            <button key={q} onClick={() => setBet(q)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${bet === q ? "bg-amber-500 border-amber-500 text-black" : "border-slate-700 text-slate-300 hover:border-amber-500/50"}`}>
-              ${q.toLocaleString()}
-            </button>
-          ))}
+      {/* Bet chips */}
+      <ChipBets bet={bet} setBet={setBet} maxBet={balance} />
+      <div className="flex items-center gap-3">
+        <button onClick={() => setBet(b => Math.max(1, b - (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+          className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+          <Minus className="w-4 h-4 text-zinc-400" />
+        </button>
+        <div className="flex-1 text-center">
+          <p className="text-3xl font-black text-amber-400">${bet.toLocaleString()}</p>
+          <p className="text-[10px] text-zinc-600 uppercase tracking-wider">bet amount</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setBet(b => Math.max(1, b - 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center hover:border-amber-500/50">
-            <Minus className="w-4 h-4 text-slate-300" />
-          </button>
-          <div className="flex-1 text-center">
-            <p className="text-2xl font-bold text-amber-400">${bet.toLocaleString()}</p>
-          </div>
-          <button onClick={() => setBet(b => Math.min(balance, b + 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center hover:border-amber-500/50">
-            <Plus className="w-4 h-4 text-slate-300" />
-          </button>
-        </div>
+        <button onClick={() => setBet(b => Math.min(balance, b + (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+          className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+          <Plus className="w-4 h-4 text-zinc-400" />
+        </button>
       </div>
 
-      <Button className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-400 text-black border-0 shadow-lg shadow-amber-500/20"
-        onClick={() => { setResult(null); flipMutation.mutate(); }}
+      <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] transition-all hover:brightness-110 active:scale-95 disabled:opacity-40"
+        style={flipping || flipMutation.isPending ? { background: "#1a1a2e", border: "1px solid rgba(212,175,55,0.3)", color: "#d4af37" } : { background: "linear-gradient(135deg,#d4af37,#f5cc5a)", color: "#000" }}
+        onClick={() => flipMutation.mutate()}
         disabled={flipping || flipMutation.isPending || balance < bet}>
-        {flipping ? "Flipping..." : "Flip Coin 🪙"}
-      </Button>
+        {flipping ? "Flipping..." : "🪙 Flip Coin"}
+      </button>
     </div>
   );
 }
@@ -514,13 +592,10 @@ function CrashGame({ balance, onRefreshUser }: { balance: number; onRefreshUser:
   const [bet, setBet] = useState(100);
   const [phase, setPhase] = useState<"idle" | "running" | "cashedout" | "crashed">("idle");
   const [multiplier, setMultiplier] = useState(1.0);
-  const [cashoutAt, setCashoutAt] = useState(2.0);
   const [cashedMult, setCashedMult] = useState(0);
   const [crashPoint, setCrashPoint] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const multRef = useRef(1.0);
-
-  const quickBets = [50, 100, 250, 500, 1000].filter(b => b <= balance);
 
   function generateCrashPoint(): number {
     const r = Math.random();
@@ -533,18 +608,14 @@ function CrashGame({ balance, onRefreshUser }: { balance: number; onRefreshUser:
     multRef.current = 1.0;
     setMultiplier(1.0);
     setPhase("running");
-
     intervalRef.current = setInterval(() => {
       multRef.current = multRef.current * 1.018;
       setMultiplier(Math.round(multRef.current * 100) / 100);
-
       if (multRef.current >= cp) {
         clearInterval(intervalRef.current!);
         setPhase("crashed");
-        const netChange = -bet;
-        apiRequest("POST", "/api/global-shop/crash-result", { bet, netChange })
-          .then(() => onRefreshUser())
-          .catch(() => {});
+        apiRequest("POST", "/api/global-shop/crash-result", { bet, netChange: -bet })
+          .then(() => onRefreshUser()).catch(() => {});
       }
     }, 80);
   }
@@ -555,8 +626,7 @@ function CrashGame({ balance, onRefreshUser }: { balance: number; onRefreshUser:
     const mult = multRef.current;
     setCashedMult(Math.round(mult * 100) / 100);
     setPhase("cashedout");
-    const winAmount = Math.floor(bet * mult) - bet;
-    const netChange = winAmount;
+    const netChange = Math.floor(bet * mult) - bet;
     try {
       await apiRequest("POST", "/api/global-shop/crash-result", { bet, netChange });
       onRefreshUser();
@@ -566,84 +636,85 @@ function CrashGame({ balance, onRefreshUser }: { balance: number; onRefreshUser:
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
-  const multColor = multiplier < 1.5 ? "text-green-400" : multiplier < 3 ? "text-yellow-400" : multiplier < 6 ? "text-orange-400" : "text-red-400";
+  const multColor = multiplier < 1.5 ? "#10b981" : multiplier < 3 ? "#f59e0b" : multiplier < 6 ? "#f97316" : "#ef4444";
   const profit = Math.floor(bet * multiplier) - bet;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-amber-400">🚀 Crash</h2>
-        <p className="text-sm text-slate-400 mt-0.5">Cash out before it crashes or lose your bet!</p>
+    <div className="p-6 space-y-5">
+      <div className="text-center pb-2 border-b border-amber-500/10">
+        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">🚀 Crash</h2>
+        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Cash out before it crashes · Lose everything if it does</p>
       </div>
 
       {/* Multiplier display */}
-      <div className={`rounded-2xl p-8 text-center border transition-all duration-200
-        ${phase === "crashed" ? "bg-red-500/10 border-red-500/40" : phase === "cashedout" ? "bg-green-500/10 border-green-500/40" : "bg-slate-900/60 border-slate-800"}`}>
+      <div className="rounded-2xl p-8 text-center transition-all duration-200 relative overflow-hidden"
+        style={{
+          background: phase === "crashed" ? "linear-gradient(135deg,rgba(220,38,38,0.15),rgba(10,10,20,0.95))"
+            : phase === "cashedout" ? "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(10,10,20,0.95))"
+            : "linear-gradient(135deg,rgba(15,15,30,0.9),rgba(10,10,20,0.95))",
+          border: phase === "crashed" ? "1px solid rgba(239,68,68,0.4)" : phase === "cashedout" ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(212,175,55,0.15)"
+        }}>
         {phase === "crashed" ? (
           <>
-            <p className="text-5xl font-black text-red-400">💥 CRASH</p>
-            <p className="text-slate-400 mt-2">Crashed at {crashPoint.toFixed(2)}×</p>
-            <p className="text-red-400 font-semibold mt-1">-${bet.toLocaleString()}</p>
+            <p className="text-5xl font-black text-red-400 animate-in zoom-in-75 duration-300">💥 CRASH</p>
+            <p className="text-zinc-500 mt-2 text-sm">Crashed at <span className="text-red-400 font-bold">{crashPoint.toFixed(2)}×</span></p>
+            <p className="text-red-400 font-black text-lg mt-1">-${bet.toLocaleString()}</p>
           </>
         ) : phase === "cashedout" ? (
           <>
-            <p className="text-5xl font-black text-green-400">{cashedMult.toFixed(2)}×</p>
-            <p className="text-green-400 font-semibold mt-2">Cashed out! +${(Math.floor(bet * cashedMult) - bet).toLocaleString()}</p>
+            <p className="text-6xl font-black text-emerald-400 animate-in zoom-in-75 duration-300">{cashedMult.toFixed(2)}×</p>
+            <p className="text-emerald-400 font-black text-lg mt-2">+${(Math.floor(bet * cashedMult) - bet).toLocaleString()}</p>
           </>
         ) : (
           <>
-            <p className={`text-6xl font-black ${phase === "running" ? multColor : "text-slate-500"} transition-colors`}>
+            <p className="text-7xl font-black transition-colors duration-100" style={{ color: phase === "running" ? multColor : "#3f3f5a" }}>
               {phase === "running" ? `${multiplier.toFixed(2)}×` : "1.00×"}
             </p>
-            {phase === "running" && <p className="text-slate-400 mt-2 text-sm">Profit if cashed now: <span className="text-green-400 font-semibold">+${profit.toLocaleString()}</span></p>}
-            {phase === "idle" && <p className="text-slate-600 mt-2 text-sm">Ready to launch 🚀</p>}
+            {phase === "running" && <p className="text-zinc-500 mt-2 text-xs">Cash out now: <span className="text-emerald-400 font-bold">+${profit.toLocaleString()}</span></p>}
+            {phase === "idle" && <p className="text-zinc-600 mt-2 text-sm">Ready to launch 🚀</p>}
           </>
         )}
       </div>
 
-      {/* Bet */}
       {phase === "idle" && (
-        <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
-            {quickBets.map(q => (
-              <button key={q} onClick={() => setBet(q)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${bet === q ? "bg-amber-500 border-amber-500 text-black" : "border-slate-700 text-slate-300 hover:border-amber-500/50"}`}>
-                ${q.toLocaleString()}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-4">
+          <ChipBets bet={bet} setBet={setBet} maxBet={balance} />
           <div className="flex items-center gap-3">
-            <button onClick={() => setBet(b => Math.max(1, b - 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-              <Minus className="w-4 h-4 text-slate-300" />
+            <button onClick={() => setBet(b => Math.max(1, b - (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Minus className="w-4 h-4 text-zinc-400" />
             </button>
             <div className="flex-1 text-center">
-              <p className="text-2xl font-bold text-amber-400">${bet.toLocaleString()}</p>
+              <p className="text-3xl font-black text-amber-400">${bet.toLocaleString()}</p>
             </div>
-            <button onClick={() => setBet(b => Math.min(balance, b + 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-              <Plus className="w-4 h-4 text-slate-300" />
+            <button onClick={() => setBet(b => Math.min(balance, b + (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Plus className="w-4 h-4 text-zinc-400" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Action button */}
       {phase === "idle" && (
-        <Button className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-400 text-black border-0 shadow-lg shadow-amber-500/20"
+        <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95 disabled:opacity-40"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f5cc5a)" }}
           onClick={startGame} disabled={balance < bet}>
-          Launch 🚀
-        </Button>
+          🚀 Launch
+        </button>
       )}
       {phase === "running" && (
-        <Button className="w-full h-14 text-xl font-black bg-green-500 hover:bg-green-400 text-black border-0 shadow-lg shadow-green-500/30 animate-pulse"
+        <button className="w-full h-16 rounded-xl text-2xl font-black text-black transition-all hover:brightness-110 active:scale-95 animate-[casino-pulse_1s_ease-in-out_infinite]"
+          style={{ background: "linear-gradient(135deg,#10b981,#34d399)", boxShadow: "0 0 30px rgba(16,185,129,0.5)" }}
           onClick={cashOut}>
           💰 CASH OUT ${Math.floor(bet * multiplier).toLocaleString()}
-        </Button>
+        </button>
       )}
       {(phase === "crashed" || phase === "cashedout") && (
-        <Button className="w-full h-12 font-bold bg-amber-500 hover:bg-amber-400 text-black border-0"
+        <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f5cc5a)" }}
           onClick={() => { setPhase("idle"); setMultiplier(1.0); }}>
           Play Again
-        </Button>
+        </button>
       )}
     </div>
   );
@@ -663,7 +734,6 @@ function HiLoGame({ balance, onRefreshUser }: { balance: number; onRefreshUser: 
   const [result, setResult] = useState<"win" | "lose" | null>(null);
   const [netChange, setNetChange] = useState(0);
 
-  const quickBets = [50, 100, 250, 500].filter(b => b <= balance);
   const streakMultipliers = [1.0, 1.5, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0];
 
   function startGame() {
@@ -683,48 +753,30 @@ function HiLoGame({ balance, onRefreshUser }: { balance: number; onRefreshUser: 
     const remaining = deck.slice(1);
     setNextCard(next);
     setDeck(remaining);
-
     const currentRank = cardRank(currentCard.value);
     const nextRank = cardRank(next.value);
     const correct = direction === "higher" ? nextRank > currentRank : nextRank < currentRank;
-
     if (nextRank === currentRank) {
-      // Tie - treated as wrong
       const nc = -bet;
-      setNetChange(nc);
-      setResult("lose");
-      setPhase("result");
-      apiRequest("POST", "/api/global-shop/hilo-result", { bet, netChange: nc })
-        .then(() => onRefreshUser())
-        .catch(() => {});
+      setNetChange(nc); setResult("lose"); setPhase("result");
+      apiRequest("POST", "/api/global-shop/hilo-result", { bet, netChange: nc }).then(() => onRefreshUser()).catch(() => {});
       return;
     }
-
     if (correct) {
       const newStreak = streak + 1;
-      const newMult = streakMultipliers[Math.min(newStreak, streakMultipliers.length - 1)];
       setStreak(newStreak);
-      setMultiplier(newMult);
-      setTimeout(() => {
-        setCurrentCard(next);
-        setNextCard(null);
-      }, 800);
+      setMultiplier(streakMultipliers[Math.min(newStreak, streakMultipliers.length - 1)]);
+      setTimeout(() => { setCurrentCard(next); setNextCard(null); }, 800);
     } else {
       const nc = -bet;
-      setNetChange(nc);
-      setResult("lose");
-      setPhase("result");
-      apiRequest("POST", "/api/global-shop/hilo-result", { bet, netChange: nc })
-        .then(() => onRefreshUser())
-        .catch(() => {});
+      setNetChange(nc); setResult("lose"); setPhase("result");
+      apiRequest("POST", "/api/global-shop/hilo-result", { bet, netChange: nc }).then(() => onRefreshUser()).catch(() => {});
     }
   }
 
   async function cashOut() {
     const nc = Math.floor(bet * multiplier) - bet;
-    setNetChange(nc);
-    setResult("win");
-    setPhase("result");
+    setNetChange(nc); setResult("win"); setPhase("result");
     try {
       await apiRequest("POST", "/api/global-shop/hilo-result", { bet, netChange: nc });
       onRefreshUser();
@@ -733,54 +785,57 @@ function HiLoGame({ balance, onRefreshUser }: { balance: number; onRefreshUser: 
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-amber-400">🎯 Hi-Lo</h2>
-        <p className="text-sm text-slate-400 mt-0.5">Guess higher or lower. Build a streak for big multipliers!</p>
+    <div className="p-6 space-y-5">
+      <div className="text-center pb-2 border-b border-amber-500/10">
+        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">▲▼ Hi-Lo</h2>
+        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Build a streak · Multipliers up to 20×</p>
       </div>
 
       {phase !== "bet" && currentCard && (
         <div className="space-y-4">
           <div className="flex items-center justify-center gap-6">
             <div className="text-center">
-              <p className="text-xs text-slate-500 mb-2">Current Card</p>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] mb-2">Current</p>
               <CardFace card={currentCard} />
-              <p className="text-xs text-slate-400 mt-1">Rank: {cardRank(currentCard.value)}</p>
+              <p className="text-[10px] text-zinc-500 mt-1.5">Rank {cardRank(currentCard.value)}</p>
             </div>
+            <div className="text-zinc-700 text-2xl font-black">→</div>
             <div className="text-center">
-              <div className="text-slate-600 text-2xl">→</div>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-500 mb-2">Next Card</p>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] mb-2">Next</p>
               {nextCard
                 ? <CardFace card={nextCard} animate />
-                : <div className="w-16 h-24 rounded-xl border-2 border-dashed border-slate-700 flex items-center justify-center"><p className="text-slate-600 text-xs">?</p></div>}
+                : <div className="w-16 h-24 rounded-xl flex items-center justify-center" style={{ border: "2px dashed rgba(212,175,55,0.2)", background: "rgba(212,175,55,0.03)" }}>
+                    <p className="text-2xl font-black" style={{ color: "rgba(212,175,55,0.3)" }}>?</p>
+                  </div>}
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-2">
-            <div className="text-center">
-              <p className="text-xs text-slate-500">Streak</p>
-              <p className="text-2xl font-bold text-amber-400">🔥 {streak}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-500">Multiplier</p>
-              <p className="text-2xl font-bold text-yellow-400">{multiplier.toFixed(1)}×</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-500">To Win</p>
-              <p className="text-2xl font-bold text-green-400">${Math.floor(bet * multiplier).toLocaleString()}</p>
-            </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "Streak", value: `🔥 ${streak}`, color: "#f59e0b" },
+              { label: "Multiplier", value: `${multiplier.toFixed(1)}×`, color: "#d4af37" },
+              { label: "To Win", value: `$${Math.floor(bet * multiplier).toLocaleString()}`, color: "#10b981" },
+            ].map(s => (
+              <div key={s.label} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(212,175,55,0.05)", border: "1px solid rgba(212,175,55,0.1)" }}>
+                <p className="text-[10px] text-zinc-600 uppercase tracking-wider">{s.label}</p>
+                <p className="text-base font-black mt-0.5" style={{ color: s.color }}>{s.value}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {phase === "result" && result && (
-        <div className={`rounded-xl p-4 text-center border animate-in fade-in ${result === "win" ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
-          <p className={`text-2xl font-bold ${result === "win" ? "text-green-400" : "text-red-400"}`}>
+        <div className={`rounded-xl p-4 text-center border animate-in fade-in duration-300`}
+          style={{
+            background: result === "win" ? "linear-gradient(135deg,rgba(16,185,129,0.1),rgba(10,10,20,0.9))" : "linear-gradient(135deg,rgba(220,38,38,0.1),rgba(10,10,20,0.9))",
+            borderColor: result === "win" ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.3)"
+          }}>
+          <p className={`text-2xl font-black tracking-wide ${result === "win" ? "text-emerald-400" : "text-red-400"}`}>
             {result === "win" ? "Cashed Out! 🎉" : "Wrong Guess 💔"}
           </p>
-          <p className={`text-lg font-semibold mt-1 ${netChange >= 0 ? "text-green-400" : "text-red-400"}`}>
+          <p className={`text-lg font-bold mt-1 ${netChange >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {netChange > 0 ? `+$${netChange.toLocaleString()}` : `-$${Math.abs(netChange).toLocaleString()}`}
           </p>
         </div>
@@ -788,53 +843,56 @@ function HiLoGame({ balance, onRefreshUser }: { balance: number; onRefreshUser: 
 
       {phase === "bet" && (
         <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            {quickBets.map(q => (
-              <button key={q} onClick={() => setBet(q)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${bet === q ? "bg-amber-500 border-amber-500 text-black" : "border-slate-700 text-slate-300 hover:border-amber-500/50"}`}>
-                ${q.toLocaleString()}
-              </button>
-            ))}
-          </div>
+          <ChipBets bet={bet} setBet={setBet} maxBet={balance} />
           <div className="flex items-center gap-3">
-            <button onClick={() => setBet(b => Math.max(1, b - 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-              <Minus className="w-4 h-4 text-slate-300" />
+            <button onClick={() => setBet(b => Math.max(1, b - (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Minus className="w-4 h-4 text-zinc-400" />
             </button>
-            <div className="flex-1 text-center"><p className="text-2xl font-bold text-amber-400">${bet.toLocaleString()}</p></div>
-            <button onClick={() => setBet(b => Math.min(balance, b + 50))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-              <Plus className="w-4 h-4 text-slate-300" />
+            <div className="flex-1 text-center">
+              <p className="text-3xl font-black text-amber-400">${bet.toLocaleString()}</p>
+            </div>
+            <button onClick={() => setBet(b => Math.min(balance, b + (b >= 1000 ? 500 : b >= 100 ? 50 : 1)))}
+              className="w-10 h-10 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center hover:border-amber-500/50 transition-colors">
+              <Plus className="w-4 h-4 text-zinc-400" />
             </button>
           </div>
-          <p className="text-xs text-slate-500 text-center">Streak multipliers: 1× → 1.5× → 2× → 3× → 5× → 8× → 12× → 20×</p>
-          <Button className="w-full h-12 font-bold bg-amber-500 hover:bg-amber-400 text-black border-0 shadow-lg shadow-amber-500/20" onClick={startGame} disabled={balance < bet}>
+          <p className="text-[10px] text-zinc-700 text-center tracking-wider">MULTIPLIERS: 1× · 1.5× · 2× · 3× · 5× · 8× · 12× · 20×</p>
+          <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95 disabled:opacity-40"
+            style={{ background: "linear-gradient(135deg,#d4af37,#f5cc5a)" }}
+            onClick={startGame} disabled={balance < bet}>
             Start Game
-          </Button>
+          </button>
         </div>
       )}
 
       {phase === "playing" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Button onClick={() => guess("higher")} className="h-14 text-lg font-black bg-green-600 hover:bg-green-500 border-0">
-              <ChevronUp className="w-6 h-6 mr-1" /> Higher
-            </Button>
-            <Button onClick={() => guess("lower")} className="h-14 text-lg font-black bg-red-600 hover:bg-red-500 border-0">
-              <ChevronDown className="w-6 h-6 mr-1" /> Lower
-            </Button>
+            <button onClick={() => guess("higher")} className="h-14 rounded-xl font-black text-base uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95 flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg,#059669,#10b981)", boxShadow: "0 4px 20px rgba(16,185,129,0.3)" }}>
+              <ChevronUp className="w-5 h-5" /> Higher
+            </button>
+            <button onClick={() => guess("lower")} className="h-14 rounded-xl font-black text-base uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95 flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 4px 20px rgba(220,38,38,0.3)" }}>
+              <ChevronDown className="w-5 h-5" /> Lower
+            </button>
           </div>
           {streak > 0 && (
-            <Button onClick={cashOut} variant="outline" className="w-full h-11 font-bold border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
+            <button onClick={cashOut} className="w-full h-11 rounded-xl font-black text-sm uppercase tracking-wider transition-all hover:brightness-110 active:scale-95 flex items-center justify-center gap-2"
+              style={{ background: "rgba(212,175,55,0.1)", border: "1px solid rgba(212,175,55,0.4)", color: "#d4af37" }}>
               💰 Cash Out ${Math.floor(bet * multiplier).toLocaleString()} ({multiplier.toFixed(1)}×)
-            </Button>
+            </button>
           )}
         </div>
       )}
 
       {phase === "result" && (
-        <Button className="w-full h-11 font-bold bg-amber-500 hover:bg-amber-400 text-black border-0"
+        <button className="w-full h-12 rounded-xl font-black text-sm uppercase tracking-[0.15em] text-black transition-all hover:brightness-110 active:scale-95"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f5cc5a)" }}
           onClick={() => { setPhase("bet"); setCurrentCard(null); }}>
           Play Again
-        </Button>
+        </button>
       )}
     </div>
   );
@@ -876,7 +934,8 @@ export default function ShopPage() {
   const packOpenMutation = useMutation({
     mutationFn: ({ packId, price }: { packId: string; price: number }) =>
       apiRequest("POST", "/api/global-shop/pack-open", { packId, price }),
-    onSuccess: async (data) => {
+    onSuccess: async (res) => {
+      const data = await res.json();
       await refreshUser();
       const itemType = data.rewardId?.startsWith("frame-") ? "frame" : data.rewardId?.startsWith("title-") ? "title" : "badge";
       setPackResult({ itemId: data.rewardId, type: itemType });
@@ -1051,30 +1110,70 @@ export default function ShopPage() {
 
         {/* ── Casino ── */}
         {mainTab === "casino" && (
-          <div className="space-y-4">
-            {/* Casino game selector */}
-            <div className="grid grid-cols-5 gap-2">
-              {CASINO_GAMES.map(g => (
-                <button key={g.id} onClick={() => setCasinoGame(g.id)}
-                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-center transition-all ${casinoGame === g.id ? "border-amber-500/50 bg-zinc-800" : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"}`}>
-                  <span className="text-2xl">{g.emoji}</span>
-                  <span className={`text-xs font-semibold ${casinoGame === g.id ? "text-amber-400" : "text-slate-500"}`}>{g.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Game panel */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-              <div>
-                {casinoGame === "blackjack" && <BlackjackGame balance={balance} onRefreshUser={refreshUser} />}
-                {casinoGame === "roulette" && <RouletteGame balance={balance} onRefreshUser={refreshUser} />}
-                {casinoGame === "coinflip" && <CoinFlipGame balance={balance} onRefreshUser={refreshUser} />}
-                {casinoGame === "crash" && <CrashGame balance={balance} onRefreshUser={refreshUser} />}
-                {casinoGame === "hilo" && <HiLoGame balance={balance} onRefreshUser={refreshUser} />}
+          <div className="space-y-5">
+            {/* Casino hero header */}
+            <div className="relative rounded-2xl overflow-hidden py-6 px-6 text-center"
+              style={{ background: "linear-gradient(135deg, #0a0208 0%, #120808 30%, #0a0a0f 60%, #080c14 100%)", border: "1px solid rgba(212,175,55,0.2)" }}>
+              {/* Animated shimmer line */}
+              <div className="absolute top-0 left-0 right-0 h-px animate-[casino-shimmer_3s_linear_infinite]"
+                style={{ background: "linear-gradient(90deg, transparent 0%, #d4af37 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
+              <div className="absolute bottom-0 left-0 right-0 h-px opacity-40"
+                style={{ background: "linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.5) 50%, transparent 100%)" }} />
+              <div className="flex items-center justify-center gap-3 mb-1">
+                <Dice6 className="w-5 h-5 text-amber-500/60" />
+                <h2 className="text-3xl font-black uppercase tracking-[0.25em]"
+                  style={{ background: "linear-gradient(135deg, #d4af37 0%, #f5cc5a 40%, #d4af37 60%, #a07820 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  Casino
+                </h2>
+                <Dice6 className="w-5 h-5 text-amber-500/60" />
+              </div>
+              <p className="text-xs text-zinc-600 tracking-[0.2em] uppercase">Simulator Balance · High Stakes · All Games</p>
+              <div className="mt-3 flex items-center justify-center gap-1.5">
+                <Gem className="w-3 h-3 text-amber-500" />
+                <span className="text-amber-400 font-black text-lg">${balance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                <span className="text-zinc-600 text-xs uppercase tracking-wider">available</span>
               </div>
             </div>
 
-            <p className="text-center text-xs text-slate-700">All games use your simulator balance. Play responsibly.</p>
+            {/* Game selector */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {CASINO_GAMES.map(g => {
+                const active = casinoGame === g.id;
+                const gameColors: Record<string, string> = {
+                  blackjack: "rgba(16,185,129,0.15)", roulette: "rgba(220,38,38,0.15)",
+                  coinflip: "rgba(212,175,55,0.15)", crash: "rgba(249,115,22,0.15)", hilo: "rgba(139,92,246,0.15)",
+                };
+                const gameBorders: Record<string, string> = {
+                  blackjack: "rgba(16,185,129,0.5)", roulette: "rgba(220,38,38,0.5)",
+                  coinflip: "rgba(212,175,55,0.5)", crash: "rgba(249,115,22,0.5)", hilo: "rgba(139,92,246,0.5)",
+                };
+                return (
+                  <button key={g.id} onClick={() => setCasinoGame(g.id)}
+                    className="flex flex-col items-center gap-1.5 py-3 px-4 rounded-xl shrink-0 transition-all hover:scale-[1.03] active:scale-95"
+                    style={{
+                      background: active ? gameColors[g.id] : "rgba(10,10,20,0.8)",
+                      border: `1px solid ${active ? gameBorders[g.id] : "rgba(255,255,255,0.05)"}`,
+                      boxShadow: active ? `0 4px 20px ${gameColors[g.id]}` : "none",
+                      minWidth: 80,
+                    }}>
+                    <span className="text-2xl">{g.emoji}</span>
+                    <span className="text-xs font-black uppercase tracking-wider" style={{ color: active ? "#d4af37" : "#4b5563" }}>{g.label}</span>
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Game panel */}
+            <CasinoPanel>
+              {casinoGame === "blackjack" && <BlackjackGame balance={balance} onRefreshUser={refreshUser} />}
+              {casinoGame === "roulette" && <RouletteGame balance={balance} onRefreshUser={refreshUser} />}
+              {casinoGame === "coinflip" && <CoinFlipGame balance={balance} onRefreshUser={refreshUser} />}
+              {casinoGame === "crash" && <CrashGame balance={balance} onRefreshUser={refreshUser} />}
+              {casinoGame === "hilo" && <HiLoGame balance={balance} onRefreshUser={refreshUser} />}
+            </CasinoPanel>
+
+            <p className="text-center text-[10px] text-zinc-800 uppercase tracking-widest">All games use your simulator balance · Play responsibly</p>
           </div>
         )}
 
@@ -1333,10 +1432,17 @@ export default function ShopPage() {
           0% { opacity: 0; transform: translateY(-20px) scale(0.8) rotate(-5deg); }
           100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
         }
-        @keyframes coin-flip {
-          0% { transform: rotateY(0deg); }
-          50% { transform: rotateY(900deg) scaleX(0.1); }
-          100% { transform: rotateY(1800deg); }
+        @keyframes casino-coin-flip {
+          0%   { transform: rotateY(0deg); }
+          100% { transform: rotateY(1440deg); }
+        }
+        @keyframes casino-shimmer {
+          0%   { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes casino-pulse {
+          0%, 100% { box-shadow: 0 0 20px rgba(16,185,129,0.4); }
+          50%       { box-shadow: 0 0 40px rgba(16,185,129,0.8); }
         }
       `}</style>
     </div>
