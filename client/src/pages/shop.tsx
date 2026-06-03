@@ -106,16 +106,52 @@ const CHIPS = [
 ];
 
 function ChipBets({ bet, setBet, maxBet }: { bet: number; setBet: (n: number) => void; maxBet: number }) {
+  const [customInput, setCustomInput] = useState("");
+  const [customFocused, setCustomFocused] = useState(false);
   const chips = CHIPS.filter(c => c.value <= maxBet);
-  if (chips.length === 0) return null;
+
+  function handleCustomSubmit() {
+    const val = parseInt(customInput.replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(val) && val >= 1) {
+      setBet(Math.min(val, maxBet));
+    }
+    setCustomInput("");
+  }
+
   return (
-    <div className="flex flex-wrap gap-2 justify-center">
-      {chips.map(c => (
-        <button key={c.value} onClick={() => setBet(c.value)}
-          className={`w-14 h-14 rounded-full border-2 font-black text-xs transition-all hover:scale-110 active:scale-95 shadow-lg ${c.bg} ${c.shadow} ${bet === c.value ? "scale-110 ring-2 ring-white/40" : "opacity-80 hover:opacity-100"}`}>
-          {c.label}
+    <div className="space-y-3">
+      {/* Chip row */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        {chips.map(c => (
+          <button key={c.value} onClick={() => setBet(c.value)}
+            className={`w-14 h-14 rounded-full border-2 font-black text-xs transition-all hover:scale-110 active:scale-95 shadow-lg ${c.bg} ${c.shadow} ${bet === c.value ? "scale-110 ring-2 ring-white/40" : "opacity-80 hover:opacity-100"}`}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {/* Custom amount input */}
+      <div className="flex items-center gap-2">
+        <div className={`flex-1 flex items-center rounded-lg transition-all ${customFocused ? "ring-1 ring-amber-500/60" : ""}`}
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <span className="pl-3 text-zinc-600 text-sm font-bold select-none">$</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="custom amount"
+            value={customInput}
+            onChange={e => setCustomInput(e.target.value.replace(/[^0-9]/g, ""))}
+            onFocus={() => setCustomFocused(true)}
+            onBlur={() => setCustomFocused(false)}
+            onKeyDown={e => e.key === "Enter" && handleCustomSubmit()}
+            className="flex-1 bg-transparent px-2 py-2 text-sm text-zinc-300 outline-none placeholder:text-zinc-700"
+          />
+        </div>
+        <button onClick={handleCustomSubmit}
+          className="px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider text-black transition-all hover:brightness-110 active:scale-95"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f5cc5a)" }}>
+          Set
         </button>
-      ))}
+      </div>
     </div>
   );
 }
@@ -236,9 +272,12 @@ function BlackjackGame({ balance, onRefreshUser }: { balance: number; onRefreshU
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div className="text-center pb-2 border-b border-amber-500/10">
-        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">♠ Blackjack</h2>
-        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Beat the dealer · Blackjack pays 3:2</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">♠ Blackjack</h2>
+          <p className="text-xs text-zinc-600 mt-0.5">Beat the dealer to 21 — blackjack pays 3:2</p>
+        </div>
+        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-950 border border-emerald-900 rounded px-1.5 py-0.5 uppercase tracking-wider">card game</span>
       </div>
 
       {/* Felt area */}
@@ -366,9 +405,12 @@ function RouletteGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
 
   return (
     <div className="p-6 space-y-5">
-      <div className="text-center pb-2 border-b border-amber-500/10">
-        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">◎ Roulette</h2>
-        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Spin the wheel · Win cash or rare items</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">◎ Roulette</h2>
+          <p className="text-xs text-zinc-600 mt-0.5">Spin for cash or rare collectibles</p>
+        </div>
+        <span className="text-[10px] font-bold text-red-500 bg-red-950 border border-red-900 rounded px-1.5 py-0.5 uppercase tracking-wider">wheel</span>
       </div>
 
       {/* Wheel */}
@@ -494,9 +536,12 @@ function CoinFlipGame({ balance, onRefreshUser }: { balance: number; onRefreshUs
 
   return (
     <div className="p-6 space-y-5">
-      <div className="text-center pb-2 border-b border-amber-500/10">
-        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">◉ Coin Flip</h2>
-        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">50/50 · Double or nothing</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">🪙 Coin Flip</h2>
+          <p className="text-xs text-zinc-600 mt-0.5">50/50 — double or nothing</p>
+        </div>
+        <span className="text-[10px] font-bold text-amber-600 bg-amber-950 border border-amber-900 rounded px-1.5 py-0.5 uppercase tracking-wider">50/50</span>
       </div>
 
       {/* Coin — FIXED: perspective on PARENT, transform on CHILD */}
@@ -641,9 +686,12 @@ function CrashGame({ balance, onRefreshUser }: { balance: number; onRefreshUser:
 
   return (
     <div className="p-6 space-y-5">
-      <div className="text-center pb-2 border-b border-amber-500/10">
-        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">🚀 Crash</h2>
-        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Cash out before it crashes · Lose everything if it does</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">🚀 Crash</h2>
+          <p className="text-xs text-zinc-600 mt-0.5">Cash out before it crashes or lose it all</p>
+        </div>
+        <span className="text-[10px] font-bold text-orange-500 bg-orange-950 border border-orange-900 rounded px-1.5 py-0.5 uppercase tracking-wider">live</span>
       </div>
 
       {/* Multiplier display */}
@@ -786,9 +834,12 @@ function HiLoGame({ balance, onRefreshUser }: { balance: number; onRefreshUser: 
 
   return (
     <div className="p-6 space-y-5">
-      <div className="text-center pb-2 border-b border-amber-500/10">
-        <h2 className="text-xl font-black uppercase tracking-[0.15em] text-amber-400">▲▼ Hi-Lo</h2>
-        <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Build a streak · Multipliers up to 20×</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">▲▼ Hi-Lo</h2>
+          <p className="text-xs text-zinc-600 mt-0.5">Guess higher or lower — streak multipliers up to 20×</p>
+        </div>
+        <span className="text-[10px] font-bold text-purple-400 bg-purple-950 border border-purple-900 rounded px-1.5 py-0.5 uppercase tracking-wider">streak</span>
       </div>
 
       {phase !== "bet" && currentCard && (
@@ -1111,27 +1162,15 @@ export default function ShopPage() {
         {/* ── Casino ── */}
         {mainTab === "casino" && (
           <div className="space-y-5">
-            {/* Casino hero header */}
-            <div className="relative rounded-2xl overflow-hidden py-6 px-6 text-center"
-              style={{ background: "linear-gradient(135deg, #0a0208 0%, #120808 30%, #0a0a0f 60%, #080c14 100%)", border: "1px solid rgba(212,175,55,0.2)" }}>
-              {/* Animated shimmer line */}
-              <div className="absolute top-0 left-0 right-0 h-px animate-[casino-shimmer_3s_linear_infinite]"
-                style={{ background: "linear-gradient(90deg, transparent 0%, #d4af37 50%, transparent 100%)", backgroundSize: "200% 100%" }} />
-              <div className="absolute bottom-0 left-0 right-0 h-px opacity-40"
-                style={{ background: "linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.5) 50%, transparent 100%)" }} />
-              <div className="flex items-center justify-center gap-3 mb-1">
-                <Dice6 className="w-5 h-5 text-amber-500/60" />
-                <h2 className="text-3xl font-black uppercase tracking-[0.25em]"
-                  style={{ background: "linear-gradient(135deg, #d4af37 0%, #f5cc5a 40%, #d4af37 60%, #a07820 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                  Casino
-                </h2>
-                <Dice6 className="w-5 h-5 text-amber-500/60" />
+            {/* Casino header */}
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Casino <span className="text-amber-400">🎰</span></h2>
+                <p className="text-xs text-zinc-600 mt-0.5">All bets use your simulator balance</p>
               </div>
-              <p className="text-xs text-zinc-600 tracking-[0.2em] uppercase">Simulator Balance · High Stakes · All Games</p>
-              <div className="mt-3 flex items-center justify-center gap-1.5">
-                <Gem className="w-3 h-3 text-amber-500" />
-                <span className="text-amber-400 font-black text-lg">${balance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                <span className="text-zinc-600 text-xs uppercase tracking-wider">available</span>
+              <div className="text-right">
+                <p className="text-[10px] text-zinc-700 uppercase tracking-wider">Balance</p>
+                <p className="text-xl font-black text-amber-400">${balance.toLocaleString()}</p>
               </div>
             </div>
 

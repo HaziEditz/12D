@@ -109,6 +109,11 @@ function getPresenceInfo(lastSeenAt: string | null, presenceStatus?: string | nu
   return { status: "online", label: "Active now" };
 }
 
+function getOnlineStatus(lastSeenAt: string | null): { isOnline: boolean } {
+  if (!lastSeenAt) return { isOnline: false };
+  return { isOnline: Date.now() - new Date(lastSeenAt).getTime() < 5 * 60 * 1000 };
+}
+
 function OnlineBadge({ lastSeenAt, presenceStatus }: { lastSeenAt: string | null; presenceStatus?: string | null }) {
   const { status, label } = getPresenceInfo(lastSeenAt, presenceStatus);
   const dotColor = status === "online"
