@@ -53,7 +53,10 @@ async function buildAll() {
   if (process.env.NODE_ENV === "production" || process.env.RENDER === "true") {
     console.log("syncing database schema...");
     try {
-      execSync("npm run db:push", { stdio: "inherit" });
+      execSync("npm run db:push", {
+        stdio: "inherit",
+        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: "0" },
+      });
       console.log("✓ Database schema synced");
     } catch (err) {
       console.warn("⚠ Database schema sync skipped (may run on startup)");
