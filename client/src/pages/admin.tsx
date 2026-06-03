@@ -1561,14 +1561,18 @@ function FinancialTab({ financialStats, financialLoading }: {
 function BalancesTab() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [resetAllAmount, setResetAllAmount] = useState("10000");
   const [customBalances, setCustomBalances] = useState<Record<string, string>>({});
   const [confirmResetAll, setConfirmResetAll] = useState(false);
-
   const { data: userList = [], refetch, isLoading } = useQuery<Array<{
     id: string; email: string; displayName: string; role: string;
     membershipTier: string; simulatorBalance: number; totalProfit: number; createdAt: string;
   }>>({ queryKey: ["/api/admin/users-list"] });
+
+  const { data: dbStorage } = useQuery<{ usedBytes: number; usedPretty: string }>({
+    queryKey: ["/api/admin/db-storage"],
+  });
 
   const resetOneMutation = useMutation({
     mutationFn: ({ id, amount }: { id: string; amount: number }) =>
@@ -1603,14 +1607,43 @@ function BalancesTab() {
       )
     : userList;
 
+  const dropdownUsers = search.trim()
+    ? userList.filter(u =>
+        (u.displayName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (u.email ?? "").toLowerCase().includes(search.toLowerCase())
+      ).slice(0, 8)
+    : userList.slice(0, 8);
+
   const suspiciousThreshold = 500000;
+
+  const storagePercent = dbStorage
+    ? Math.min(100, Math.round((dbStorage.usedBytes / (256 * 1024 * 1024)) * 100))
+    : 0;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-6 space-y-6 max-w-5xl">
-        <div>
-          <h2 className="text-lg font-semibold">Balance Manager</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Reset, inspect, and correct simulator balances. Use this to clean up glitched or exploited accounts.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Balance Manager</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Reset, inspect, and correct simulator balances. Use this to clean up glitched or exploited accounts.</p>
+          </div>
+          {dbStorage && (
+            <div className="border rounded-lg px-4 py-3 min-w-[200px] bg-muted/30">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Database Storage</span>
+              </div>
+              <p className="text-xl font-bold tabular-nums">{dbStorage.usedPretty}</p>
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${storagePercent > 80 ? "bg-destructive" : storagePercent > 60 ? "bg-amber-500" : "bg-emerald-500"}`}
+                  style={{ width: `${storagePercent}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">{storagePercent}% of 256 MB free tier</p>
+            </div>
+          )}
         </div>
 
         {/* Bulk actions */}
@@ -1651,7 +1684,52 @@ function BalancesTab() {
 
         {/* Search */}
         <div className="flex items-center gap-3">
-          <Input placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm h-9 text-sm" />
+          <div className="relative max-w-sm w-full">
+            <Input
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setShowDropdown(true); }}
+              onFocus={() => setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              className="h-9 text-sm w-full"
+            />
+            {showDropdown && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-lg bg-popover shadow-lg max-h-64 overflow-y-auto">
+                {dropdownUsers.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">No users found</div>
+                ) : (
+                  <>
+                    {!search.trim() && (
+                      <div className="px-3 py-1.5 border-b">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">All users ({userList.length})</span>
+                      </div>
+                    )}
+                    {dropdownUsers.map(u => (
+                      <button
+                        key={u.id}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
+                        onMouseDown={() => { setSearch(u.displayName || u.email || ""); setShowDropdown(false); }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{u.displayName || "—"}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <Badge variant="outline" className="text-[9px] py-0">{u.role}</Badge>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">${(u.simulatorBalance ?? 0).toLocaleString()}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {!search.trim() && userList.length > 8 && (
+                      <div className="px-3 py-1.5 border-t text-[10px] text-muted-foreground text-center">
+                        Type to search all {userList.length} users
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <Button size="sm" variant="outline" onClick={() => refetch()}>Refresh</Button>
           <span className="text-xs text-muted-foreground">{filtered.length} users</span>
         </div>

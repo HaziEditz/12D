@@ -1401,6 +1401,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ users: usersCount, lessons: lessonsCount, trades: tradesCount });
   });
 
+  app.get("/api/admin/db-storage", requireAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT
+          pg_database_size(current_database()) AS used_bytes,
+          pg_size_pretty(pg_database_size(current_database())) AS used_pretty
+      `);
+      const usedBytes = parseInt(result.rows[0].used_bytes, 10);
+      res.json({ usedBytes, usedPretty: result.rows[0].used_pretty });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ── Admin Balance Management ────────────────────────────────────────────────
   app.get("/api/admin/users-list", requireAdmin, async (req, res) => {
     try {
