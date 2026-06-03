@@ -860,6 +860,87 @@ export const betEntries = pgTable("bet_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── Trading Leagues ──────────────────────────────────────────────────────────
+
+export const playerLeagueStats = pgTable("player_league_stats", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  lp: integer("lp").default(0).notNull(),
+  weeklyLp: integer("weekly_lp").default(0).notNull(),
+  seasonLp: integer("season_lp").default(0).notNull(),
+  peakLp: integer("peak_lp").default(0).notNull(),
+  rivalId: varchar("rival_id"),
+  rivalWins: integer("rival_wins").default(0).notNull(),
+  rivalLosses: integer("rival_losses").default(0).notNull(),
+  showdownWins: integer("showdown_wins").default(0).notNull(),
+  showdownLosses: integer("showdown_losses").default(0).notNull(),
+  weeklyResetAt: timestamp("weekly_reset_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const showdowns = pgTable("showdowns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challengerId: varchar("challenger_id").notNull().references(() => users.id),
+  challengeeId: varchar("challengee_id").notNull().references(() => users.id),
+  timeframe: text("timeframe").notNull(),
+  status: text("status").default("pending").notNull(),
+  challengerLpStart: integer("challenger_lp_start").default(0),
+  challengeeLpStart: integer("challengee_lp_start").default(0),
+  challengerLpGained: integer("challenger_lp_gained").default(0),
+  challengeeLpGained: integer("challengee_lp_gained").default(0),
+  winnerUserId: varchar("winner_user_id"),
+  startedAt: timestamp("started_at"),
+  endsAt: timestamp("ends_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const hedgeFunds = pgTable("hedge_funds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  joinCode: text("join_code").notNull().unique(),
+  logoEmoji: text("logo_emoji").default("🏦"),
+  weeklyLpTotal: integer("weekly_lp_total").default(0),
+  allTimeLpTotal: integer("all_time_lp_total").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const hedgeFundMembers = pgTable("hedge_fund_members", {
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fundId: varchar("fund_id").notNull().references(() => hedgeFunds.id),
+  role: text("role").default("member").notNull(),
+  weeklyLpContrib: integer("weekly_lp_contrib").default(0),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const challengeCompletions = pgTable("challenge_completions", {
+  userId: varchar("user_id").notNull().references(() => users.id),
+  challengeKey: text("challenge_key").notNull(),
+  completedAt: timestamp("completed_at").defaultNow(),
+  lpAwarded: integer("lp_awarded").default(0),
+});
+
+export const leagueSeasons = pgTable("league_seasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: integer("number").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
+});
+
+export type PlayerLeagueStat = typeof playerLeagueStats.$inferSelect;
+export type InsertPlayerLeagueStat = typeof playerLeagueStats.$inferInsert;
+export type Showdown = typeof showdowns.$inferSelect;
+export type InsertShowdown = typeof showdowns.$inferInsert;
+export type HedgeFund = typeof hedgeFunds.$inferSelect;
+export type InsertHedgeFund = typeof hedgeFunds.$inferInsert;
+export type HedgeFundMember = typeof hedgeFundMembers.$inferSelect;
+export type LeagueSeason = typeof leagueSeasons.$inferSelect;
+export type ChallengeCompletion = typeof challengeCompletions.$inferSelect;
+
+export const insertShowdownSchema = createInsertSchema(showdowns).omit({ id: true, createdAt: true });
+export const insertHedgeFundSchema = createInsertSchema(hedgeFunds).omit({ id: true, createdAt: true });
+
 export const insertUserInventorySchema = createInsertSchema(userInventory).omit({ id: true, createdAt: true });
 export const insertTradeOfferSchema = createInsertSchema(tradeOffers).omit({ id: true, createdAt: true, respondedAt: true });
 export const insertMarketplaceListingSchema = createInsertSchema(studentMarketplaceListings).omit({ id: true, createdAt: true });

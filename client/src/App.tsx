@@ -52,6 +52,7 @@ import SchoolPlanPortal from "@/pages/school-plan-portal";
 import CasualPortfolioAnalysis from "@/pages/casual-portfolio-analysis";
 import ShopPage from "@/pages/shop";
 import MessagesPage from "@/pages/messages";
+import LeaguesPage from "@/pages/leagues";
 
 function Router() {
   const { user } = useAuth();
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/casual/portfolio" component={CasualPortfolioAnalysis} />
       <Route path="/shop" component={ShopPage} />
       <Route path="/messages" component={MessagesPage} />
+      <Route path="/leagues" component={LeaguesPage} />
       <Route component={NotFound} />
     </Switch>
   );

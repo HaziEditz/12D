@@ -943,6 +943,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Check and award achievements after closing a trade
       // Non-blocking for performance
       checkAndAwardAchievements(user.id).catch(console.error);
+
+      // Award / deduct League Points based on trade P&L (non-blocking)
+      Promise.resolve().then(async () => {
+        try {
+          const profit = trade.profit ?? 0;
+          const entryValue = (trade.quantity ?? 0) * (trade.entryPrice ?? 0);
+          if (entryValue <= 0) return;
+          const profitPct = (profit / entryValue) * 100;
+          if (profit > 0) {
+            const rr = trade.stopLoss && trade.takeProfit
+              ? Math.abs((trade.takeProfit - trade.entryPrice) / (trade.entryPrice - trade.stopLoss))
+              : 1;
+            let lp = Math.min(50, Math.max(5, Math.floor(profitPct * 3)));
+            if (rr >= 2) lp += 20; // discipline bonus
+            await storage.awardLP(user.id, lp);
+          } else if (profit < 0) {
+            const lp = Math.min(30, Math.max(3, Math.floor(Math.abs(profitPct) * 2)));
+            await storage.awardLP(user.id, -lp);
+          }
+        } catch (_) {}
+      });
       
       res.json(trade);
     } catch (error: any) {
@@ -4609,6 +4630,173 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const result = await storage.repayLoan(classId, user.id, req.params.id, Number(amount));
       res.json(result);
     } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  // ─── Trading Leagues Routes ────────────────────────────────────────────────
+
+  app.get("/api/leagues/me", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const stats = await storage.ensureLeagueStats(user.id);
+      const season = await storage.ensureCurrentSeason();
+      res.json({ stats, season });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/leagues/leaderboard", requireAuth, async (_req, res) => {
+    try {
+      const rows = await storage.getLeagueLeaderboard(50);
+      res.json(rows);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/leagues/season/leaderboard", requireAuth, async (_req, res) => {
+    try {
+      const rows = await storage.getSeasonLeaderboard(50);
+      res.json(rows);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/rival/match", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const rivalId = await storage.matchRival(user.id);
+      res.json({ rivalId });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/leagues/rival", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const stats = await storage.getLeagueStats(user.id);
+      if (!stats?.rivalId) return res.json({ rival: null });
+      const [rivalStats, rivalUser] = await Promise.all([
+        storage.getLeagueStats(stats.rivalId),
+        storage.getUserById(stats.rivalId),
+      ]);
+      res.json({ rival: { ...rivalStats, displayName: rivalUser?.displayName, avatarUrl: rivalUser?.avatarUrl, username: rivalUser?.username } });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // Showdowns
+  app.get("/api/leagues/showdowns", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const list = await storage.getShowdowns(user.id);
+      const enriched = await Promise.all(list.map(async s => {
+        const [c, ee] = await Promise.all([storage.getUserById(s.challengerId), storage.getUserById(s.challengeeId)]);
+        return { ...s, challengerName: c?.displayName, challengeeName: ee?.displayName, challengerAvatar: c?.avatarUrl, challengeeAvatar: ee?.avatarUrl };
+      }));
+      res.json(enriched);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/showdowns", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { challengeeId, timeframe } = req.body;
+      if (!challengeeId || !["1h","1d","1w"].includes(timeframe)) return res.status(400).json({ message: "challengeeId and timeframe (1h/1d/1w) required" });
+      const showdown = await storage.createShowdown(user.id, challengeeId, timeframe);
+      res.json(showdown);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/showdowns/:id/accept", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sd = await storage.acceptShowdown(req.params.id, user.id);
+      res.json(sd);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/showdowns/:id/decline", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sd = await storage.declineShowdown(req.params.id, user.id);
+      res.json(sd);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/showdowns/:id/resolve", requireAuth, async (req, res) => {
+    try {
+      const sd = await storage.resolveShowdown(req.params.id);
+      res.json(sd);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // Hedge Funds
+  app.get("/api/leagues/hedge-funds/mine", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const result = await storage.getUserHedgeFund(user.id);
+      res.json(result);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/leagues/hedge-funds", requireAuth, async (_req, res) => {
+    try {
+      const funds = await storage.getHedgeFundLeaderboard();
+      res.json(funds);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/hedge-funds", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { name, description, emoji } = req.body;
+      if (!name) return res.status(400).json({ message: "Fund name is required" });
+      const fund = await storage.createHedgeFund(user.id, name, description ?? "", emoji ?? "🏦");
+      res.json(fund);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/hedge-funds/join", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { joinCode } = req.body;
+      if (!joinCode) return res.status(400).json({ message: "Join code required" });
+      const fund = await storage.joinHedgeFund(user.id, joinCode);
+      res.json(fund);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/hedge-funds/leave", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.leaveHedgeFund(user.id);
+      res.json({ ok: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // Weekly Challenges
+  app.get("/api/leagues/challenges", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const completions = await storage.getWeeklyChallengeCompletions(user.id);
+      const completedKeys = new Set(completions.map(c => c.challengeKey.split("_").slice(1).join("_")));
+      const challenges = [
+        { id: "profit-target", title: "Profit Target", description: "Achieve 5%+ return on a single winning trade", type: "profit_pct", target: 5, lpReward: 150, emoji: "📈" },
+        { id: "risk-manager", title: "Risk Manager", description: "Close 3 trades where you set a stop-loss", type: "stop_loss_trades", target: 3, lpReward: 125, emoji: "🛡️" },
+        { id: "win-streak", title: "Win Streak", description: "Close 5 consecutive profitable trades", type: "win_streak", target: 5, lpReward: 200, emoji: "🔥" },
+        { id: "discipline", title: "Disciplined Trader", description: "Set both stop-loss and take-profit on 5 trades", type: "full_risk_trades", target: 5, lpReward: 175, emoji: "⚖️" },
+        { id: "volume", title: "Active Trader", description: "Close at least 10 trades this week", type: "trade_volume", target: 10, lpReward: 100, emoji: "⚡" },
+      ];
+      res.json(challenges.map(c => ({ ...c, completed: completedKeys.has(c.id) })));
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/leagues/challenges/:id/claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const challengeMap: Record<string, number> = {
+        "profit-target": 150, "risk-manager": 125, "win-streak": 200,
+        "discipline": 175, "volume": 100,
+      };
+      const lp = challengeMap[req.params.id];
+      if (!lp) return res.status(404).json({ message: "Challenge not found" });
+      await storage.completeLeagueChallenge(user.id, req.params.id, lp);
+      res.json({ ok: true, lpAwarded: lp });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   // Background achievement check loop

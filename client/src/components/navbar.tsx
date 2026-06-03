@@ -17,7 +17,7 @@ import {
   Menu, X, GraduationCap, Settings, Library, BarChart3, Lock, Crown,
   Award, Zap, BookOpenText, Newspaper, Calendar, Calculator, Star,
   Lightbulb, Users, ShieldCheck, HelpCircle, ShoppingBag, Clock,
-  ChevronLeft, ChevronRight, Coins, MessageSquare
+  ChevronLeft, ChevronRight, Coins, MessageSquare, Swords
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -113,6 +113,7 @@ export function Navbar() {
     { href: "/achievements",   label: "Achievements", icon: Award,           premium: false },
     { href: "/watchlist",      label: "Watchlist",    icon: Star,            premium: false },
     { href: "/tips",           label: "Tips",         icon: Lightbulb,       premium: false },
+    { href: "/leagues",        label: "Leagues",      icon: Swords,          premium: false },
     { href: "/shop",           label: "Shop",         icon: ShoppingBag,     premium: false },
     { href: "/strategies",     label: "Strategies",   icon: Library,         premium: false },
     { href: "/risk-calculator",label: "Risk Calc",    icon: Calculator,      premium: true  },

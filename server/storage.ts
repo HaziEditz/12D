@@ -13,6 +13,7 @@ import {
   classGroupChats, classGroupChatMembers, classGroupChatMessages,
   classMessageReactions, classDirectMessages,
   friendGroupChats, friendGroupChatMembers, friendGroupChatMessages, cosmeticListings,
+  playerLeagueStats, showdowns, hedgeFunds, hedgeFundMembers, challengeCompletions, leagueSeasons,
   type User, type InsertUser, type Lesson, type InsertLesson, type LessonProgress,
   type Trade, type InsertTrade, type PortfolioItem, type InsertPortfolioItem,
   type Assignment, type InsertAssignment, type School, type InsertSchool,
@@ -47,7 +48,9 @@ import {
   type ClassroomChallenge, type InsertClassroomChallenge,
   type ClassroomAsset, type InsertClassroomAsset, type StudentAsset,
   type UserInventory, type InsertUserInventory,
-  type TradeOffer
+  type TradeOffer,
+  type PlayerLeagueStat, type Showdown, type HedgeFund, type HedgeFundMember,
+  type LeagueSeason, type ChallengeCompletion
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -333,6 +336,27 @@ export interface IStorage {
   resolveBet(betId: string, userId: string, result: string): Promise<{ success: boolean; message: string; payouts?: any[] }>;
   cancelBet(betId: string, userId: string): Promise<{ success: boolean; message: string }>;
   getMyBetEntries(userId: string): Promise<any[]>;
+  // Trading Leagues
+  ensureLeagueStats(userId: string): Promise<PlayerLeagueStat>;
+  getLeagueStats(userId: string): Promise<PlayerLeagueStat | undefined>;
+  awardLP(userId: string, amount: number): Promise<PlayerLeagueStat>;
+  getLeagueLeaderboard(limit?: number): Promise<Array<PlayerLeagueStat & { displayName: string; avatarUrl: string | null; equippedTitle: string | null; username: string | null }>>;
+  getSeasonLeaderboard(limit?: number): Promise<Array<PlayerLeagueStat & { displayName: string; avatarUrl: string | null; username: string | null }>>;
+  matchRival(userId: string): Promise<string | null>;
+  createShowdown(challengerId: string, challengeeId: string, timeframe: string): Promise<Showdown>;
+  getShowdowns(userId: string): Promise<Showdown[]>;
+  acceptShowdown(showdownId: string, userId: string): Promise<Showdown>;
+  declineShowdown(showdownId: string, userId: string): Promise<Showdown>;
+  resolveShowdown(showdownId: string): Promise<Showdown>;
+  createHedgeFund(ownerId: string, name: string, description: string, emoji: string): Promise<HedgeFund>;
+  joinHedgeFund(userId: string, joinCode: string): Promise<HedgeFund>;
+  leaveHedgeFund(userId: string): Promise<void>;
+  getUserHedgeFund(userId: string): Promise<{ fund: HedgeFund; members: Array<{ userId: string; displayName: string; lp: number; role: string; weeklyLpContrib: number }> } | null>;
+  getHedgeFundLeaderboard(): Promise<Array<HedgeFund & { memberCount: number }>>;
+  getCurrentSeason(): Promise<LeagueSeason | null>;
+  ensureCurrentSeason(): Promise<LeagueSeason>;
+  getWeeklyChallengeCompletions(userId: string): Promise<ChallengeCompletion[]>;
+  completeLeagueChallenge(userId: string, challengeKey: string, lpReward: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2932,6 +2956,293 @@ export class DatabaseStorage implements IStorage {
     const today = new Date().toISOString().split("T")[0];
     const available = user.luckyBonusClaimedAt !== today;
     return { available, nextAvailable: available ? null : new Date(Date.now() + 86400000).toISOString().split("T")[0] };
+  }
+
+  // ─── Trading Leagues ───────────────────────────────────────────────────────
+
+  async ensureLeagueStats(userId: string): Promise<PlayerLeagueStat> {
+    const existing = await db.select().from(playerLeagueStats).where(eq(playerLeagueStats.userId, userId)).limit(1);
+    if (existing[0]) return existing[0];
+    const [row] = await db.insert(playerLeagueStats).values({ userId }).returning();
+    return row;
+  }
+
+  async getLeagueStats(userId: string): Promise<PlayerLeagueStat | undefined> {
+    const [row] = await db.select().from(playerLeagueStats).where(eq(playerLeagueStats.userId, userId)).limit(1);
+    return row;
+  }
+
+  async awardLP(userId: string, amount: number): Promise<PlayerLeagueStat> {
+    await this.ensureLeagueStats(userId);
+    const delta = Math.round(amount);
+    const [updated] = await db.update(playerLeagueStats).set({
+      lp: sql`GREATEST(0, ${playerLeagueStats.lp} + ${delta})`,
+      weeklyLp: sql`GREATEST(0, ${playerLeagueStats.weeklyLp} + ${delta})`,
+      seasonLp: sql`GREATEST(0, ${playerLeagueStats.seasonLp} + ${delta})`,
+      peakLp: sql`GREATEST(${playerLeagueStats.peakLp}, ${playerLeagueStats.lp} + ${delta})`,
+      updatedAt: new Date(),
+    }).where(eq(playerLeagueStats.userId, userId)).returning();
+
+    // Sync hedge fund contribution
+    const membership = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.userId, userId)).limit(1);
+    if (membership[0] && delta > 0) {
+      await db.update(hedgeFundMembers).set({ weeklyLpContrib: sql`${hedgeFundMembers.weeklyLpContrib} + ${delta}` }).where(eq(hedgeFundMembers.userId, userId));
+      await db.update(hedgeFunds).set({
+        weeklyLpTotal: sql`${hedgeFunds.weeklyLpTotal} + ${delta}`,
+        allTimeLpTotal: sql`${hedgeFunds.allTimeLpTotal} + ${delta}`,
+      }).where(eq(hedgeFunds.id, membership[0].fundId));
+    }
+
+    // Sync rival weekly LP
+    if (delta > 0) {
+      const stats = updated;
+      if (stats.rivalId) {
+        // weekly rivalry tracked by comparing weeklyLp each week — no extra table needed
+      }
+    }
+
+    return updated;
+  }
+
+  async getLeagueLeaderboard(limit = 50) {
+    const rows = await db.select({
+      userId: playerLeagueStats.userId,
+      lp: playerLeagueStats.lp,
+      weeklyLp: playerLeagueStats.weeklyLp,
+      seasonLp: playerLeagueStats.seasonLp,
+      peakLp: playerLeagueStats.peakLp,
+      rivalId: playerLeagueStats.rivalId,
+      rivalWins: playerLeagueStats.rivalWins,
+      rivalLosses: playerLeagueStats.rivalLosses,
+      showdownWins: playerLeagueStats.showdownWins,
+      showdownLosses: playerLeagueStats.showdownLosses,
+      weeklyResetAt: playerLeagueStats.weeklyResetAt,
+      updatedAt: playerLeagueStats.updatedAt,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      equippedTitle: users.equippedTitle,
+      username: users.username,
+    }).from(playerLeagueStats)
+      .innerJoin(users, eq(playerLeagueStats.userId, users.id))
+      .orderBy(desc(playerLeagueStats.lp))
+      .limit(limit);
+    return rows;
+  }
+
+  async getSeasonLeaderboard(limit = 50) {
+    const rows = await db.select({
+      userId: playerLeagueStats.userId,
+      lp: playerLeagueStats.lp,
+      weeklyLp: playerLeagueStats.weeklyLp,
+      seasonLp: playerLeagueStats.seasonLp,
+      peakLp: playerLeagueStats.peakLp,
+      rivalId: playerLeagueStats.rivalId,
+      rivalWins: playerLeagueStats.rivalWins,
+      rivalLosses: playerLeagueStats.rivalLosses,
+      showdownWins: playerLeagueStats.showdownWins,
+      showdownLosses: playerLeagueStats.showdownLosses,
+      weeklyResetAt: playerLeagueStats.weeklyResetAt,
+      updatedAt: playerLeagueStats.updatedAt,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      username: users.username,
+    }).from(playerLeagueStats)
+      .innerJoin(users, eq(playerLeagueStats.userId, users.id))
+      .orderBy(desc(playerLeagueStats.seasonLp))
+      .limit(limit);
+    return rows;
+  }
+
+  async matchRival(userId: string): Promise<string | null> {
+    const myStats = await this.ensureLeagueStats(userId);
+    // Find closest LP player who is not already my rival and not me
+    const candidates = await db.select({
+      userId: playerLeagueStats.userId,
+      lp: playerLeagueStats.lp,
+    }).from(playerLeagueStats)
+      .where(and(ne(playerLeagueStats.userId, userId)))
+      .orderBy(desc(playerLeagueStats.lp))
+      .limit(100);
+
+    if (candidates.length === 0) return null;
+
+    // Find closest LP
+    const sorted = candidates.sort((a, b) => Math.abs(a.lp - myStats.lp) - Math.abs(b.lp - myStats.lp));
+    const rival = sorted[0];
+    if (!rival) return null;
+
+    await db.update(playerLeagueStats).set({ rivalId: rival.userId }).where(eq(playerLeagueStats.userId, userId));
+    return rival.userId;
+  }
+
+  async createShowdown(challengerId: string, challengeeId: string, timeframe: string): Promise<Showdown> {
+    const [challengerStats] = await Promise.all([this.ensureLeagueStats(challengerId), this.ensureLeagueStats(challengeeId)]);
+    const challengeeStatsRow = await this.getLeagueStats(challengeeId);
+    const now = new Date();
+    const durationMs = timeframe === "1h" ? 3600000 : timeframe === "1d" ? 86400000 : 604800000;
+    const [row] = await db.insert(showdowns).values({
+      challengerId,
+      challengeeId,
+      timeframe,
+      status: "pending",
+      challengerLpStart: challengerStats.lp,
+      challengeeLpStart: challengeeStatsRow?.lp ?? 0,
+      startedAt: now,
+      endsAt: new Date(now.getTime() + durationMs),
+    }).returning();
+    return row;
+  }
+
+  async getShowdowns(userId: string): Promise<Showdown[]> {
+    return db.select().from(showdowns)
+      .where(or(eq(showdowns.challengerId, userId), eq(showdowns.challengeeId, userId)))
+      .orderBy(desc(showdowns.createdAt))
+      .limit(20);
+  }
+
+  async acceptShowdown(showdownId: string, userId: string): Promise<Showdown> {
+    const [row] = await db.update(showdowns).set({ status: "active", startedAt: new Date() })
+      .where(and(eq(showdowns.id, showdownId), eq(showdowns.challengeeId, userId))).returning();
+    return row;
+  }
+
+  async declineShowdown(showdownId: string, userId: string): Promise<Showdown> {
+    const [row] = await db.update(showdowns).set({ status: "declined" })
+      .where(and(eq(showdowns.id, showdownId), eq(showdowns.challengeeId, userId))).returning();
+    return row;
+  }
+
+  async resolveShowdown(showdownId: string): Promise<Showdown> {
+    const [sd] = await db.select().from(showdowns).where(eq(showdowns.id, showdownId)).limit(1);
+    if (!sd || sd.status === "completed") return sd;
+
+    const [cStats, eeStats] = await Promise.all([
+      this.getLeagueStats(sd.challengerId),
+      this.getLeagueStats(sd.challengeeId),
+    ]);
+
+    const cGained = (cStats?.lp ?? sd.challengerLpStart!) - sd.challengerLpStart!;
+    const eeGained = (eeStats?.lp ?? sd.challengeeLpStart!) - sd.challengeeLpStart!;
+    const winnerId = cGained >= eeGained ? sd.challengerId : sd.challengeeId;
+    const loserId = winnerId === sd.challengerId ? sd.challengeeId : sd.challengerId;
+
+    // Award LP bonus to winner
+    await this.awardLP(winnerId, 100);
+    await db.update(playerLeagueStats).set({ showdownWins: sql`${playerLeagueStats.showdownWins} + 1` }).where(eq(playerLeagueStats.userId, winnerId));
+    await db.update(playerLeagueStats).set({ showdownLosses: sql`${playerLeagueStats.showdownLosses} + 1` }).where(eq(playerLeagueStats.userId, loserId));
+
+    const [updated] = await db.update(showdowns).set({
+      status: "completed",
+      winnerUserId: winnerId,
+      challengerLpGained: cGained,
+      challengeeLpGained: eeGained,
+    }).where(eq(showdowns.id, showdownId)).returning();
+    return updated;
+  }
+
+  async createHedgeFund(ownerId: string, name: string, description: string, emoji: string): Promise<HedgeFund> {
+    // Check user doesn't already have a fund
+    const existing = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.userId, ownerId)).limit(1);
+    if (existing[0]) throw new Error("Already a member of a hedge fund. Leave first.");
+    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const [fund] = await db.insert(hedgeFunds).values({ name, description, ownerId, joinCode, logoEmoji: emoji || "🏦" }).returning();
+    await db.insert(hedgeFundMembers).values({ userId: ownerId, fundId: fund.id, role: "owner" });
+    return fund;
+  }
+
+  async joinHedgeFund(userId: string, joinCode: string): Promise<HedgeFund> {
+    const existing = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.userId, userId)).limit(1);
+    if (existing[0]) throw new Error("Already in a hedge fund. Leave first.");
+    const [fund] = await db.select().from(hedgeFunds).where(eq(hedgeFunds.joinCode, joinCode.toUpperCase())).limit(1);
+    if (!fund) throw new Error("Invalid join code.");
+    const members = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.fundId, fund.id));
+    if (members.length >= 20) throw new Error("Hedge fund is full (max 20 members).");
+    await db.insert(hedgeFundMembers).values({ userId, fundId: fund.id, role: "member" });
+    return fund;
+  }
+
+  async leaveHedgeFund(userId: string): Promise<void> {
+    const [membership] = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.userId, userId)).limit(1);
+    if (!membership) return;
+    await db.delete(hedgeFundMembers).where(eq(hedgeFundMembers.userId, userId));
+    // If owner left, transfer ownership or dissolve
+    const remaining = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.fundId, membership.fundId));
+    if (remaining.length === 0) {
+      await db.delete(hedgeFunds).where(eq(hedgeFunds.id, membership.fundId));
+    } else if (membership.role === "owner") {
+      await db.update(hedgeFundMembers).set({ role: "owner" }).where(eq(hedgeFundMembers.userId, remaining[0].userId));
+      await db.update(hedgeFunds).set({ ownerId: remaining[0].userId }).where(eq(hedgeFunds.id, membership.fundId));
+    }
+  }
+
+  async getUserHedgeFund(userId: string) {
+    const [membership] = await db.select().from(hedgeFundMembers).where(eq(hedgeFundMembers.userId, userId)).limit(1);
+    if (!membership) return null;
+    const [fund] = await db.select().from(hedgeFunds).where(eq(hedgeFunds.id, membership.fundId)).limit(1);
+    if (!fund) return null;
+    const allMembers = await db.select({
+      userId: hedgeFundMembers.userId,
+      role: hedgeFundMembers.role,
+      weeklyLpContrib: hedgeFundMembers.weeklyLpContrib,
+      displayName: users.displayName,
+    }).from(hedgeFundMembers)
+      .innerJoin(users, eq(hedgeFundMembers.userId, users.id))
+      .where(eq(hedgeFundMembers.fundId, fund.id));
+
+    const memberIds = allMembers.map(m => m.userId);
+    const statsRows = memberIds.length > 0
+      ? await db.select({ userId: playerLeagueStats.userId, lp: playerLeagueStats.lp }).from(playerLeagueStats).where(sql`${playerLeagueStats.userId} = ANY(${memberIds})`)
+      : [];
+    const statsMap = Object.fromEntries(statsRows.map(s => [s.userId, s.lp]));
+
+    return {
+      fund,
+      members: allMembers.map(m => ({ ...m, lp: statsMap[m.userId] ?? 0 })),
+    };
+  }
+
+  async getHedgeFundLeaderboard() {
+    const funds = await db.select().from(hedgeFunds).orderBy(desc(hedgeFunds.allTimeLpTotal)).limit(20);
+    const counts = await Promise.all(funds.map(f =>
+      db.select({ count: sql<number>`count(*)` }).from(hedgeFundMembers).where(eq(hedgeFundMembers.fundId, f.id))
+    ));
+    return funds.map((f, i) => ({ ...f, memberCount: Number(counts[i][0]?.count ?? 0) }));
+  }
+
+  async getCurrentSeason(): Promise<LeagueSeason | null> {
+    const [row] = await db.select().from(leagueSeasons).where(eq(leagueSeasons.isActive, true)).limit(1);
+    return row ?? null;
+  }
+
+  async ensureCurrentSeason(): Promise<LeagueSeason> {
+    const existing = await this.getCurrentSeason();
+    if (existing) return existing;
+    const now = new Date();
+    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const seasons = await db.select().from(leagueSeasons).orderBy(desc(leagueSeasons.number)).limit(1);
+    const nextNum = (seasons[0]?.number ?? 0) + 1;
+    const [row] = await db.insert(leagueSeasons).values({ number: nextNum, startDate: now, endDate: end, isActive: true }).returning();
+    return row;
+  }
+
+  async getWeeklyChallengeCompletions(userId: string): Promise<ChallengeCompletion[]> {
+    const weekStart = new Date();
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+    return db.select().from(challengeCompletions)
+      .where(and(eq(challengeCompletions.userId, userId), sql`${challengeCompletions.completedAt} >= ${weekStart}`));
+  }
+
+  async completeLeagueChallenge(userId: string, challengeKey: string, lpReward: number): Promise<void> {
+    const weekStart = new Date();
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const fullKey = `${weekStart.toISOString().split("T")[0]}_${challengeKey}`;
+    const existing = await db.select().from(challengeCompletions)
+      .where(and(eq(challengeCompletions.userId, userId), eq(challengeCompletions.challengeKey, fullKey))).limit(1);
+    if (existing[0]) return; // already claimed this week
+    await db.insert(challengeCompletions).values({ userId, challengeKey: fullKey, lpAwarded: lpReward });
+    await this.awardLP(userId, lpReward);
   }
 
   async claimLuckyBonus(userId: string) {
