@@ -14,6 +14,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   max: 10,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
 pool.on('error', (err) => {
