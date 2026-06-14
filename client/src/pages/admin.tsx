@@ -1631,7 +1631,12 @@ function BalancesTab() {
 
   const resetAllMutation = useMutation({
     mutationFn: (amount: number) => apiRequest("POST", "/api/admin/reset-all-balances", { amount }),
-    onSuccess: () => { toast({ title: "All balances reset" }); refetch(); setConfirmResetAll(false); },
+    onSuccess: () => {
+      toast({ title: "All balances reset" });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users-list"] });
+      setConfirmResetAll(false);
+    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 

@@ -105,7 +105,7 @@ export interface IStorage {
   // Admin stats
   getUsersCount(): Promise<number>;
   getLessonsCount(): Promise<number>;
-  getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "membershipStatus" | "simulatorBalance" | "totalProfit" | "createdAt">>>;
+  getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "membershipStatus" | "simulatorBalance" | "totalProfit">>>;
   deleteUserAccount(userId: string): Promise<void>;
   resetUserBalance(userId: string, amount: number): Promise<void>;
   resetAllBalances(amount: number): Promise<void>;
@@ -650,7 +650,7 @@ export class DatabaseStorage implements IStorage {
     return result.length;
   }
 
-  async getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "membershipStatus" | "simulatorBalance" | "totalProfit" | "createdAt">>> {
+  async getAllUsers(): Promise<Array<Pick<User, "id" | "email" | "displayName" | "role" | "membershipTier" | "membershipStatus" | "simulatorBalance" | "totalProfit">>> {
     const rows = await db.select({
       id: users.id,
       email: users.email,
@@ -660,8 +660,7 @@ export class DatabaseStorage implements IStorage {
       membershipStatus: users.membershipStatus,
       simulatorBalance: users.simulatorBalance,
       totalProfit: users.totalProfit,
-      createdAt: users.createdAt,
-    }).from(users).orderBy(desc(users.createdAt));
+    }).from(users).orderBy(desc(users.simulatorBalance));
     return rows;
   }
 
