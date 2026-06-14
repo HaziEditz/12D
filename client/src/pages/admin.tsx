@@ -49,6 +49,16 @@ import {
   CheckCircle2,
   XCircle,
   MoreHorizontal,
+  Search,
+  Award,
+  RefreshCw,
+  UserCog,
+  TrendingDown,
+  Edit2,
+  Check,
+  X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   BarChart,
@@ -275,15 +285,36 @@ function QuizEditor({ lessonId }: { lessonId: string }) {
   );
 }
 
-const navItems = [
-  { id: "lessons", label: "Lessons", icon: BookOpen },
-  { id: "tips", label: "Trading Tips", icon: Lightbulb },
-  { id: "insights", label: "Market Insights", icon: TrendingUp },
-  { id: "strategies", label: "Strategies", icon: Target },
-  { id: "promo-codes", label: "Promo Codes", icon: Tag },
-  { id: "financial", label: "Financials", icon: DollarSign },
-  { id: "balances", label: "Balances", icon: Shield },
+const navSections = [
+  {
+    label: "Platform",
+    items: [
+      { id: "overview", label: "Overview", icon: BarChart3 },
+      { id: "users", label: "Users", icon: Users },
+      { id: "achievements", label: "Achievements", icon: Award },
+      { id: "simulator", label: "Simulator Prices", icon: Activity },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { id: "lessons", label: "Lessons", icon: BookOpen },
+      { id: "tips", label: "Trading Tips", icon: Lightbulb },
+      { id: "insights", label: "Market Insights", icon: TrendingUp },
+      { id: "strategies", label: "Strategies", icon: Target },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { id: "promo-codes", label: "Promo Codes", icon: Tag },
+      { id: "financial", label: "Financials", icon: DollarSign },
+      { id: "balances", label: "Balances", icon: Shield },
+    ],
+  },
 ];
+
+const navItems = navSections.flatMap(s => s.items);
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -566,26 +597,32 @@ export default function AdminPage() {
           <span className="font-semibold text-sm" data-testid="text-admin-title">Admin Panel</span>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-2">Content</p>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                data-testid={`tab-${item.id}`}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                  activeTab === item.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {item.label}
-              </button>
-            );
-          })}
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+          {navSections.map((section) => (
+            <div key={section.label}>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 pb-1">{section.label}</p>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      data-testid={`tab-${item.id}`}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                        activeTab === item.id
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-3 border-t">
@@ -1122,6 +1159,10 @@ export default function AdminPage() {
             />
           )}
 
+          {activeTab === "overview" && <OverviewTab stats={stats} financialStats={financialStats} lessons={lessons} />}
+          {activeTab === "users" && <UsersTab />}
+          {activeTab === "achievements" && <AchievementsAdminTab />}
+          {activeTab === "simulator" && <SimulatorTab />}
           {activeTab === "promo-codes" && <PromoCodesTab />}
           {activeTab === "financial" && <FinancialTab financialStats={financialStats} financialLoading={financialLoading} />}
           {activeTab === "balances" && <BalancesTab />}
@@ -1791,5 +1832,730 @@ function BalancesTab() {
         )}
       </div>
     </ScrollArea>
+  );
+}
+
+// ── Overview Tab ──────────────────────────────────────────────────────────────
+function OverviewTab({ stats, financialStats, lessons }: { stats: any; financialStats: any; lessons: any[] | undefined }) {
+  const { data: allUsers } = useQuery<any[]>({ queryKey: ["/api/admin/users-list"] });
+  const { data: prices } = useQuery<Record<string, number>>({ queryKey: ["/api/simulated-prices"] });
+  const { data: achievements } = useQuery<any[]>({ queryKey: ["/api/achievements"] });
+
+  const statCards = [
+    { label: "Total Users", value: stats?.users ?? 0, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Lessons", value: stats?.lessons ?? 0, icon: BookOpen, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total Trades", value: stats?.trades ?? 0, icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Active Subs", value: financialStats?.activeSubscribers ?? 0, icon: CreditCard, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: "Trial Users", value: financialStats?.trialUsers ?? 0, icon: Clock, color: "text-orange-500", bg: "bg-orange-500/10" },
+    { label: "Stock Prices", value: prices ? Object.keys(prices).length : 0, icon: TrendingUp, color: "text-cyan-500", bg: "bg-cyan-500/10" },
+    { label: "Achievements", value: achievements?.length ?? 0, icon: Award, color: "text-pink-500", bg: "bg-pink-500/10" },
+    { label: "Trial Users", value: financialStats?.trialUsers ?? "—", icon: CalendarDays, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+  ];
+
+  const tierData = Object.entries(financialStats?.byTier ?? {}).map(([name, count]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    count: count as number,
+  }));
+
+  const TIER_COLORS: Record<string, string> = {
+    School: "#3b82f6", Casual: "#10b981", Premium: "#8b5cf6", Trial: "#f59e0b", Free: "#6b7280",
+  };
+
+  const recentUsers = (allUsers ?? []).slice(0, 8);
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-6 space-y-6 max-w-6xl mx-auto">
+        <div>
+          <h2 className="text-lg font-bold">Platform Overview</h2>
+          <p className="text-sm text-muted-foreground">Live snapshot of the entire 12Digits platform</p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: "Total Users", value: stats?.users ?? 0, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+            { label: "Total Lessons", value: stats?.lessons ?? 0, icon: BookOpen, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+            { label: "Total Trades", value: (stats?.trades ?? 0).toLocaleString(), icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10" },
+            { label: "Active Subscribers", value: financialStats?.activeSubscribers ?? 0, icon: CreditCard, color: "text-purple-500", bg: "bg-purple-500/10" },
+          ].map((s) => {
+            const Icon = s.icon;
+            return (
+              <Card key={s.label} className="border">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${s.bg}`}>
+                    <Icon className={`h-5 w-5 ${s.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold leading-tight">{s.value}</p>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {tierData.length > 0 && (
+            <Card className="border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Users by Tier</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={tierData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {tierData.map((entry) => (
+                        <Cell key={entry.name} fill={TIER_COLORS[entry.name] ?? "#6b7280"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Recent Sign-ups</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {recentUsers.map((u: any) => (
+                  <div key={u.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{u.displayName || u.email}</p>
+                      <p className="text-xs text-muted-foreground">{u.role} · {u.membershipTier ?? "free"}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground shrink-0 ml-2">
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                    </p>
+                  </div>
+                ))}
+                {recentUsers.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No users yet</p>}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </ScrollArea>
+  );
+}
+
+// ── Users Tab ─────────────────────────────────────────────────────────────────
+function UsersTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, any>>({});
+
+  const { data: allUsers = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["/api/admin/users-list"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => apiRequest("PATCH", `/api/admin/users/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users-list"] });
+      toast({ title: "User updated" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to update user", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/users/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users-list"] });
+      setExpandedId(null);
+      toast({ title: "User deleted" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to delete user", variant: "destructive" }),
+  });
+
+  const resetBalanceMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/users/${id}/reset-balance`, { amount: 10000 }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users-list"] });
+      toast({ title: "Balance reset to $10,000" });
+    },
+  });
+
+  const setBalanceMutation = useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) => apiRequest("POST", `/api/admin/users/${id}/set-balance`, { amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users-list"] });
+      toast({ title: "Balance updated" });
+    },
+  });
+
+  const closeTradesMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", "/api/admin/close-open-trades", { userId: id }),
+    onSuccess: (data: any) => toast({ title: `Closed ${data?.closedCount ?? 0} open trades` }),
+  });
+
+  const roleColors: Record<string, string> = {
+    admin: "bg-red-500/10 text-red-600 border-red-300 dark:text-red-400",
+    teacher: "bg-blue-500/10 text-blue-600 border-blue-300 dark:text-blue-400",
+    student: "bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:text-emerald-400",
+    casual: "bg-purple-500/10 text-purple-600 border-purple-300 dark:text-purple-400",
+  };
+
+  const tierColors: Record<string, string> = {
+    school: "bg-blue-500/10 text-blue-600 border-blue-300 dark:text-blue-400",
+    casual: "bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:text-emerald-400",
+    premium: "bg-purple-500/10 text-purple-600 border-purple-300 dark:text-purple-400",
+  };
+
+  const filtered = allUsers.filter(u =>
+    !search ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    (u.displayName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    u.role?.toLowerCase().includes(search.toLowerCase()) ||
+    (u.membershipTier ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const getEdit = (id: string) => editValues[id] ?? {};
+  const setEdit = (id: string, field: string, val: any) =>
+    setEditValues(prev => ({ ...prev, [id]: { ...(prev[id] ?? {}), [field]: val } }));
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b flex items-center gap-3 shrink-0">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search users…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+            data-testid="input-user-search"
+          />
+        </div>
+        <Badge variant="secondary" className="text-xs">{filtered.length} users</Badge>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5 h-9">
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="divide-y">
+          {filtered.map((u: any) => {
+            const isExpanded = expandedId === u.id;
+            const ev = getEdit(u.id);
+            return (
+              <div key={u.id} className="bg-background">
+                {/* Row */}
+                <div
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors"
+                  onClick={() => setExpandedId(isExpanded ? null : u.id)}
+                  data-testid={`row-user-${u.id}`}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                    {(u.displayName || u.email || "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium truncate">{u.displayName || "—"}</span>
+                      <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${roleColors[u.role] ?? ""}`}>{u.role}</Badge>
+                      {u.membershipTier && <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${tierColors[u.membershipTier] ?? ""}`}>{u.membershipTier}</Badge>}
+                      {u.membershipStatus === "active" && <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:text-emerald-400">active</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                  </div>
+                  <div className="text-right shrink-0 hidden md:block">
+                    <p className="text-sm font-semibold">${(u.simulatorBalance ?? 0).toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">balance</p>
+                  </div>
+                  <div className="text-right shrink-0 hidden lg:block w-20">
+                    <p className={`text-sm font-semibold ${(u.totalProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {(u.totalProfit ?? 0) >= 0 ? "+" : ""}${(u.totalProfit ?? 0).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">P&L</p>
+                  </div>
+                  <div className="shrink-0 text-muted-foreground">
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </div>
+                </div>
+
+                {/* Expanded panel */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 bg-muted/20 border-t space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4">
+                      {/* Role */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">Role</Label>
+                        <Select
+                          value={ev.role ?? u.role}
+                          onValueChange={v => setEdit(u.id, "role", v)}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="teacher">Teacher</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Membership Tier */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">Membership Tier</Label>
+                        <Select
+                          value={ev.membershipTier ?? u.membershipTier ?? "none"}
+                          onValueChange={v => setEdit(u.id, "membershipTier", v === "none" ? null : v)}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="school">School</SelectItem>
+                            <SelectItem value="casual">Casual</SelectItem>
+                            <SelectItem value="premium">Premium (12Digits+)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Membership Status */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">Membership Status</Label>
+                        <Select
+                          value={ev.membershipStatus ?? u.membershipStatus ?? "inactive"}
+                          onValueChange={v => setEdit(u.id, "membershipStatus", v)}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="trial">Trial</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Balance controls */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">Set Balance</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder={`Current: $${(u.simulatorBalance ?? 0).toLocaleString()}`}
+                          value={ev.newBalance ?? ""}
+                          onChange={e => setEdit(u.id, "newBalance", e.target.value)}
+                          className="h-9 text-sm max-w-[200px]"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9"
+                          disabled={!ev.newBalance || setBalanceMutation.isPending}
+                          onClick={() => setBalanceMutation.mutate({ id: u.id, amount: Number(ev.newBalance) })}
+                        >
+                          Set Balance
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
+                          disabled={resetBalanceMutation.isPending}
+                          onClick={() => resetBalanceMutation.mutate(u.id)}
+                        >
+                          Reset to $10k
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-muted-foreground"
+                          disabled={closeTradesMutation.isPending}
+                          onClick={() => closeTradesMutation.mutate(u.id)}
+                        >
+                          Close Trades
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-between pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Delete user ${u.email}? This cannot be undone.`)) {
+                            deleteMutation.mutate(u.id);
+                          }
+                        }}
+                        data-testid={`button-delete-user-${u.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Delete User
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={updateMutation.isPending}
+                        onClick={() => {
+                          const updates: any = {};
+                          if (ev.role) updates.role = ev.role;
+                          if (ev.membershipTier !== undefined) updates.membershipTier = ev.membershipTier;
+                          if (ev.membershipStatus) updates.membershipStatus = ev.membershipStatus;
+                          if (Object.keys(updates).length === 0) {
+                            toast({ title: "No changes to save" });
+                            return;
+                          }
+                          updateMutation.mutate({ id: u.id, data: updates });
+                        }}
+                        data-testid={`button-save-user-${u.id}`}
+                      >
+                        {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Users className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">{search ? "No users match your search" : "No users yet"}</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+// ── Achievements Admin Tab ────────────────────────────────────────────────────
+function AchievementsAdminTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [awardUserId, setAwardUserId] = useState<Record<string, string>>({});
+
+  const { data: achievements = [] } = useQuery<any[]>({ queryKey: ["/api/achievements"] });
+  const { data: allUsers = [] } = useQuery<any[]>({ queryKey: ["/api/admin/users-list"] });
+
+  const awardMutation = useMutation({
+    mutationFn: ({ userId, achievementId }: { userId: string; achievementId: string }) =>
+      apiRequest("POST", `/api/admin/users/${userId}/award-achievement`, { achievementId }),
+    onSuccess: (_, vars) => toast({ title: `Achievement awarded!` }),
+    onError: (e: any) => toast({ title: e.message || "Failed to award", variant: "destructive" }),
+  });
+
+  const categories = ["all", ...Array.from(new Set((achievements as any[]).map((a: any) => a.category)))];
+
+  const filtered = (achievements as any[]).filter((a: any) => {
+    const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.description.toLowerCase().includes(search.toLowerCase());
+    const matchCat = selectedCategory === "all" || a.category === selectedCategory;
+    return matchSearch && matchCat;
+  });
+
+  const categoryColors: Record<string, string> = {
+    trading: "bg-blue-500/10 text-blue-600 border-blue-300 dark:text-blue-400",
+    learning: "bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:text-emerald-400",
+    balance: "bg-amber-500/10 text-amber-600 border-amber-300 dark:text-amber-400",
+    social: "bg-purple-500/10 text-purple-600 border-purple-300 dark:text-purple-400",
+    milestone: "bg-orange-500/10 text-orange-600 border-orange-300 dark:text-orange-400",
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b flex items-center gap-3 flex-wrap shrink-0">
+        <div className="relative flex-1 min-w-[160px] max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search achievements…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="h-9 w-36 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(c => (
+              <SelectItem key={c} value={c}>{c === "all" ? "All Categories" : c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="secondary" className="text-xs">{filtered.length} achievements</Badge>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="divide-y">
+          {filtered.map((a: any) => {
+            const userId = awardUserId[a.id] ?? "";
+            return (
+              <div key={a.id} className="px-4 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <span className="text-sm font-medium">{a.name}</span>
+                    <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${categoryColors[a.category] ?? ""}`}>
+                      {a.category}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">+{a.xpReward} XP</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{a.description}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Select
+                    value={userId}
+                    onValueChange={v => setAwardUserId(prev => ({ ...prev, [a.id]: v }))}
+                  >
+                    <SelectTrigger className="h-8 w-40 text-xs">
+                      <SelectValue placeholder="Select user…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(allUsers as any[]).map((u: any) => (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">
+                          {u.displayName || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={!userId || awardMutation.isPending}
+                    onClick={() => awardMutation.mutate({ userId, achievementId: a.id })}
+                    data-testid={`button-award-${a.id}`}
+                  >
+                    <Award className="h-3 w-3 mr-1" />
+                    Award
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Award className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">No achievements found</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+// ── Simulator Prices Tab ──────────────────────────────────────────────────────
+function SimulatorTab() {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<Record<string, string>>({});
+  const [newSymbol, setNewSymbol] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [search, setSearch] = useState("");
+
+  const { data: prices, isLoading, refetch } = useQuery<Record<string, number>>({
+    queryKey: ["/api/simulated-prices"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ symbol, price }: { symbol: string; price: number }) =>
+      apiRequest("POST", "/api/simulated-prices/update", { symbol, price }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/simulated-prices"] });
+      toast({ title: "Price updated" });
+    },
+    onError: () => toast({ title: "Failed to update price", variant: "destructive" }),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: ({ symbol, price }: { symbol: string; price: number }) =>
+      apiRequest("POST", "/api/admin/simulated-prices", { symbol, price }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/simulated-prices"] });
+      setNewSymbol("");
+      setNewPrice("");
+      toast({ title: "Stock added" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to add stock", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (symbol: string) => apiRequest("DELETE", `/api/admin/simulated-prices/${symbol}`),
+    onSuccess: (_, symbol) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/simulated-prices"] });
+      toast({ title: `${symbol} removed` });
+    },
+    onError: () => toast({ title: "Failed to remove", variant: "destructive" }),
+  });
+
+  const handleSave = (symbol: string) => {
+    const val = Number(editing[symbol]);
+    if (isNaN(val) || val <= 0) {
+      toast({ title: "Invalid price", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({ symbol, price: val });
+    setEditing(prev => { const n = { ...prev }; delete n[symbol]; return n; });
+  };
+
+  const priceEntries = Object.entries(prices ?? {}).filter(([sym]) =>
+    !search || sym.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b flex items-center gap-3 shrink-0 flex-wrap">
+        <div className="relative max-w-xs flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search symbol…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <Badge variant="secondary" className="text-xs">{Object.keys(prices ?? {}).length} stocks</Badge>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5 h-9">
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Add new stock */}
+      <div className="p-4 border-b bg-muted/20 shrink-0">
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Add New Stock</p>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Symbol (e.g. NVDA)"
+            value={newSymbol}
+            onChange={e => setNewSymbol(e.target.value.toUpperCase())}
+            className="h-9 text-sm w-36 font-mono uppercase"
+            data-testid="input-new-symbol"
+          />
+          <Input
+            type="number"
+            placeholder="Price"
+            value={newPrice}
+            onChange={e => setNewPrice(e.target.value)}
+            className="h-9 text-sm w-32"
+            data-testid="input-new-price"
+          />
+          <Button
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={!newSymbol || !newPrice || addMutation.isPending}
+            onClick={() => addMutation.mutate({ symbol: newSymbol.toUpperCase(), price: Number(newPrice) })}
+            data-testid="button-add-stock"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Stock
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1">
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+          </div>
+        ) : (
+          <div className="divide-y">
+            {priceEntries.map(([symbol, price]) => {
+              const isEditing = symbol in editing;
+              return (
+                <div key={symbol} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors">
+                  <div className="w-24 shrink-0">
+                    <span className="font-mono font-bold text-sm text-foreground">{symbol}</span>
+                  </div>
+
+                  <div className="flex-1 flex items-center gap-2">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={editing[symbol]}
+                        onChange={e => setEditing(prev => ({ ...prev, [symbol]: e.target.value }))}
+                        className="h-8 text-sm w-32"
+                        autoFocus
+                        onKeyDown={e => { if (e.key === "Enter") handleSave(symbol); if (e.key === "Escape") setEditing(prev => { const n = {...prev}; delete n[symbol]; return n; }); }}
+                        data-testid={`input-price-${symbol}`}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                          ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isEditing ? (
+                      <>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 hover:text-emerald-700" onClick={() => handleSave(symbol)}>
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setEditing(prev => { const n = {...prev}; delete n[symbol]; return n; })}>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditing(prev => ({ ...prev, [symbol]: String(price) }))}
+                        data-testid={`button-edit-${symbol}`}
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Remove ${symbol} from the simulator?`)) {
+                          deleteMutation.mutate(symbol);
+                        }
+                      }}
+                      data-testid={`button-delete-${symbol}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {priceEntries.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Activity className="h-8 w-8 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">{search ? "No stocks match your search" : "No stocks configured"}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
   );
 }

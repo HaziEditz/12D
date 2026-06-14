@@ -1456,6 +1456,79 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ── Admin User Management ───────────────────────────────────────────────────
+  app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { role, membershipTier, membershipStatus, displayName, email } = req.body;
+      const updates: any = {};
+      if (role !== undefined) updates.role = role;
+      if (membershipTier !== undefined) updates.membershipTier = membershipTier;
+      if (membershipStatus !== undefined) updates.membershipStatus = membershipStatus;
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (email !== undefined) updates.email = email;
+      await storage.updateUser(req.params.id, updates);
+      const updated = await storage.getUserById(req.params.id);
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      const { password: _, ...safe } = updated;
+      res.json(safe);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const adminUser = req.user as User;
+      if (req.params.id === adminUser.id) return res.status(400).json({ message: "Cannot delete your own account" });
+      await storage.deleteUserAccount(req.params.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/users/:id/award-achievement", requireAdmin, async (req, res) => {
+    try {
+      const { achievementId } = req.body;
+      if (!achievementId) return res.status(400).json({ message: "achievementId required" });
+      const userAchievements = await storage.getUserAchievements(req.params.id);
+      const existing = userAchievements.find(ua => ua.achievementId === achievementId);
+      if (existing && (existing.progress ?? 0) >= 100) {
+        return res.status(400).json({ message: "Achievement already unlocked" });
+      }
+      if (existing) {
+        await storage.updateUserAchievement(existing.id, { progress: 100, unlockedAt: new Date() });
+      } else {
+        await storage.createUserAchievement({ userId: req.params.id, achievementId, progress: 100, unlockedAt: new Date() });
+      }
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/admin/users/:id/details", requireAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.params.id);
+      if (!user) return res.status(404).json({ message: "Not found" });
+      const { password: _, ...safe } = user;
+      res.json(safe);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // ── Admin Simulated Prices ──────────────────────────────────────────────────
+  app.delete("/api/admin/simulated-prices/:symbol", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteSimulatedPrice(req.params.symbol.toUpperCase());
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/admin/simulated-prices", requireAdmin, async (req, res) => {
+    try {
+      const { symbol, price } = req.body;
+      if (!symbol || typeof price !== "number" || price <= 0) {
+        return res.status(400).json({ message: "Invalid symbol or price" });
+      }
+      await storage.updateSimulatedPrice(symbol.toUpperCase(), price);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // Teacher routes
   app.get("/api/teacher/students", requireTeacher, async (req, res) => {
     const user = req.user as User;
